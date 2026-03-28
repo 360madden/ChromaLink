@@ -21,6 +21,7 @@ This is intentional. The project is small again so we can decide the next direct
 - `RIFT/ErrorTrap.lua`: addon-specific error reporting
 - `RIFT/Render.lua`: tiny top-band renderer
 - `RIFT/Bootstrap.lua`: load and update loop
+- `scripts/Resize-RiftClient-640x360.cmd`: optional Windows helper that restores and sizes the RIFT client area to `640x360`
 
 ## Next Build Direction
 
