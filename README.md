@@ -1,44 +1,69 @@
 # ChromaLink
 
-ChromaLink was reset to a fresh root commit on March 28, 2026.
+ChromaLink is a reliability-first optical telemetry project for RIFT with three active parts:
+- a Lua addon that renders a deterministic top-band strip in game
+- a `.NET 9` reader and CLI under `DesktopDotNet/`
+- small Windows helper scripts under `scripts/`
 
-The active project stays in this folder:
-`C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink`
+This repo now contains the first restored baseline from the legacy BarCode workspace, but the active product is plain `ChromaLink`.
 
-The GitHub repo stays here:
-[360madden/ChromaLink](https://github.com/360madden/ChromaLink)
+## Current Baseline
 
-The old project history was preserved on:
-`archive/pre-reset-2026-03-28-134247`
+What is restored in the live repo:
+- the Lua sender stack under `Core/` and `RIFT/`
+- the `P360A` sender/reader profile targeting a `640x40` strip on a `640x360` client
+- the `.NET 9` reader, CLI, and tests under `DesktopDotNet/`
+- the working standalone RIFT window resizer that targets the real game window instead of Minion or Glyph
+- click-to-run wrappers for `smoke`, `bench`, `live`, and window preparation
 
-## Current State
+What is still unproven in the fresh repo:
+- a live end-to-end decode against the current in-game strip after this reset
+- any feature beyond the hot-lane `coreStatus` and `tactical` baseline
+- deferred work from the project prompt such as color payloads, delta scheduling, aura transport, and hostile summaries
 
-This repo is intentionally minimal again.
+## Quick Start
 
-What exists now:
-- a clean RIFT addon scaffold
-- the durable project prompt
-- a placeholder `.NET 9` workspace root for the future reader/tooling stack
+CLI examples:
 
-What does not exist yet:
-- the restored telemetry strip
-- the `.NET 9` reader
-- helper apps/tooling
-- replay fixtures and tests
+```powershell
+dotnet run --project C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- smoke
+```
 
-## Working Brief
+```powershell
+dotnet run --project C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- bench
+```
 
-The active project brief lives in `PROJECT_PROMPT.md`.
+```powershell
+dotnet run --project C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- prepare-window 32 32
+```
 
-## Repo Shape
+```powershell
+dotnet run --project C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- live 20 100
+```
 
-- `Core/`: addon configuration
-- `RIFT/`: addon bootstrap and diagnostics
-- `DesktopDotNet/`: future `.NET 9` reader/tooling workspace
+Wrapper scripts:
+- [Prepare-ChromaLink-640x360.cmd](C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\scripts\Prepare-ChromaLink-640x360.cmd)
+- [Smoke-ChromaLink.cmd](C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\scripts\Smoke-ChromaLink.cmd)
+- [Bench-ChromaLink.cmd](C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\scripts\Bench-ChromaLink.cmd)
+- [Live-ChromaLink.cmd](C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\scripts\Live-ChromaLink.cmd)
+- [Resize-RiftClient-640x360.cmd](C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\scripts\Resize-RiftClient-640x360.cmd)
+- [Run-ChromaLink.cmd](C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\scripts\Run-ChromaLink.cmd)
 
-## Next Milestone
+If RIFT was already running while Lua files changed, restart the client or reload the addon before expecting `capture-dump` or `live` to see the new strip.
 
-The next real slice should restore the first working vertical path:
-1. deterministic addon strip
-2. `.NET 9` reader
-3. helper tooling that speeds up replay and live validation
+## Outputs
+
+Reader artifacts are written under:
+`C:\Users\mrkoo\AppData\Local\ChromaLink\DesktopDotNet`
+
+Useful locations:
+- `out\chromalink-capture-dump.bmp`
+- `out\chromalink-first-reject.bmp`
+- `out\geometry-lock.txt`
+- `fixtures\chromalink-core.bmp`
+- `fixtures\chromalink-tactical.bmp`
+
+## Source Of Truth
+
+- Project direction lives in [PROJECT_PROMPT.md](C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\PROJECT_PROMPT.md)
+- Legacy BarCode and archived trees are reference only and are not the active product path

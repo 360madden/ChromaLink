@@ -1,0 +1,1230 @@
+-- script name: Core/Gather.lua
+-- version: 0.5.0
+-- purpose: Gathers and normalizes the scoped player-target ChromaLink telemetry snapshot for ChromaLink.
+-- dependencies: Core/Config.lua
+-- important assumptions: Uses locally precedent-backed Inspect.Unit.Detail/Lookup/Castbar and Inspect.Stat fields; aura, hostile-list, and item metadata remain deferred until they are probed live.
+-- protocol version: ChromaLink
+-- framework module role: Core live data gather/normalize
+-- character count note: Character count not precomputed; measure with tooling if needed.
+
+ChromaLink = ChromaLink or {}
+ChromaLink.Gather = {}
+ChromaLink.Gather.State = {
+  playerUnitId = nil,
+  targetUnitId = nil,
+  lastCastbar = nil,
+  lastCastbarSource = nil,
+  lastCastbarAt = 0
+}
+
+ChromaLink.Gather.ResourceKind = {
+  none = 0,
+  mana = 1,
+  energy = 2,
+  charge = 3,
+  planar = 4,
+  power = 5
+}
+
+ChromaLink.Gather.SampleBits = {
+  playerHealth = 0x0001,
+  playerResource = 0x0002,
+  playerLevel = 0x0004,
+  playerCalling = 0x0008,
+  playerRole = 0x0010,
+  playerCast = 0x0020,
+  playerPowerAttack = 0x0040,
+  playerCritAttack = 0x0080,
+  playerPowerSpell = 0x0100,
+  playerCritSpell = 0x0200,
+  playerCritPower = 0x0400,
+  playerHit = 0x0800,
+  targetHealth = 0x1000,
+  targetResource = 0x2000,
+  targetLevel = 0x4000,
+  targetFlags = 0x8000
+}
+
+ChromaLink.Gather.StateBits = {
+  playerAvailable = 0x0001,
+  playerAlive = 0x0002,
+  playerCombat = 0x0004,
+  playerCastActive = 0x0008,
+  playerResourceAvailable = 0x0010,
+  targetPresent = 0x0020,
+  targetAlive = 0x0040,
+  targetCombat = 0x0080,
+  targetResourceAvailable = 0x0100
+}
+
+ChromaLink.Gather.TargetBits = {
+  player = 0x01,
+  pet = 0x02
+}
+
+ChromaLink.Gather.CastBits = {
+  active = 0x01,
+  channeled = 0x02,
+  uninterruptible = 0x04
+}
+
+ChromaLink.Gather.TacticalBits = {
+  playerCast = 0x0001,
+  playerOffense = 0x0002,
+  playerZone = 0x0004,
+  targetZone = 0x0008,
+  playerCoords = 0x0010,
+  targetCoords = 0x0020,
+  targetRelation = 0x0040,
+  targetTier = 0x0080,
+  targetTagged = 0x0100,
+  targetCalling = 0x0200,
+  targetRadius = 0x0400
+}
+
+ChromaLink.Gather.CallingTokens = {
+  { token = "mage", code = 1 },
+  { token = "rogue", code = 2 },
+  { token = "cleric", code = 3 },
+  { token = "warrior", code = 4 },
+  { token = "primalist", code = 5 }
+}
+
+ChromaLink.Gather.RoleTokens = {
+  { token = "dps", code = 1 },
+  { token = "damage", code = 1 },
+  { token = "heal", code = 2 },
+  { token = "tank", code = 3 },
+  { token = "support", code = 4 }
+}
+
+local function ClampUnsigned24(value)
+  local number = math.floor(tonumber(value) or 0)
+
+  if number < 0 then
+    return 0
+  end
+
+  if number > 0xFFFFFF then
+    return 0xFFFFFF
+  end
+
+  return number
+end
+
+local function ClampUnsigned16(value)
+  local number = math.floor(tonumber(value) or 0)
+
+  if number < 0 then
+    return 0
+  end
+
+  if number > 0xFFFF then
+    return 0xFFFF
+  end
+
+  return number
+end
+
+local function ClampUnsigned8(value)
+  local number = math.floor(tonumber(value) or 0)
+
+  if number < 0 then
+    return 0
+  end
+
+  if number > 0xFF then
+    return 0xFF
+  end
+
+  return number
+end
+
+local function ClampSigned24(value)
+  local number = math.floor(tonumber(value) or 0)
+
+  if number < -0x800000 then
+    return -0x800000
+  end
+
+  if number > 0x7FFFFF then
+    return 0x7FFFFF
+  end
+
+  return number
+end
+
+local function NormalizeText(value)
+  if value == nil then
+    return ""
+  end
+
+  return string.lower(tostring(value))
+end
+
+local function HashText16(value)
+  local text = tostring(value or "")
+  local hash = 0x811C
+  local index
+
+  if text == "" then
+    return 0
+  end
+
+  for index = 1, string.len(text) do
+    hash = ChromaLink.Pack.BitXor(hash, string.byte(text, index))
+    hash = math.fmod((hash * 0x0101), 0x10000)
+  end
+
+  return hash
+end
+
+local function QuantizeCoordTenths(value)
+  local scale = ChromaLink.Config.coordQuantizeScale or 10
+  local number = tonumber(value)
+
+  if number == nil then
+    return 0, false
+  end
+
+  return ClampSigned24((number * scale) + (number >= 0 and 0.5 or -0.5)), true
+end
+
+local function QuantizeUnsignedTenths(value, maxValue)
+  local scale = ChromaLink.Config.targetRadiusQuantizeScale or 10
+  local number = tonumber(value)
+
+  if number == nil then
+    return 0, false
+  end
+
+  return ClampUnsigned16((number * scale) + 0.5), true
+end
+
+local function CollectCandidateTexts(target, value, depth)
+  local valueType = type(value)
+  local key
+  local innerValue
+
+  depth = depth or 0
+  if value == nil then
+    return
+  end
+
+  if valueType == "string" or valueType == "number" or valueType == "boolean" then
+    local text = NormalizeText(value)
+    if text ~= "" then
+      target[#target + 1] = text
+    end
+    return
+  end
+
+  if valueType ~= "table" or depth >= 2 then
+    return
+  end
+
+  for key, innerValue in pairs(value) do
+    if type(key) == "string" then
+      local keyText = NormalizeText(key)
+      if keyText ~= "" then
+        target[#target + 1] = keyText
+      end
+    end
+
+    CollectCandidateTexts(target, innerValue, depth + 1)
+  end
+end
+
+local function MatchTokenCode(tokenList, ...)
+  local texts = {}
+  local argIndex
+  local argCount = select("#", ...)
+  local textIndex
+  local tokenIndex
+
+  for argIndex = 1, argCount do
+    CollectCandidateTexts(texts, select(argIndex, ...), 0)
+  end
+
+  for textIndex = 1, #texts do
+    local text = texts[textIndex]
+    for tokenIndex = 1, #tokenList do
+      local tokenEntry = tokenList[tokenIndex]
+      if string.find(text, tokenEntry.token, 1, true) then
+        return tokenEntry.code, text
+      end
+    end
+  end
+
+  return 0, ""
+end
+
+local function ScoreResourceCandidate(current, maximum)
+  local score = -1
+  local currentNumber = tonumber(current)
+  local maximumNumber = tonumber(maximum)
+
+  if current ~= nil or maximum ~= nil then
+    score = 1
+  end
+
+  if maximumNumber ~= nil and maximumNumber > 0 then
+    score = score + 4
+  end
+
+  if currentNumber ~= nil and currentNumber > 0 then
+    score = score + 2
+  end
+
+  return score
+end
+
+local function BuildResourceCandidate(kindId, current, maximum, source, bonus)
+  return {
+    kindId = kindId,
+    current = current,
+    maximum = maximum,
+    source = source,
+    score = ScoreResourceCandidate(current, maximum) + (bonus or 0)
+  }
+end
+
+function ChromaLink.Gather.GetClientSize()
+  if UIParent == nil or UIParent.GetWidth == nil or UIParent.GetHeight == nil then
+    return 0, 0
+  end
+
+  local ok, width, height = pcall(function()
+    return UIParent:GetWidth(), UIParent:GetHeight()
+  end)
+
+  if not ok then
+    return 0, 0
+  end
+
+  return math.floor((tonumber(width) or 0) + 0.5), math.floor((tonumber(height) or 0) + 0.5)
+end
+
+function ChromaLink.Gather.GetRealtimeNow()
+  if Inspect ~= nil and Inspect.Time ~= nil and Inspect.Time.Real ~= nil then
+    return Inspect.Time.Real()
+  end
+
+  return 0
+end
+
+function ChromaLink.Gather.GetPlayerUnitId()
+  local state = ChromaLink.Gather.State
+
+  if state.playerUnitId ~= nil and state.playerUnitId ~= false then
+    return state.playerUnitId
+  end
+
+  if Inspect ~= nil and Inspect.Unit ~= nil and Inspect.Unit.Lookup ~= nil then
+    state.playerUnitId = Inspect.Unit.Lookup("player") or nil
+    return state.playerUnitId
+  end
+
+  return nil
+end
+
+function ChromaLink.Gather.GetTargetUnitId()
+  if Inspect ~= nil and Inspect.Unit ~= nil and Inspect.Unit.Lookup ~= nil then
+    ChromaLink.Gather.State.targetUnitId = Inspect.Unit.Lookup("player.target") or nil
+    return ChromaLink.Gather.State.targetUnitId
+  end
+
+  return nil
+end
+
+function ChromaLink.Gather.InspectUnitDetail(unit)
+  if unit == nil or unit == false or unit == "" or Inspect == nil or Inspect.Unit == nil or Inspect.Unit.Detail == nil then
+    return {}
+  end
+
+  local ok, detail = pcall(function()
+    return Inspect.Unit.Detail(unit)
+  end)
+
+  if not ok or type(detail) ~= "table" then
+    return {}
+  end
+
+  return detail
+end
+
+function ChromaLink.Gather.InspectCastbar(unit)
+  if unit == nil or unit == false or unit == "" or Inspect == nil or Inspect.Unit == nil or Inspect.Unit.Castbar == nil then
+    return nil
+  end
+
+  local ok, castbar = pcall(function()
+    return Inspect.Unit.Castbar(unit)
+  end)
+
+  if not ok then
+    return nil
+  end
+
+  return castbar
+end
+
+function ChromaLink.Gather.RefreshCastbarCache(unitHint, reason)
+  local state = ChromaLink.Gather.State
+  local playerUnitId = ChromaLink.Gather.GetPlayerUnitId()
+  local candidates = {}
+  local index
+
+  if unitHint ~= nil and unitHint ~= false then
+    candidates[#candidates + 1] = {
+      unit = unitHint,
+      source = "hint"
+    }
+  end
+
+  if playerUnitId ~= nil and playerUnitId ~= false then
+    candidates[#candidates + 1] = {
+      unit = playerUnitId,
+      source = "player-unit-id"
+    }
+  end
+
+  candidates[#candidates + 1] = {
+    unit = "player",
+    source = "player-specifier"
+  }
+
+  for index = 1, #candidates do
+    local candidate = candidates[index]
+    local detail = ChromaLink.Gather.InspectCastbar(candidate.unit)
+    if detail ~= nil and next(detail) ~= nil then
+      state.lastCastbar = detail
+      state.lastCastbarSource = candidate.source
+      state.lastCastbarAt = ChromaLink.Gather.GetRealtimeNow()
+      return detail, candidate.source
+    end
+  end
+
+  if reason == "castbar-cleared" then
+    state.lastCastbar = nil
+    state.lastCastbarSource = nil
+    state.lastCastbarAt = ChromaLink.Gather.GetRealtimeNow()
+  end
+
+  return nil, "none"
+end
+
+function ChromaLink.Gather.GetCachedCastbar()
+  local state = ChromaLink.Gather.State
+  local maxAge = ChromaLink.Config.castbarCacheSeconds or 0
+  local now = ChromaLink.Gather.GetRealtimeNow()
+
+  if state.lastCastbar == nil then
+    return nil, "none"
+  end
+
+  if maxAge <= 0 or now <= 0 or (now - (state.lastCastbarAt or 0)) <= maxAge then
+    return state.lastCastbar, state.lastCastbarSource or "cache"
+  end
+
+  return nil, "expired"
+end
+
+function ChromaLink.Gather.EncodeCallingCode(value)
+  local code = MatchTokenCode(ChromaLink.Gather.CallingTokens, value)
+  return code
+end
+
+function ChromaLink.Gather.EncodeRoleCode(value)
+  local code = MatchTokenCode(ChromaLink.Gather.RoleTokens, value)
+  return code
+end
+
+function ChromaLink.Gather.ResolveCalling(player)
+  return MatchTokenCode(
+    ChromaLink.Gather.CallingTokens,
+    player.calling,
+    player.callingName,
+    player.class,
+    player.className,
+    player.career,
+    player.careerName
+  )
+end
+
+function ChromaLink.Gather.ResolveRole(player)
+  return MatchTokenCode(
+    ChromaLink.Gather.RoleTokens,
+    player.role,
+    player.roleName
+  )
+end
+
+function ChromaLink.Gather.GetTemporaryRole()
+  if Inspect == nil or Inspect.TEMPORARY == nil or Inspect.TEMPORARY.Role == nil then
+    return nil
+  end
+
+  local ok, value = pcall(function()
+    return Inspect.TEMPORARY.Role()
+  end)
+
+  if not ok then
+    return nil
+  end
+
+  return value
+end
+
+function ChromaLink.Gather.EncodeRelationCode(value)
+  local text = NormalizeText(value)
+
+  if text == "friendly" then
+    return 1
+  end
+
+  if text == "hostile" then
+    return 2
+  end
+
+  if text == "neutral" then
+    return 3
+  end
+
+  return 0
+end
+
+function ChromaLink.Gather.EncodeTierCode(value)
+  local text = NormalizeText(value)
+
+  if text == "group" then
+    return 1
+  end
+
+  if text == "raid" then
+    return 2
+  end
+
+  return 0
+end
+
+function ChromaLink.Gather.EncodeTaggedCode(value)
+  if value == true then
+    return 1
+  end
+
+  if NormalizeText(value) == "other" then
+    return 2
+  end
+
+  return 0
+end
+
+function ChromaLink.Gather.GetPreferredResourceKind(callingCode)
+  if callingCode == 1 or callingCode == 3 then
+    return ChromaLink.Gather.ResourceKind.mana
+  end
+
+  if callingCode == 2 or callingCode == 4 then
+    return ChromaLink.Gather.ResourceKind.energy
+  end
+
+  if callingCode == 5 then
+    return ChromaLink.Gather.ResourceKind.power
+  end
+
+  return ChromaLink.Gather.ResourceKind.none
+end
+
+function ChromaLink.Gather.SelectPrimaryResource(player, callingCode)
+  local powerMaximum = player.powerMax
+  if powerMaximum == nil and player.power ~= nil then
+    powerMaximum = 100
+  end
+
+  local candidates = {
+    BuildResourceCandidate(ChromaLink.Gather.ResourceKind.mana, player.mana, player.manaMax, "mana", 0),
+    BuildResourceCandidate(ChromaLink.Gather.ResourceKind.energy, player.energy, player.energyMax, "energy", 0),
+    BuildResourceCandidate(ChromaLink.Gather.ResourceKind.charge, player.charge, player.chargeMax, "charge", 0),
+    BuildResourceCandidate(ChromaLink.Gather.ResourceKind.planar, player.planar, player.planarMax, "planar", 0),
+    BuildResourceCandidate(ChromaLink.Gather.ResourceKind.power, player.power, powerMaximum, "power", player.power ~= nil and 1 or 0)
+  }
+  local preferredKind = ChromaLink.Gather.GetPreferredResourceKind(callingCode)
+  local bestCandidate = nil
+  local index
+
+  for index = 1, #candidates do
+    local candidate = candidates[index]
+    if candidate.kindId == preferredKind then
+      candidate.score = candidate.score + 3
+    end
+
+    if candidate.score >= 0 and (bestCandidate == nil or candidate.score > bestCandidate.score) then
+      bestCandidate = candidate
+    end
+  end
+
+  if bestCandidate ~= nil then
+    return {
+      kindId = bestCandidate.kindId,
+      current = ClampUnsigned24(bestCandidate.current),
+      maximum = ClampUnsigned24(bestCandidate.maximum),
+      available = true,
+      source = bestCandidate.source
+    }
+  end
+
+  return {
+    kindId = ChromaLink.Gather.ResourceKind.none,
+    current = 0,
+    maximum = 0,
+    available = false,
+    source = "none"
+  }
+end
+
+function ChromaLink.Gather.BuildCastbarSnapshot()
+  local castbarAvailable = Inspect ~= nil and Inspect.Unit ~= nil and Inspect.Unit.Castbar ~= nil
+  local castbar = {}
+  local castbarSource = "none"
+
+  if castbarAvailable then
+    castbar, castbarSource = ChromaLink.Gather.RefreshCastbarCache(nil, "poll")
+    if castbar == nil then
+      castbar, castbarSource = ChromaLink.Gather.GetCachedCastbar()
+    end
+    castbar = castbar or {}
+  end
+
+  local ability = tostring(castbar.ability or "")
+  local abilityName = tostring(castbar.abilityName or "")
+  local remaining = tonumber(castbar.remaining or 0) or 0
+  local duration = tonumber(castbar.duration or 0) or 0
+  local expired = tonumber(castbar.expired or 0) or 0
+  local active = remaining > 0 or duration > 0 or expired > 0 or ability ~= "" or abilityName ~= ""
+  local flags = 0
+  local progress = 0
+
+  if active then
+    flags = flags + ChromaLink.Gather.CastBits.active
+  end
+
+  if castbar.channeled then
+    flags = flags + ChromaLink.Gather.CastBits.channeled
+  end
+
+  if castbar.uninterruptible then
+    flags = flags + ChromaLink.Gather.CastBits.uninterruptible
+  end
+
+  if duration > 0 then
+    local completed = duration - remaining
+    if completed < 0 then
+      completed = 0
+    end
+    if completed > duration then
+      completed = duration
+    end
+    progress = math.floor(((completed / duration) * 0x7FFF) + 0.5)
+  end
+
+  return {
+    available = castbarAvailable,
+    active = active,
+    flags = ClampUnsigned8(flags),
+    progressQ15 = ClampUnsigned16(progress),
+    ability = ability,
+    abilityName = abilityName,
+    source = castbarSource,
+    remainingSeconds = remaining,
+    durationSeconds = duration,
+    expiredSeconds = expired
+  }
+end
+
+function ChromaLink.Gather.SafeInspectStat(statName)
+  if statName == nil or Inspect == nil or Inspect.Stat == nil then
+    return nil
+  end
+
+  local ok, value = pcall(function()
+    return Inspect.Stat(statName)
+  end)
+
+  if not ok then
+    return nil
+  end
+
+  return value
+end
+
+function ChromaLink.Gather.BuildCombatStatsSnapshot()
+  local function BuildStatField(statName)
+    local value = ChromaLink.Gather.SafeInspectStat(statName)
+    return {
+      value = ClampUnsigned16(value),
+      available = value ~= nil
+    }
+  end
+
+  return {
+    powerAttack = BuildStatField("powerAttack"),
+    critAttack = BuildStatField("critAttack"),
+    powerSpell = BuildStatField("powerSpell"),
+    critSpell = BuildStatField("critSpell"),
+    critPower = BuildStatField("critPower"),
+    hit = BuildStatField("hit")
+  }
+end
+
+function ChromaLink.Gather.BuildTargetFlags(target)
+  local flags = 0
+
+  if target.player then
+    flags = flags + ChromaLink.Gather.TargetBits.player
+  end
+
+  if target.isPet then
+    flags = flags + ChromaLink.Gather.TargetBits.pet
+  end
+
+  return ClampUnsigned8(flags)
+end
+
+function ChromaLink.Gather.BuildDebugProbe(player, target, cast, playerResource, targetResource, combatStats, callingCode, callingRaw, roleCode, roleRaw, targetCallingCode, targetCallingRaw, targetUnitId)
+  return {
+    availability = NormalizeText(player.availability),
+    rawCalling = NormalizeText(player.calling),
+    matchedCalling = callingRaw or "",
+    normalizedCallingCode = callingCode or 0,
+    rawRole = NormalizeText(player.role),
+    matchedRole = roleRaw or "",
+    normalizedRoleCode = roleCode or 0,
+    race = NormalizeText(player.race),
+    raceName = NormalizeText(player.raceName),
+    mana = player.mana,
+    manaMax = player.manaMax,
+    energy = player.energy,
+    energyMax = player.energyMax,
+    charge = player.charge,
+    chargeMax = player.chargeMax,
+    planar = player.planar,
+    planarMax = player.planarMax,
+    power = player.power,
+    selectedResourceKind = playerResource.kindId or 0,
+    selectedResourceSource = playerResource.source or "none",
+    selectedResourceCurrent = playerResource.current or 0,
+    selectedResourceMax = playerResource.maximum or 0,
+    playerUnitId = ChromaLink.Gather.GetPlayerUnitId(),
+    targetUnitId = targetUnitId,
+    targetName = NormalizeText(target.name),
+    targetCalling = NormalizeText(target.calling),
+    targetMatchedCalling = targetCallingRaw or "",
+    targetCallingCode = targetCallingCode or 0,
+    targetHealth = target.health,
+    targetHealthMax = target.healthMax,
+    targetPower = target.power,
+    targetMana = target.mana,
+    targetManaMax = target.manaMax,
+    targetEnergy = target.energy,
+    targetEnergyMax = target.energyMax,
+    targetResourceKind = targetResource.kindId or 0,
+    targetResourceSource = targetResource.source or "none",
+    targetResourceCurrent = targetResource.current or 0,
+    targetResourceMax = targetResource.maximum or 0,
+    powerAttack = combatStats.powerAttack.value or 0,
+    critAttack = combatStats.critAttack.value or 0,
+    powerSpell = combatStats.powerSpell.value or 0,
+    critSpell = combatStats.critSpell.value or 0,
+    critPower = combatStats.critPower.value or 0,
+    hit = combatStats.hit.value or 0,
+    castAbility = NormalizeText(cast.ability),
+    castAbilityName = NormalizeText(cast.abilityName),
+    castSource = cast.source or "none",
+    castDurationSeconds = cast.durationSeconds or 0,
+    castRemainingSeconds = cast.remainingSeconds or 0,
+    castExpiredSeconds = cast.expiredSeconds or 0,
+    castActive = cast.active and true or false,
+    castFlags = cast.flags or 0,
+    castProgressQ15 = cast.progressQ15 or 0
+  }
+end
+
+function ChromaLink.Gather.BuildPlayerSnapshot()
+  local player = ChromaLink.Gather.InspectUnitDetail("player")
+  local targetUnitId = ChromaLink.Gather.GetTargetUnitId()
+  local target = ChromaLink.Gather.InspectUnitDetail(targetUnitId)
+  local cast = ChromaLink.Gather.BuildCastbarSnapshot()
+  local callingCode, callingRaw = ChromaLink.Gather.ResolveCalling(player)
+  local roleCode, roleRaw = ChromaLink.Gather.ResolveRole(player)
+  if roleCode == 0 then
+    roleCode, roleRaw = MatchTokenCode(ChromaLink.Gather.RoleTokens, ChromaLink.Gather.GetTemporaryRole())
+  end
+  local targetCallingCode, targetCallingRaw = ChromaLink.Gather.ResolveCalling(target)
+  local playerResource = ChromaLink.Gather.SelectPrimaryResource(player, callingCode)
+  local targetResource = ChromaLink.Gather.SelectPrimaryResource(target, targetCallingCode)
+  local combatStats = ChromaLink.Gather.BuildCombatStatsSnapshot()
+  local clientWidth, clientHeight = ChromaLink.Gather.GetClientSize()
+  local playerAvailable = next(player) ~= nil
+  local targetAvailable = next(target) ~= nil
+  local playerHealthCurrent = ClampUnsigned24(player.health)
+  local playerHealthMaximum = ClampUnsigned24(player.healthMax)
+  local playerLevel = ClampUnsigned8(player.level)
+  local targetHealthCurrent = ClampUnsigned24(target.health)
+  local targetHealthMaximum = ClampUnsigned24(target.healthMax)
+  local targetLevel = ClampUnsigned8(target.level)
+  local targetFlags = ChromaLink.Gather.BuildTargetFlags(target)
+  local targetRelationCode = ChromaLink.Gather.EncodeRelationCode(target.relation)
+  local targetTierCode = ChromaLink.Gather.EncodeTierCode(target.tier)
+  local targetTaggedCode = ChromaLink.Gather.EncodeTaggedCode(target.tagged)
+  local targetRadiusQ10, targetRadiusAvailable = QuantizeUnsignedTenths(target.radius)
+  local playerZoneHash16 = HashText16(player.zone)
+  local targetZoneHash16 = HashText16(target.zone)
+  local playerCoordX10, playerCoordXAvailable = QuantizeCoordTenths(player.coordX)
+  local playerCoordY10, playerCoordYAvailable = QuantizeCoordTenths(player.coordY)
+  local playerCoordZ10, playerCoordZAvailable = QuantizeCoordTenths(player.coordZ)
+  local targetCoordX10, targetCoordXAvailable = QuantizeCoordTenths(target.coordX)
+  local targetCoordY10, targetCoordYAvailable = QuantizeCoordTenths(target.coordY)
+  local targetCoordZ10, targetCoordZAvailable = QuantizeCoordTenths(target.coordZ)
+  local playerCoordsAvailable = playerCoordXAvailable and playerCoordZAvailable
+  local targetCoordsAvailable = targetCoordXAvailable and targetCoordZAvailable
+  local sampleMask = 0
+  local stateFlags = 0
+  local tacticalMask = 0
+
+  if playerAvailable then
+    stateFlags = stateFlags + ChromaLink.Gather.StateBits.playerAvailable
+  end
+
+  if player.health ~= nil or player.healthMax ~= nil then
+    sampleMask = sampleMask + ChromaLink.Gather.SampleBits.playerHealth
+  end
+
+  if playerHealthCurrent > 0 then
+    stateFlags = stateFlags + ChromaLink.Gather.StateBits.playerAlive
+  end
+
+  if player.combat then
+    stateFlags = stateFlags + ChromaLink.Gather.StateBits.playerCombat
+  end
+
+  if playerResource.available then
+    sampleMask = sampleMask + ChromaLink.Gather.SampleBits.playerResource
+    stateFlags = stateFlags + ChromaLink.Gather.StateBits.playerResourceAvailable
+  end
+
+  if cast.available then
+    sampleMask = sampleMask + ChromaLink.Gather.SampleBits.playerCast
+    tacticalMask = tacticalMask + ChromaLink.Gather.TacticalBits.playerCast
+  end
+
+  if cast.active then
+    stateFlags = stateFlags + ChromaLink.Gather.StateBits.playerCastActive
+  end
+
+  if player.level ~= nil then
+    sampleMask = sampleMask + ChromaLink.Gather.SampleBits.playerLevel
+  end
+
+  if callingCode > 0 then
+    sampleMask = sampleMask + ChromaLink.Gather.SampleBits.playerCalling
+  end
+
+  if roleCode > 0 then
+    sampleMask = sampleMask + ChromaLink.Gather.SampleBits.playerRole
+  end
+
+  if combatStats.powerAttack.available then
+    sampleMask = sampleMask + ChromaLink.Gather.SampleBits.playerPowerAttack
+    tacticalMask = tacticalMask + ChromaLink.Gather.TacticalBits.playerOffense
+  end
+
+  if combatStats.critAttack.available then
+    sampleMask = sampleMask + ChromaLink.Gather.SampleBits.playerCritAttack
+    tacticalMask = tacticalMask + ChromaLink.Gather.TacticalBits.playerOffense
+  end
+
+  if combatStats.powerSpell.available then
+    sampleMask = sampleMask + ChromaLink.Gather.SampleBits.playerPowerSpell
+    tacticalMask = tacticalMask + ChromaLink.Gather.TacticalBits.playerOffense
+  end
+
+  if combatStats.critSpell.available then
+    sampleMask = sampleMask + ChromaLink.Gather.SampleBits.playerCritSpell
+    tacticalMask = tacticalMask + ChromaLink.Gather.TacticalBits.playerOffense
+  end
+
+  if combatStats.critPower.available then
+    sampleMask = sampleMask + ChromaLink.Gather.SampleBits.playerCritPower
+    tacticalMask = tacticalMask + ChromaLink.Gather.TacticalBits.playerOffense
+  end
+
+  if combatStats.hit.available then
+    sampleMask = sampleMask + ChromaLink.Gather.SampleBits.playerHit
+    tacticalMask = tacticalMask + ChromaLink.Gather.TacticalBits.playerOffense
+  end
+
+  if targetAvailable then
+    stateFlags = stateFlags + ChromaLink.Gather.StateBits.targetPresent
+  end
+
+  if target.health ~= nil or target.healthMax ~= nil then
+    sampleMask = sampleMask + ChromaLink.Gather.SampleBits.targetHealth
+  end
+
+  if targetHealthCurrent > 0 then
+    stateFlags = stateFlags + ChromaLink.Gather.StateBits.targetAlive
+  end
+
+  if target.combat then
+    stateFlags = stateFlags + ChromaLink.Gather.StateBits.targetCombat
+  end
+
+  if targetResource.available then
+    sampleMask = sampleMask + ChromaLink.Gather.SampleBits.targetResource
+    stateFlags = stateFlags + ChromaLink.Gather.StateBits.targetResourceAvailable
+  end
+
+  if target.level ~= nil then
+    sampleMask = sampleMask + ChromaLink.Gather.SampleBits.targetLevel
+  end
+
+  if targetAvailable then
+    sampleMask = sampleMask + ChromaLink.Gather.SampleBits.targetFlags
+  end
+
+  if playerZoneHash16 > 0 then
+    tacticalMask = tacticalMask + ChromaLink.Gather.TacticalBits.playerZone
+  end
+
+  if targetZoneHash16 > 0 then
+    tacticalMask = tacticalMask + ChromaLink.Gather.TacticalBits.targetZone
+  end
+
+  if playerCoordsAvailable then
+    tacticalMask = tacticalMask + ChromaLink.Gather.TacticalBits.playerCoords
+  end
+
+  if targetCoordsAvailable then
+    tacticalMask = tacticalMask + ChromaLink.Gather.TacticalBits.targetCoords
+  end
+
+  if targetRelationCode > 0 then
+    tacticalMask = tacticalMask + ChromaLink.Gather.TacticalBits.targetRelation
+  end
+
+  if targetTierCode > 0 then
+    tacticalMask = tacticalMask + ChromaLink.Gather.TacticalBits.targetTier
+  end
+
+  if targetTaggedCode > 0 then
+    tacticalMask = tacticalMask + ChromaLink.Gather.TacticalBits.targetTagged
+  end
+
+  if targetCallingCode > 0 then
+    tacticalMask = tacticalMask + ChromaLink.Gather.TacticalBits.targetCalling
+  end
+
+  if targetRadiusAvailable then
+    tacticalMask = tacticalMask + ChromaLink.Gather.TacticalBits.targetRadius
+  end
+
+  return {
+    clientWidth = clientWidth,
+    clientHeight = clientHeight,
+    playerAvailable = playerAvailable,
+    sampleMask = ClampUnsigned16(sampleMask),
+    tacticalMask = ClampUnsigned16(tacticalMask),
+    stateFlags = ClampUnsigned16(stateFlags),
+    playerResourceKindId = playerResource.kindId,
+    playerHealthCurrent = playerHealthCurrent,
+    playerHealthMax = playerHealthMaximum,
+    playerResourceCurrent = playerResource.current,
+    playerResourceMax = playerResource.maximum,
+    playerLevel = playerLevel,
+    playerCallingCode = callingCode,
+    playerRoleCode = roleCode,
+    playerCastFlags = cast.flags,
+    playerCastProgressQ15 = cast.progressQ15,
+    playerPowerAttack = combatStats.powerAttack.value,
+    playerCritAttack = combatStats.critAttack.value,
+    playerPowerSpell = combatStats.powerSpell.value,
+    playerCritSpell = combatStats.critSpell.value,
+    playerCritPower = combatStats.critPower.value,
+    playerHit = combatStats.hit.value,
+    targetResourceKindId = targetResource.kindId,
+    targetHealthCurrent = targetHealthCurrent,
+    targetHealthMax = targetHealthMaximum,
+    targetResourceCurrent = targetResource.current,
+    targetResourceMax = targetResource.maximum,
+    targetLevel = targetLevel,
+    targetFlags = targetFlags,
+    targetRelationCode = targetRelationCode,
+    targetTierCode = targetTierCode,
+    targetTaggedCode = targetTaggedCode,
+    targetCallingCode = targetCallingCode,
+    targetRadiusQ10 = targetRadiusQ10,
+    playerZoneHash16 = playerZoneHash16,
+    targetZoneHash16 = targetZoneHash16,
+    playerCoordX10 = playerCoordX10,
+    playerCoordY10 = playerCoordY10,
+    playerCoordZ10 = playerCoordZ10,
+    targetCoordX10 = targetCoordX10,
+    targetCoordY10 = targetCoordY10,
+    targetCoordZ10 = targetCoordZ10,
+    playerDamageEstimate = 0,
+    targetDamageEstimate = 0,
+    castActive = cast.active,
+    resourceSource = playerResource.source,
+    debugProbe = ChromaLink.Gather.BuildDebugProbe(
+      player,
+      target,
+      cast,
+      playerResource,
+      targetResource,
+      combatStats,
+      callingCode,
+      callingRaw,
+      roleCode,
+      roleRaw,
+      targetCallingCode,
+      targetCallingRaw,
+      targetUnitId
+    )
+  }
+end
+
+local function IsFilledText(value)
+  return value ~= nil and tostring(value) ~= ""
+end
+
+local function HasFlag(value, flag)
+  local number = math.floor(tonumber(value) or 0)
+  local divisor = math.floor(flag or 0)
+
+  if divisor <= 0 then
+    return false
+  end
+
+  return math.fmod(math.floor(number / divisor), 2) == 1
+end
+
+local function AddValidationIssue(report, severity, code, field, message, value)
+  local issue = {
+    severity = severity,
+    code = code,
+    field = field,
+    message = message,
+    value = value
+  }
+
+  report.issues[#report.issues + 1] = issue
+  report.issueCount = report.issueCount + 1
+
+  if severity == "error" then
+    report.errorCount = report.errorCount + 1
+  else
+    report.warningCount = report.warningCount + 1
+    report.suspicious = true
+  end
+end
+
+local function AddError(report, code, field, message, value)
+  AddValidationIssue(report, "error", code, field, message, value)
+end
+
+local function AddWarning(report, code, field, message, value)
+  AddValidationIssue(report, "warning", code, field, message, value)
+end
+
+local function EmptyTargetData(snapshot)
+  local debugProbe = snapshot.debugProbe or {}
+
+  return not (
+    (tonumber(snapshot.targetHealthCurrent) or 0) > 0
+    or (tonumber(snapshot.targetHealthMax) or 0) > 0
+    or (tonumber(snapshot.targetResourceCurrent) or 0) > 0
+    or (tonumber(snapshot.targetResourceMax) or 0) > 0
+    or (tonumber(snapshot.targetLevel) or 0) > 0
+    or (tonumber(snapshot.targetFlags) or 0) > 0
+    or (tonumber(snapshot.targetResourceKindId) or 0) > 0
+    or IsFilledText(debugProbe.targetName)
+    or IsFilledText(debugProbe.targetUnitId)
+  )
+end
+
+function ChromaLink.Gather.ValidateSnapshot(snapshot)
+  local report = {
+    valid = true,
+    suspicious = false,
+    errorCount = 0,
+    warningCount = 0,
+    issueCount = 0,
+    issues = {},
+    summary = ""
+  }
+
+  local debugProbe = {}
+  local stateFlags = 0
+  local playerAvailable = false
+  local playerHealthCurrent = 0
+  local playerHealthMax = 0
+  local playerResourceKindId = 0
+  local playerResourceCurrent = 0
+  local playerResourceMax = 0
+  local playerCastFlags = 0
+  local playerCastProgressQ15 = 0
+  local playerCallingCode = 0
+  local playerRoleCode = 0
+  local targetHealthCurrent = 0
+  local targetHealthMax = 0
+  local targetResourceKindId = 0
+  local targetResourceCurrent = 0
+  local targetResourceMax = 0
+  local targetLevel = 0
+  local targetFlags = 0
+  local castActive = false
+
+  if type(snapshot) ~= "table" then
+    AddError(report, "snapshot-type", "snapshot", "Snapshot was not a table.", type(snapshot))
+    report.valid = false
+    report.suspicious = true
+    report.summary = "errors=1 warnings=0"
+    return report
+  end
+
+  debugProbe = snapshot.debugProbe or {}
+  stateFlags = math.floor(tonumber(snapshot.stateFlags) or 0)
+  playerAvailable = snapshot.playerAvailable and true or false
+  playerHealthCurrent = math.floor(tonumber(snapshot.playerHealthCurrent) or 0)
+  playerHealthMax = math.floor(tonumber(snapshot.playerHealthMax) or 0)
+  playerResourceKindId = math.floor(tonumber(snapshot.playerResourceKindId) or 0)
+  playerResourceCurrent = math.floor(tonumber(snapshot.playerResourceCurrent) or 0)
+  playerResourceMax = math.floor(tonumber(snapshot.playerResourceMax) or 0)
+  playerCastFlags = math.floor(tonumber(snapshot.playerCastFlags) or 0)
+  playerCastProgressQ15 = math.floor(tonumber(snapshot.playerCastProgressQ15) or 0)
+  playerCallingCode = math.floor(tonumber(snapshot.playerCallingCode) or 0)
+  playerRoleCode = math.floor(tonumber(snapshot.playerRoleCode) or 0)
+  targetHealthCurrent = math.floor(tonumber(snapshot.targetHealthCurrent) or 0)
+  targetHealthMax = math.floor(tonumber(snapshot.targetHealthMax) or 0)
+  targetResourceKindId = math.floor(tonumber(snapshot.targetResourceKindId) or 0)
+  targetResourceCurrent = math.floor(tonumber(snapshot.targetResourceCurrent) or 0)
+  targetResourceMax = math.floor(tonumber(snapshot.targetResourceMax) or 0)
+  targetLevel = math.floor(tonumber(snapshot.targetLevel) or 0)
+  targetFlags = math.floor(tonumber(snapshot.targetFlags) or 0)
+  castActive = snapshot.castActive and true or false
+
+  if playerAvailable ~= HasFlag(stateFlags, ChromaLink.Gather.StateBits.playerAvailable) then
+    AddError(report, "player-available-bit", "stateFlags", "Player availability bit disagrees with the snapshot flag.", stateFlags)
+  end
+
+  if HasFlag(stateFlags, ChromaLink.Gather.StateBits.playerAlive) and playerHealthCurrent <= 0 then
+    AddWarning(report, "player-alive-empty-health", "playerHealthCurrent", "Player is flagged alive but has no health value.", playerHealthCurrent)
+  end
+
+  if playerHealthCurrent > playerHealthMax and playerHealthMax > 0 then
+    AddError(report, "player-health-order", "playerHealthCurrent", "Player health current exceeds max.", playerHealthCurrent .. "/" .. playerHealthMax)
+  end
+
+  if playerHealthCurrent > 0 and playerHealthMax <= 0 then
+    AddError(report, "player-health-max-missing", "playerHealthMax", "Player health current is present but max is missing or zero.", playerHealthCurrent .. "/" .. playerHealthMax)
+  end
+
+  if playerResourceCurrent > playerResourceMax and playerResourceMax > 0 then
+    AddError(report, "player-resource-order", "playerResourceCurrent", "Player resource current exceeds max.", playerResourceCurrent .. "/" .. playerResourceMax)
+  end
+
+  if playerResourceCurrent > 0 and playerResourceMax <= 0 then
+    AddError(report, "player-resource-max-missing", "playerResourceMax", "Player resource current is present but max is missing or zero.", playerResourceCurrent .. "/" .. playerResourceMax)
+  end
+
+  if playerResourceKindId == ChromaLink.Gather.ResourceKind.none and HasFlag(stateFlags, ChromaLink.Gather.StateBits.playerResourceAvailable) then
+    AddError(report, "player-resource-bit", "playerResourceKindId", "Player resource bit is set but no resource kind was selected.", playerResourceKindId)
+  end
+
+  if playerResourceKindId ~= ChromaLink.Gather.ResourceKind.none and not HasFlag(stateFlags, ChromaLink.Gather.StateBits.playerResourceAvailable) and (playerResourceCurrent > 0 or playerResourceMax > 0) then
+    AddWarning(report, "player-resource-mismatch", "playerResourceKindId", "Player resource exists but the resource-available flag is clear.", playerResourceKindId)
+  end
+
+  if playerCallingCode < 0 or playerCallingCode > 5 then
+    AddWarning(report, "player-calling-range", "playerCallingCode", "Player calling code is outside the current narrow range.", playerCallingCode)
+  end
+
+  if playerRoleCode < 0 or playerRoleCode > 4 then
+    AddWarning(report, "player-role-range", "playerRoleCode", "Player role code is outside the current narrow range.", playerRoleCode)
+  end
+
+  if playerCallingCode == 1 or playerCallingCode == 3 then
+    if playerResourceKindId ~= ChromaLink.Gather.ResourceKind.mana and (playerResourceCurrent > 0 or playerResourceMax > 0) then
+      AddWarning(report, "player-resource-calling", "playerResourceKindId", "Mage/cleric resource kind does not look like mana.", playerResourceKindId)
+    end
+  elseif playerCallingCode == 2 or playerCallingCode == 4 then
+    if playerResourceKindId ~= ChromaLink.Gather.ResourceKind.energy and (playerResourceCurrent > 0 or playerResourceMax > 0) then
+      AddWarning(report, "player-resource-calling", "playerResourceKindId", "Rogue/warrior resource kind does not look like energy.", playerResourceKindId)
+    end
+  elseif playerCallingCode == 5 then
+    if playerResourceKindId ~= ChromaLink.Gather.ResourceKind.power and (playerResourceCurrent > 0 or playerResourceMax > 0) then
+      AddWarning(report, "player-resource-calling", "playerResourceKindId", "Primalist resource kind does not look like power.", playerResourceKindId)
+    end
+  end
+
+  if playerHealthCurrent > 0 and not playerAvailable then
+    AddWarning(report, "player-unavailable-health", "playerAvailable", "Player snapshot has health while availability is false.", playerHealthCurrent)
+  end
+
+  if castActive and playerCastFlags == 0 then
+    AddError(report, "cast-active-flags", "playerCastFlags", "Cast is active but the cast flag field is empty.", playerCastFlags)
+  end
+
+  if not castActive and (playerCastFlags > 0 or playerCastProgressQ15 > 0 or IsFilledText(debugProbe.castAbilityName)) then
+    AddWarning(report, "cast-stale", "playerCastFlags", "Cast snapshot still contains active-looking data after cast deactivation.", playerCastFlags .. "/" .. playerCastProgressQ15)
+  end
+
+  if targetHealthCurrent > targetHealthMax and targetHealthMax > 0 then
+    AddError(report, "target-health-order", "targetHealthCurrent", "Target health current exceeds max.", targetHealthCurrent .. "/" .. targetHealthMax)
+  end
+
+  if targetHealthCurrent > 0 and targetHealthMax <= 0 then
+    AddError(report, "target-health-max-missing", "targetHealthMax", "Target health current is present but max is missing or zero.", targetHealthCurrent .. "/" .. targetHealthMax)
+  end
+
+  if targetResourceCurrent > targetResourceMax and targetResourceMax > 0 then
+    AddError(report, "target-resource-order", "targetResourceCurrent", "Target resource current exceeds max.", targetResourceCurrent .. "/" .. targetResourceMax)
+  end
+
+  if targetResourceCurrent > 0 and targetResourceMax <= 0 then
+    AddError(report, "target-resource-max-missing", "targetResourceMax", "Target resource current is present but max is missing or zero.", targetResourceCurrent .. "/" .. targetResourceMax)
+  end
+
+  if targetFlags > 0 and not HasFlag(stateFlags, ChromaLink.Gather.StateBits.targetPresent) then
+    AddError(report, "target-flag-without-target", "targetFlags", "Target flags are present but the target-present bit is clear.", targetFlags)
+  end
+
+  if HasFlag(stateFlags, ChromaLink.Gather.StateBits.targetPresent) and EmptyTargetData(snapshot) then
+    AddWarning(report, "target-present-empty", "target", "Target is present but the snapshot has no usable target data.", debugProbe.targetUnitId or targetFlags)
+  end
+
+  if targetResourceKindId == ChromaLink.Gather.ResourceKind.none and (targetResourceCurrent > 0 or targetResourceMax > 0) then
+    AddError(report, "target-resource-kind", "targetResourceKindId", "Target resource values exist but no resource kind was selected.", targetResourceKindId)
+  end
+
+  if HasFlag(stateFlags, ChromaLink.Gather.StateBits.targetPresent) and not HasFlag(stateFlags, ChromaLink.Gather.StateBits.targetAlive) and targetHealthCurrent > 0 then
+    AddWarning(report, "target-alive-flag", "stateFlags", "Target has health but is not marked alive.", stateFlags)
+  end
+
+  if HasFlag(stateFlags, ChromaLink.Gather.StateBits.targetPresent) and targetHealthCurrent <= 0 and targetHealthMax <= 0 and targetLevel <= 0 and targetFlags == 0 then
+    AddWarning(report, "target-empty", "target", "Target is present but has no health, level, or flags.", debugProbe.targetUnitId or "unknown")
+  end
+
+  if not HasFlag(stateFlags, ChromaLink.Gather.StateBits.targetPresent) and (targetHealthCurrent > 0 or targetHealthMax > 0 or targetLevel > 0 or targetFlags > 0 or targetResourceCurrent > 0 or targetResourceMax > 0) then
+    AddWarning(report, "target-data-without-bit", "stateFlags", "Target data exists even though the target-present bit is clear.", stateFlags)
+  end
+
+  report.valid = report.errorCount == 0
+  report.suspicious = report.suspicious or report.errorCount > 0
+  report.summary = "errors=" .. tostring(report.errorCount) .. " warnings=" .. tostring(report.warningCount)
+
+  return report
+end
+
+-- end-of-script marker comment

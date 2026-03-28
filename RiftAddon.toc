@@ -1,14 +1,20 @@
 Identifier = "ChromaLink"
 Name = "ChromaLink"
 NameShort = "CL"
-Description = "Fresh-start ChromaLink scaffold for RIFT."
+Description = "Reliability-first optical telemetry strip for RIFT."
 Author = "360madden"
 Email = "360madden@gmail.com"
 Website = ""
-Version = "0.0.1"
+Version = "0.1.0"
 Environment = "4.4"
 RunOnStartup = {
   "Core/Config.lua",
+  "RIFT/ErrorTrap.lua",
+  "Core/Pack.lua",
+  "Core/Gather.lua",
+  "Core/Scheduler.lua",
+  "Core/Protocol.lua",
   "RIFT/Diagnostics.lua",
+  "RIFT/Render.lua",
   "RIFT/Bootstrap.lua"
 }
