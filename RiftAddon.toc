@@ -1,0 +1,16 @@
+Identifier = "ChromaLink"
+Name = "ChromaLink"
+NameShort = "CL"
+Description = "Fresh-start ChromaLink sandbox for RIFT."
+Author = "360madden"
+Email = "360madden@gmail.com"
+Website = ""
+Version = "0.1.0"
+Environment = "4.4"
+RunOnStartup = {
+  "Core/Config.lua",
+  "RIFT/Diagnostics.lua",
+  "RIFT/ErrorTrap.lua",
+  "RIFT/Render.lua",
+  "RIFT/Bootstrap.lua"
+}

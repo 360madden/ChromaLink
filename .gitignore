@@ -1,0 +1,17 @@
+# Windows / Explorer noise
+Thumbs.db
+Desktop.ini
+
+# Editor / local temp files
+*.tmp
+*.temp
+*.bak
+*.log
+
+# Local reset backups
+_archive/
+
+# Generated build outputs
+**/bin/
+**/obj/
+TestResults/
