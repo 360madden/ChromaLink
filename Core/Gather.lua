@@ -1,0 +1,212 @@
+ChromaLink = ChromaLink or {}
+ChromaLink.Gather = {}
+
+local config = ChromaLink.Config
+
+local function ClampByte(value)
+  local number = tonumber(value) or 0
+  if number < 0 then
+    return 0
+  end
+  if number > 255 then
+    return 255
+  end
+  return math.floor(number + 0.5)
+end
+
+local function Lower(value)
+  if value == nil then
+    return ""
+  end
+  return string.lower(tostring(value))
+end
+
+local function SafeUnitLookup(reference)
+  if Inspect == nil or Inspect.Unit == nil or Inspect.Unit.Lookup == nil then
+    return nil
+  end
+
+  local ok, result = pcall(Inspect.Unit.Lookup, reference)
+  if ok then
+    return result
+  end
+
+  return nil
+end
+
+local function SafeUnitDetail(unit)
+  if unit == nil or Inspect == nil or Inspect.Unit == nil or Inspect.Unit.Detail == nil then
+    return nil
+  end
+
+  local ok, result = pcall(Inspect.Unit.Detail, unit)
+  if ok then
+    return result
+  end
+
+  return nil
+end
+
+local function QuantizePercent(current, maximum)
+  local currentNumber = tonumber(current) or 0
+  local maxNumber = tonumber(maximum) or 0
+
+  if maxNumber <= 0 then
+    return 0
+  end
+
+  return ClampByte((currentNumber / maxNumber) * 255)
+end
+
+local function EncodeCallingCode(value)
+  local text = Lower(value)
+  if string.find(text, "warrior", 1, true) then
+    return config.callingCodes.warrior
+  end
+  if string.find(text, "cleric", 1, true) then
+    return config.callingCodes.cleric
+  end
+  if string.find(text, "mage", 1, true) then
+    return config.callingCodes.mage
+  end
+  if string.find(text, "rogue", 1, true) then
+    return config.callingCodes.rogue
+  end
+  if string.find(text, "primalist", 1, true) then
+    return config.callingCodes.primalist
+  end
+  return 0
+end
+
+local function EncodeRoleCode(value)
+  local text = Lower(value)
+  if string.find(text, "tank", 1, true) then
+    return config.roleCodes.tank
+  end
+  if string.find(text, "heal", 1, true) then
+    return config.roleCodes.healer
+  end
+  if string.find(text, "support", 1, true) then
+    return config.roleCodes.support
+  end
+  if string.find(text, "dps", 1, true) or string.find(text, "damage", 1, true) then
+    return config.roleCodes.dps
+  end
+  return config.roleCodes.unknown
+end
+
+local function EncodeRelationCode(value, targetUnitId)
+  if targetUnitId == "player" then
+    return config.relationCodes.self
+  end
+
+  local text = Lower(value)
+  if string.find(text, "hostile", 1, true) or string.find(text, "enemy", 1, true) then
+    return config.relationCodes.hostile
+  end
+  if string.find(text, "friendly", 1, true) or string.find(text, "ally", 1, true) then
+    return config.relationCodes.friendly
+  end
+  if string.find(text, "neutral", 1, true) then
+    return config.relationCodes.neutral
+  end
+  return config.relationCodes.unknown
+end
+
+local function SelectPreferredResource(detail, callingCode)
+  if detail == nil then
+    return config.resourceKinds.none, 0
+  end
+
+  local candidates = {
+    { kind = config.resourceKinds.mana, current = detail.mana, maximum = detail.manaMax },
+    { kind = config.resourceKinds.energy, current = detail.energy, maximum = detail.energyMax },
+    { kind = config.resourceKinds.power, current = detail.power, maximum = detail.powerMax },
+    { kind = config.resourceKinds.charge, current = detail.charge, maximum = detail.chargeMax },
+    { kind = config.resourceKinds.planar, current = detail.planar, maximum = detail.planarMax }
+  }
+
+  local preferredKind = config.resourceKinds.none
+  if callingCode == config.callingCodes.rogue then
+    preferredKind = config.resourceKinds.energy
+  elseif callingCode == config.callingCodes.warrior then
+    preferredKind = config.resourceKinds.power
+  else
+    preferredKind = config.resourceKinds.mana
+  end
+
+  local index
+  for index = 1, #candidates do
+    local candidate = candidates[index]
+    if candidate.kind == preferredKind and tonumber(candidate.maximum) ~= nil and tonumber(candidate.maximum) > 0 then
+      return candidate.kind, QuantizePercent(candidate.current, candidate.maximum)
+    end
+  end
+
+  for index = 1, #candidates do
+    local candidate = candidates[index]
+    if tonumber(candidate.maximum) ~= nil and tonumber(candidate.maximum) > 0 then
+      return candidate.kind, QuantizePercent(candidate.current, candidate.maximum)
+    end
+  end
+
+  return config.resourceKinds.none, 0
+end
+
+local function BuildPlayerStateFlags(detail)
+  local flags = 0
+  if detail ~= nil then
+    flags = flags + 1
+  end
+  if detail ~= nil and not detail.dead then
+    flags = flags + 2
+  end
+  if detail ~= nil and detail.combat then
+    flags = flags + 4
+  end
+  return flags
+end
+
+local function BuildTargetStateFlags(detail)
+  local flags = 0
+  if detail ~= nil then
+    flags = flags + 1
+  end
+  if detail ~= nil and not detail.dead then
+    flags = flags + 2
+  end
+  if detail ~= nil and detail.combat then
+    flags = flags + 4
+  end
+  if detail ~= nil and (detail.tagged or detail.marked) then
+    flags = flags + 8
+  end
+  return flags
+end
+
+function ChromaLink.Gather.BuildCoreStatusSnapshot()
+  local player = SafeUnitDetail("player")
+  local targetUnitId = SafeUnitLookup("player.target")
+  local target = SafeUnitDetail(targetUnitId)
+  local playerCallingCode = EncodeCallingCode(player and (player.calling or player.callingName))
+  local targetCallingCode = EncodeCallingCode(target and (target.calling or target.callingName))
+  local playerRoleCode = EncodeRoleCode(player and (player.role or player.roleName or player.playstyle))
+  local relationCode = EncodeRelationCode(target and target.relation, targetUnitId)
+  local playerResourceKind, playerResourcePct = SelectPreferredResource(player, playerCallingCode)
+  local targetResourceKind, targetResourcePct = SelectPreferredResource(target, targetCallingCode)
+
+  return {
+    playerStateFlags = ClampByte(BuildPlayerStateFlags(player)),
+    playerHealthPctQ8 = ClampByte(QuantizePercent(player and player.health, player and player.healthMax)),
+    playerResourceKind = ClampByte(playerResourceKind),
+    playerResourcePctQ8 = ClampByte(playerResourcePct),
+    targetStateFlags = ClampByte(BuildTargetStateFlags(target)),
+    targetHealthPctQ8 = ClampByte(QuantizePercent(target and target.health, target and target.healthMax)),
+    targetResourceKind = ClampByte(targetResourceKind),
+    targetResourcePctQ8 = ClampByte(targetResourcePct),
+    playerLevel = ClampByte(player and player.level),
+    targetLevel = ClampByte(target and target.level),
+    playerCallingRolePacked = ClampByte((playerCallingCode * 16) + playerRoleCode),
+    targetCallingRelationPacked = ClampByte((targetCallingCode * 16) + relationCode)
+  }
+end
