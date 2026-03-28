@@ -1,7 +1,7 @@
 Identifier = "ChromaLink"
 Name = "ChromaLink"
 NameShort = "CL"
-Description = "Fresh-start ChromaLink sandbox for RIFT."
+Description = "Reliability-first optical telemetry strip for RIFT."
 Author = "360madden"
 Email = "360madden@gmail.com"
 Website = ""

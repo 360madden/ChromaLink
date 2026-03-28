@@ -54,7 +54,7 @@ function ChromaLink.Bootstrap.Initialize()
 
   ChromaLink.Render.Update(renderState, clientWidth, 1)
   ChromaLink.Diagnostics.LogLoaded()
-  ChromaLink.Diagnostics.Log("Fresh baseline initialized. The moving strip is only a proof of life.")
+  ChromaLink.Diagnostics.Log("ChromaLink baseline initialized. Proof-of-life strip active for the reliability-first telemetry path.")
 end
 
 function ChromaLink.Bootstrap.OnLoadEnd(_, loadedAddonIdentifier)
