@@ -1,0 +1,15 @@
+# Windows / Explorer noise
+Thumbs.db
+Desktop.ini
+
+# Editor / temp files
+*.tmp
+*.temp
+*.bak
+*.log
+
+# .NET build outputs
+**/bin/
+**/obj/
+TestResults/
+.vs/

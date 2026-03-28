@@ -1,0 +1,14 @@
+Identifier = "ChromaLink"
+Name = "ChromaLink"
+NameShort = "CL"
+Description = "Fresh-start ChromaLink scaffold for RIFT."
+Author = "360madden"
+Email = "360madden@gmail.com"
+Website = ""
+Version = "0.0.1"
+Environment = "4.4"
+RunOnStartup = {
+  "Core/Config.lua",
+  "RIFT/Diagnostics.lua",
+  "RIFT/Bootstrap.lua"
+}
