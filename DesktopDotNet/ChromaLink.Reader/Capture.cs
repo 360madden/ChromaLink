@@ -6,9 +6,24 @@ namespace ChromaLink.Reader;
 
 public enum CaptureBackend
 {
+    DesktopDuplication,
     ScreenBitBlt,
     PrintWindow
 }
+
+public readonly record struct ScreenRect(int Left, int Top, int Width, int Height)
+{
+    public int Right => Left + Width;
+
+    public int Bottom => Top + Height;
+}
+
+internal readonly record struct CaptureTarget(
+    nint WindowHandle,
+    ScreenRect ClientRect,
+    ScreenRect WindowRect,
+    ScreenRect SourceRect,
+    nint MonitorHandle);
 
 public sealed record CaptureResult(
     Bgr24Frame Image,
@@ -25,6 +40,9 @@ public sealed record CaptureResult(
 
 public static class WindowCaptureService
 {
+    private const uint MonitorDefaultToNearest = 2;
+    private static bool _dpiAwarenessInitialized;
+
     public static nint FindRiftWindow()
     {
         var process = Process
@@ -39,12 +57,29 @@ public static class WindowCaptureService
             .FirstOrDefault(static candidate =>
                 candidate.MainWindowHandle != nint.Zero &&
                 candidate.MainWindowTitle.StartsWith("RIFT", StringComparison.OrdinalIgnoreCase) &&
-                !candidate.MainWindowTitle.Contains("Minion", StringComparison.OrdinalIgnoreCase));
+                !candidate.MainWindowTitle.Contains("Minion", StringComparison.OrdinalIgnoreCase) &&
+                !candidate.MainWindowTitle.Contains("Glyph", StringComparison.OrdinalIgnoreCase));
 
         return process?.MainWindowHandle ?? nint.Zero;
     }
 
     public static CaptureResult CaptureTopSlice(nint hwnd, StripProfile profile, int heightPadding, CaptureBackend backend)
+    {
+        EnsurePerMonitorDpiAwareness();
+
+        var target = ResolveCaptureTarget(hwnd, profile);
+        var captureHeight = Math.Min(target.SourceRect.Height, Math.Max(profile.BandHeight, profile.BandHeight + heightPadding));
+
+        return backend switch
+        {
+            CaptureBackend.DesktopDuplication => DesktopDuplicationCaptureBackend.CaptureTopSlice(target, captureHeight, backend),
+            CaptureBackend.ScreenBitBlt => CaptureScreen(target.SourceRect, target.ClientRect, captureHeight, backend),
+            CaptureBackend.PrintWindow => CapturePrintWindow(hwnd, target.ClientRect, captureHeight, backend),
+            _ => throw new ArgumentOutOfRangeException(nameof(backend))
+        };
+    }
+
+    internal static CaptureTarget ResolveCaptureTarget(nint hwnd, StripProfile profile)
     {
         if (IsIconic(hwnd))
         {
@@ -52,36 +87,73 @@ public static class WindowCaptureService
         }
 
         var clientRect = TryGetClientRectOnScreen(hwnd);
-        var windowRect = GetWindowRectOnScreen(hwnd);
-        var sourceRect = clientRect is { Width: > 0, Height: > 0 } ? clientRect.Value : windowRect;
-        if (sourceRect.Width <= 0 || sourceRect.Height <= 0)
+        if (clientRect is null || clientRect.Value.Width <= 0 || clientRect.Value.Height <= 0)
         {
-            throw new InvalidOperationException("Could not resolve a valid RIFT capture rectangle.");
+            throw new InvalidOperationException("Could not resolve the RIFT client rectangle on screen.");
         }
 
-        if (sourceRect.Width < profile.BandWidth || sourceRect.Height < profile.BandHeight)
+        var resolvedClient = clientRect.Value;
+        if (resolvedClient.Width < profile.BandWidth || resolvedClient.Height < profile.BandHeight)
         {
             throw new InvalidOperationException(
-                $"The RIFT capture rectangle is too small for {profile.Id}: {sourceRect.Width}x{sourceRect.Height}.");
+                $"The RIFT client rectangle is too small for {profile.Id}: {resolvedClient.Width}x{resolvedClient.Height}.");
         }
 
-        var captureHeight = Math.Min(sourceRect.Height, Math.Max(profile.BandHeight, profile.BandHeight + heightPadding));
-        return backend switch
+        var windowRect = GetWindowRectOnScreen(hwnd);
+        var monitorHandle = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+        if (monitorHandle == nint.Zero)
         {
-            CaptureBackend.ScreenBitBlt => CaptureScreen(sourceRect.X, sourceRect.Y, sourceRect.Width, captureHeight, sourceRect, backend),
-            CaptureBackend.PrintWindow => CapturePrintWindow(hwnd, sourceRect.Width, sourceRect.Height, captureHeight, sourceRect, backend),
-            _ => throw new ArgumentOutOfRangeException(nameof(backend))
-        };
+            throw new InvalidOperationException("Could not determine the monitor that hosts the RIFT window.");
+        }
+
+        return new CaptureTarget(hwnd, resolvedClient, windowRect, resolvedClient, monitorHandle);
     }
 
-    private static CaptureResult CaptureScreen(int left, int top, int width, int height, NativeRect clientRect, CaptureBackend backend)
+    internal static ScreenRect? TryGetClientRectOnScreen(nint hwnd)
     {
-        var image = CaptureBitmap(width, height, (hdc) =>
+        if (!GetClientRect(hwnd, out var rect))
+        {
+            return null;
+        }
+
+        var point = new NativePoint();
+        if (!ClientToScreen(hwnd, ref point))
+        {
+            return null;
+        }
+
+        return new ScreenRect(point.X, point.Y, rect.Right - rect.Left, rect.Bottom - rect.Top);
+    }
+
+    internal static ScreenRect GetWindowRectOnScreen(nint hwnd)
+    {
+        if (!GetWindowRect(hwnd, out var rect))
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "GetWindowRect failed.");
+        }
+
+        return new ScreenRect(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top);
+    }
+
+    private static void EnsurePerMonitorDpiAwareness()
+    {
+        if (_dpiAwarenessInitialized)
+        {
+            return;
+        }
+
+        _dpiAwarenessInitialized = true;
+        _ = SetProcessDpiAwarenessContext(new nint(-4));
+    }
+
+    private static CaptureResult CaptureScreen(ScreenRect captureRect, ScreenRect clientRect, int captureHeight, CaptureBackend backend)
+    {
+        var image = CaptureBitmap(captureRect.Width, captureHeight, (hdc) =>
         {
             var screenDc = GetDC(nint.Zero);
             try
             {
-                if (!BitBlt(hdc, 0, 0, width, height, screenDc, left, top, 0x40CC0020))
+                if (!BitBlt(hdc, 0, 0, captureRect.Width, captureHeight, screenDc, captureRect.Left, captureRect.Top, 0x40CC0020))
                 {
                     throw new Win32Exception(Marshal.GetLastWin32Error(), "BitBlt failed.");
                 }
@@ -95,20 +167,20 @@ public static class WindowCaptureService
         return new CaptureResult(
             image with { CaptureRouteReason = "screen" },
             backend,
-            clientRect.X,
-            clientRect.Y,
+            clientRect.Left,
+            clientRect.Top,
             clientRect.Width,
             clientRect.Height,
-            left,
-            top,
-            width,
-            height,
+            captureRect.Left,
+            captureRect.Top,
+            captureRect.Width,
+            captureHeight,
             "screen");
     }
 
-    private static CaptureResult CapturePrintWindow(nint hwnd, int clientWidth, int clientHeight, int captureHeight, NativeRect clientRect, CaptureBackend backend)
+    private static CaptureResult CapturePrintWindow(nint hwnd, ScreenRect clientRect, int captureHeight, CaptureBackend backend)
     {
-        var full = CaptureBitmap(clientWidth, clientHeight, (hdc) =>
+        var full = CaptureBitmap(clientRect.Width, clientRect.Height, (hdc) =>
         {
             if (!PrintWindow(hwnd, hdc, 0x00000003) && !PrintWindow(hwnd, hdc, 0x00000001))
             {
@@ -116,22 +188,22 @@ public static class WindowCaptureService
             }
         });
 
-        var cropped = full.Crop(0, 0, clientWidth, captureHeight, "printwindow");
+        var cropped = full.Crop(0, 0, clientRect.Width, captureHeight, "printwindow") with { CaptureRouteReason = "printwindow" };
         return new CaptureResult(
-            cropped with { CaptureRouteReason = "printwindow" },
+            cropped,
             backend,
-            clientRect.X,
-            clientRect.Y,
+            clientRect.Left,
+            clientRect.Top,
             clientRect.Width,
             clientRect.Height,
-            clientRect.X,
-            clientRect.Y,
+            clientRect.Left,
+            clientRect.Top,
             cropped.Width,
             cropped.Height,
             "printwindow");
     }
 
-    private static Bgr24Frame CaptureBitmap(int width, int height, Action<nint> drawAction)
+    internal static Bgr24Frame CaptureBitmap(int width, int height, Action<nint> drawAction)
     {
         var screenDc = GetDC(nint.Zero);
         if (screenDc == nint.Zero)
@@ -196,40 +268,12 @@ public static class WindowCaptureService
         }
     }
 
-    private static NativeRect? TryGetClientRectOnScreen(nint hwnd)
-    {
-        if (!GetClientRect(hwnd, out var rect))
-        {
-            return null;
-        }
-
-        var point = new NativePoint();
-        if (!ClientToScreen(hwnd, ref point))
-        {
-            return null;
-        }
-
-        return new NativeRect(point.X, point.Y, rect.Right - rect.Left, rect.Bottom - rect.Top);
-    }
-
-    private static NativeRect GetWindowRectOnScreen(nint hwnd)
-    {
-        if (!GetWindowRect(hwnd, out var rect))
-        {
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "GetWindowRect failed.");
-        }
-
-        return new NativeRect(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top);
-    }
-
     [StructLayout(LayoutKind.Sequential)]
     private struct NativePoint
     {
         public int X;
         public int Y;
     }
-
-    private readonly record struct NativeRect(int X, int Y, int Width, int Height);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct Rect
@@ -304,4 +348,10 @@ public static class WindowCaptureService
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool IsIconic(nint hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern nint MonitorFromWindow(nint hwnd, uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetProcessDpiAwarenessContext(nint value);
 }

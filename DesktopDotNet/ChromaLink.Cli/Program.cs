@@ -7,7 +7,7 @@ return new CliApp().Run(args);
 internal sealed class CliApp
 {
     private readonly StripProfile _profile = StripProfiles.Default;
-    private static readonly CaptureBackend[] CaptureBackends = { CaptureBackend.ScreenBitBlt, CaptureBackend.PrintWindow };
+    private static readonly CaptureBackend[] DefaultCaptureBackends = { CaptureBackend.DesktopDuplication, CaptureBackend.ScreenBitBlt };
 
     public int Run(string[] args)
     {
@@ -19,7 +19,7 @@ internal sealed class CliApp
             "live" => RunLive(args, watchMode: false),
             "watch" => RunLive(args, watchMode: true),
             "bench" => RunBench(),
-            "capture-dump" => RunCaptureDump(),
+            "capture-dump" => RunCaptureDump(args),
             "prepare-window" => RunPrepareWindow(args),
             "help" or "--help" or "-h" => PrintUsage(),
             _ => Fail($"Unsupported command: {command}")
@@ -71,15 +71,20 @@ internal sealed class CliApp
         return validation.IsAccepted ? 0 : 1;
     }
 
-    private int RunCaptureDump()
+    private int RunCaptureDump(string[] args)
     {
+        if (!TryParseCaptureInvocation(args, 1, out var invocation, out var error))
+        {
+            return Fail(error);
+        }
+
         var hwnd = WindowCaptureService.FindRiftWindow();
         if (hwnd == nint.Zero)
         {
             return Fail("No likely RIFT window was found.");
         }
 
-        var attempts = CaptureAndAnalyze(hwnd);
+        var attempts = CaptureAndAnalyze(hwnd, invocation.Backends);
         var selectedAttempt = ChooseBestAttempt(attempts);
         if (selectedAttempt is null)
         {
@@ -89,6 +94,14 @@ internal sealed class CliApp
         var capture = selectedAttempt.Capture!;
         var path = Path.Combine(PathProvider.EnsureOutDirectory(), "chromalink-color-capture-dump.bmp");
         BmpIO.Save(path, capture.Image);
+        DiagnosticsArtifacts.WriteArtifacts(
+            path,
+            _profile,
+            capture,
+            selectedAttempt.Validation!,
+            attempts.Select(static attempt =>
+                $"{attempt.Backend} | {(attempt.Validation?.IsAccepted == true ? "accepted" : "rejected")} | {attempt.Validation?.Reason ?? attempt.FailureReason ?? "capture failed"} | AvgLuma {(attempt.Signal?.AverageLuma ?? 0):F2} | LumaRange {(attempt.Signal?.LumaRange ?? 0):F2}")
+                .ToArray());
 
         Console.WriteLine("ChromaLink");
         Console.WriteLine("Mode: capture-dump");
@@ -169,15 +182,24 @@ internal sealed class CliApp
 
     private int RunLive(string[] args, bool watchMode)
     {
+        if (!TryParseCaptureInvocation(args, 1, out var invocation, out var error))
+        {
+            return Fail(error);
+        }
+
         var hwnd = WindowCaptureService.FindRiftWindow();
         if (hwnd == nint.Zero)
         {
             return Fail("No likely RIFT window was found.");
         }
 
-        var iterationLimit = watchMode ? int.MaxValue : (args.Length >= 2 ? Math.Max(1, int.Parse(args[1])) : 5);
-        var sleepMs = args.Length >= 3 ? Math.Max(0, int.Parse(args[2])) : 100;
-        var durationMs = watchMode && args.Length >= 2 ? Math.Max(1, int.Parse(args[1])) * 1000 : int.MaxValue;
+        var iterationLimit = watchMode
+            ? int.MaxValue
+            : (invocation.Positionals.Count >= 1 ? Math.Max(1, int.Parse(invocation.Positionals[0])) : 5);
+        var sleepMs = invocation.Positionals.Count >= 2 ? Math.Max(0, int.Parse(invocation.Positionals[1])) : 100;
+        var durationMs = watchMode && invocation.Positionals.Count >= 1
+            ? Math.Max(1, int.Parse(invocation.Positionals[0])) * 1000
+            : int.MaxValue;
         var metrics = new LiveMetrics();
         var started = Stopwatch.StartNew();
         FrameValidationResult? lastValidation = null;
@@ -186,7 +208,7 @@ internal sealed class CliApp
 
         for (var iteration = 0; iteration < iterationLimit && started.ElapsedMilliseconds < durationMs; iteration++)
         {
-            var bestAttempt = ChooseBestAttempt(CaptureAndAnalyze(hwnd));
+            var bestAttempt = ChooseBestAttempt(CaptureAndAnalyze(hwnd, invocation.Backends));
             if (bestAttempt is not null)
             {
                 metrics.Add(
@@ -201,12 +223,21 @@ internal sealed class CliApp
                 {
                     firstRejectPath = Path.Combine(PathProvider.EnsureOutDirectory(), "chromalink-color-first-reject.bmp");
                     BmpIO.Save(firstRejectPath, bestAttempt.Capture!.Image);
+                    DiagnosticsArtifacts.WriteArtifacts(
+                        firstRejectPath,
+                        _profile,
+                        bestAttempt.Capture,
+                        bestAttempt.Validation,
+                        new[]
+                        {
+                            $"{bestAttempt.Backend} | {(bestAttempt.Validation.IsAccepted ? "accepted" : "rejected")} | {bestAttempt.Validation.Reason} | AvgLuma {(bestAttempt.Signal?.AverageLuma ?? 0):F2} | LumaRange {(bestAttempt.Signal?.LumaRange ?? 0):F2}"
+                        });
                 }
             }
             else
             {
                 metrics.Add(false, 0, 0, "No capture backend produced an image.");
-                lastValidation = new FrameValidationResult(false, "No capture backend produced an image.", null, Array.Empty<SegmentSample>(), null);
+                lastValidation = new FrameValidationResult(false, "No capture backend produced an image.", null, Array.Empty<SegmentSample>(), null, null);
             }
 
             if (sleepMs > 0)
@@ -253,6 +284,9 @@ internal sealed class CliApp
         Console.WriteLine($"Pitch: {detection.Pitch:F3}");
         Console.WriteLine($"Scale: {detection.Scale:F3}");
         Console.WriteLine($"ControlError: {detection.ControlError:F4}");
+        Console.WriteLine($"LeftControlScore: {detection.LeftControlScore:F4}");
+        Console.WriteLine($"RightControlScore: {detection.RightControlScore:F4}");
+        Console.WriteLine($"AnchorLumaDelta: {detection.AnchorLumaDelta:F2}");
         Console.WriteLine($"SearchMode: {detection.SearchMode}");
     }
 
@@ -276,10 +310,10 @@ internal sealed class CliApp
         Console.WriteLine($"TargetRelation: {frame.Payload.TargetCallingRelationPacked & 0x0F}");
     }
 
-    private List<CaptureAttempt> CaptureAndAnalyze(nint hwnd)
+    private List<CaptureAttempt> CaptureAndAnalyze(nint hwnd, IReadOnlyList<CaptureBackend> backends)
     {
-        var attempts = new List<CaptureAttempt>(CaptureBackends.Length);
-        foreach (var backend in CaptureBackends)
+        var attempts = new List<CaptureAttempt>(backends.Count);
+        foreach (var backend in backends)
         {
             try
             {
@@ -326,10 +360,10 @@ internal sealed class CliApp
         Console.WriteLine("ChromaLink CLI");
         Console.WriteLine("  smoke");
         Console.WriteLine("  replay <bmpPath>");
-        Console.WriteLine("  live [sampleCount] [sleepMs]");
-        Console.WriteLine("  watch [durationSeconds] [sleepMs]");
+        Console.WriteLine("  live [sampleCount] [sleepMs] [--backend desktopdup|screen|printwindow]");
+        Console.WriteLine("  watch [durationSeconds] [sleepMs] [--backend desktopdup|screen|printwindow]");
         Console.WriteLine("  bench");
-        Console.WriteLine("  capture-dump");
+        Console.WriteLine("  capture-dump [--backend desktopdup|screen|printwindow]");
         Console.WriteLine("  prepare-window [left] [top]");
         return 0;
     }
@@ -352,6 +386,82 @@ internal sealed class CliApp
         return samples[Math.Clamp(index, 0, samples.Length - 1)];
     }
 
+    private static bool TryParseCaptureInvocation(string[] args, int startIndex, out CaptureInvocation invocation, out string error)
+    {
+        var positionals = new List<string>();
+        CaptureBackend? backendOverride = null;
+
+        for (var index = startIndex; index < args.Length; index++)
+        {
+            var argument = args[index];
+            if (argument.Equals("--backend", StringComparison.OrdinalIgnoreCase))
+            {
+                if (index + 1 >= args.Length)
+                {
+                    invocation = default;
+                    error = "--backend requires a value.";
+                    return false;
+                }
+
+                if (!TryParseBackendName(args[index + 1], out var parsedBackend))
+                {
+                    invocation = default;
+                    error = $"Unsupported backend: {args[index + 1]}.";
+                    return false;
+                }
+
+                backendOverride = parsedBackend;
+                index++;
+                continue;
+            }
+
+            if (argument.StartsWith("--backend=", StringComparison.OrdinalIgnoreCase))
+            {
+                var backendText = argument.Substring("--backend=".Length);
+                if (!TryParseBackendName(backendText, out var parsedBackend))
+                {
+                    invocation = default;
+                    error = $"Unsupported backend: {backendText}.";
+                    return false;
+                }
+
+                backendOverride = parsedBackend;
+                continue;
+            }
+
+            positionals.Add(argument);
+        }
+
+        invocation = new CaptureInvocation(
+            positionals,
+            backendOverride is null ? DefaultCaptureBackends : new[] { backendOverride.Value });
+        error = string.Empty;
+        return true;
+    }
+
+    private static bool TryParseBackendName(string text, out CaptureBackend backend)
+    {
+        switch (text.Trim().ToLowerInvariant())
+        {
+            case "desktopdup":
+            case "desktop-dup":
+            case "desktopduplication":
+                backend = CaptureBackend.DesktopDuplication;
+                return true;
+            case "screen":
+            case "bitblt":
+                backend = CaptureBackend.ScreenBitBlt;
+                return true;
+            case "printwindow":
+            case "print-window":
+                backend = CaptureBackend.PrintWindow;
+                return true;
+            default:
+                backend = default;
+                return false;
+        }
+    }
+
     private sealed record CaptureAttempt(
         CaptureBackend Backend,
         CaptureResult? Capture,
@@ -360,4 +470,8 @@ internal sealed class CliApp
         double CaptureElapsedMs,
         double DecodeElapsedMs,
         string? FailureReason);
+
+    private readonly record struct CaptureInvocation(
+        IReadOnlyList<string> Positionals,
+        IReadOnlyList<CaptureBackend> Backends);
 }

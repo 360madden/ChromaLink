@@ -25,7 +25,11 @@ function ChromaLink.Bootstrap.Refresh(forceRefresh, reason)
     return
   end
 
-  snapshot = ChromaLink.Gather.BuildCoreStatusSnapshot()
+  if ChromaLink.Config.syntheticMode ~= nil and ChromaLink.Config.syntheticMode.enabled then
+    snapshot = ChromaLink.Gather.BuildSyntheticCoreStatusSnapshot()
+  else
+    snapshot = ChromaLink.Gather.BuildCoreStatusSnapshot()
+  end
   _, symbols = ChromaLink.Protocol.BuildCoreFrame(snapshot, state.sequence)
   ChromaLink.Render.Update(state.render, symbols)
 
@@ -70,7 +74,21 @@ function ChromaLink.Bootstrap.Initialize()
     sequence = 0
   }
 
+  ChromaLink.Render.SyncLayout(ChromaLink.Bootstrap.state.render)
   ChromaLink.Diagnostics.Log("Initialized P360C segmented color strip.")
+  if ChromaLink.Config.syntheticMode ~= nil and ChromaLink.Config.syntheticMode.enabled then
+    ChromaLink.Diagnostics.Log("Synthetic strip mode is enabled.")
+  end
+
+  if ChromaLink.Bootstrap.state.render.lastScaleX ~= nil and ChromaLink.Bootstrap.state.render.lastScaleY ~= nil then
+    ChromaLink.Diagnostics.Log(string.format(
+      "Root layout %.1fx%.1f -> ui scale %.3f x %.3f.",
+      ChromaLink.Bootstrap.state.render.lastRootWidth or 0,
+      ChromaLink.Bootstrap.state.render.lastRootHeight or 0,
+      ChromaLink.Bootstrap.state.render.lastScaleX or 1,
+      ChromaLink.Bootstrap.state.render.lastScaleY or 1))
+  end
+
   ChromaLink.Bootstrap.SafeRefresh(true, "initialize")
 end
 

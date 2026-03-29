@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Text;
+using System.Text.Json;
 using System.Windows.Forms;
 using ChromaLink.Reader;
 using Timer = System.Windows.Forms.Timer;
@@ -148,13 +149,40 @@ internal sealed class InspectorForm : Form
         builder.AppendLine($"Accepted: {analysis.IsAccepted}");
         builder.AppendLine($"Reason: {analysis.Reason}");
 
+        var sidecarPath = Path.ChangeExtension(path, ".json");
+        if (File.Exists(sidecarPath))
+        {
+            builder.AppendLine($"Sidecar: {sidecarPath}");
+            AppendSidecarSummary(builder, sidecarPath);
+        }
+
         if (analysis.Detection is not null)
         {
             builder.AppendLine($"Origin: {analysis.Detection.OriginX},{analysis.Detection.OriginY}");
             builder.AppendLine($"Pitch: {analysis.Detection.Pitch:F3}");
             builder.AppendLine($"Scale: {analysis.Detection.Scale:F3}");
             builder.AppendLine($"ControlError: {analysis.Detection.ControlError:F4}");
+            builder.AppendLine($"LeftControlScore: {analysis.Detection.LeftControlScore:F4}");
+            builder.AppendLine($"RightControlScore: {analysis.Detection.RightControlScore:F4}");
+            builder.AppendLine($"AnchorLumaDelta: {analysis.Detection.AnchorLumaDelta:F2}");
             builder.AppendLine($"SearchMode: {analysis.Detection.SearchMode}");
+            builder.AppendLine($"LeftExpected: {FormatPattern(StripProfiles.Default.LeftControl)}");
+            builder.AppendLine($"LeftObserved: {FormatObservedPattern(analysis.Samples, 0, StripProfiles.Default.LeftControl.Length)}");
+            builder.AppendLine($"RightExpected: {FormatPattern(StripProfiles.Default.RightControl)}");
+            builder.AppendLine($"RightObserved: {FormatObservedPattern(analysis.Samples, StripProfiles.Default.SegmentCount - StripProfiles.Default.RightControl.Length, StripProfiles.Default.RightControl.Length)}");
+        }
+
+        if (analysis.ParseResult is not null)
+        {
+            builder.AppendLine("Transport:");
+            builder.AppendLine($"  ParseAccepted: {analysis.ParseResult.IsAccepted}");
+            builder.AppendLine($"  ParseReason: {analysis.ParseResult.Reason}");
+            builder.AppendLine($"  MagicValid: {analysis.ParseResult.MagicValid}");
+            builder.AppendLine($"  ProtocolProfileValid: {analysis.ParseResult.ProtocolProfileValid}");
+            builder.AppendLine($"  FrameSchemaValid: {analysis.ParseResult.FrameSchemaValid}");
+            builder.AppendLine($"  HeaderCrcValid: {analysis.ParseResult.HeaderCrcValid}");
+            builder.AppendLine($"  PayloadCrcValid: {analysis.ParseResult.PayloadCrcValid}");
+            builder.AppendLine($"  TransportBytes: {BitConverter.ToString(analysis.ParseResult.TransportBytes)}");
         }
 
         if (analysis.Frame is not null)
@@ -186,10 +214,53 @@ internal sealed class InspectorForm : Form
         foreach (var sample in analysis.Samples)
         {
             builder.AppendLine(
-                $"  {sample.SegmentIndex:00}: symbol={sample.Symbol} confidence={sample.Confidence:F3} distance={sample.Distance:F3} rgb={sample.SampleColor.R},{sample.SampleColor.G},{sample.SampleColor.B}");
+                $"  {sample.SegmentIndex:00}: symbol={sample.Symbol} confidence={sample.Confidence:F3} distance={sample.Distance:F3} second={sample.SecondChoiceSymbol}/{sample.SecondChoiceDistance:F3} rgb={sample.SampleColor.R},{sample.SampleColor.G},{sample.SampleColor.B}");
+            foreach (var probe in sample.Probes)
+            {
+                builder.AppendLine(
+                    $"      probe=({probe.X},{probe.Y}) rgb={probe.SampleColor.R},{probe.SampleColor.G},{probe.SampleColor.B}");
+            }
         }
 
         return builder.ToString();
+    }
+
+    private static void AppendSidecarSummary(StringBuilder builder, string sidecarPath)
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(sidecarPath));
+        var root = document.RootElement;
+
+        if (root.TryGetProperty("backend", out var backend))
+        {
+            builder.AppendLine($"Backend: {backend.GetString()}");
+        }
+
+        if (root.TryGetProperty("clientRect", out var clientRect))
+        {
+            builder.AppendLine(
+                $"ClientRect: {clientRect.GetProperty("left").GetInt32()},{clientRect.GetProperty("top").GetInt32()} {clientRect.GetProperty("width").GetInt32()}x{clientRect.GetProperty("height").GetInt32()}");
+        }
+
+        if (root.TryGetProperty("captureRect", out var captureRect))
+        {
+            builder.AppendLine(
+                $"CaptureRect: {captureRect.GetProperty("left").GetInt32()},{captureRect.GetProperty("top").GetInt32()} {captureRect.GetProperty("width").GetInt32()}x{captureRect.GetProperty("height").GetInt32()}");
+        }
+    }
+
+    private static string FormatPattern(IEnumerable<byte> symbols)
+    {
+        return string.Join(" ", symbols.Select(static symbol => symbol.ToString()));
+    }
+
+    private static string FormatObservedPattern(IReadOnlyList<SegmentSample> samples, int start, int length)
+    {
+        return string.Join(
+            " ",
+            samples
+                .Where(sample => sample.SegmentIndex >= start && sample.SegmentIndex < start + length)
+                .OrderBy(sample => sample.SegmentIndex)
+                .Select(sample => sample.Symbol.ToString()));
     }
 }
 
@@ -232,12 +303,29 @@ internal sealed class StripPreviewControl : Control
         }
 
         using var pen = new Pen(Color.LimeGreen, 1);
+        using var roiPen = new Pen(Color.Gold, 1);
+        using var probeBrush = new SolidBrush(Color.DeepPink);
         var detection = _analysis.Detection;
         var bandHeight = StripProfiles.Default.SegmentHeight * detection.Scale * Zoom;
+        var bandWidth = StripProfiles.Default.SegmentCount * detection.Pitch * Zoom;
+        e.Graphics.DrawRectangle(
+            roiPen,
+            (float)(detection.OriginX * Zoom),
+            (float)(detection.OriginY * Zoom),
+            (float)bandWidth,
+            (float)bandHeight);
         for (var segmentIndex = 0; segmentIndex <= StripProfiles.Default.SegmentCount; segmentIndex++)
         {
             var x = (float)((detection.OriginX + (segmentIndex * detection.Pitch)) * Zoom);
             e.Graphics.DrawLine(pen, x, detection.OriginY * Zoom, x, (float)(detection.OriginY * Zoom + bandHeight));
+        }
+
+        foreach (var sample in _analysis.Samples)
+        {
+            foreach (var probe in sample.Probes)
+            {
+                e.Graphics.FillEllipse(probeBrush, (probe.X * Zoom) - 2, (probe.Y * Zoom) - 2, 4, 4);
+            }
         }
     }
 

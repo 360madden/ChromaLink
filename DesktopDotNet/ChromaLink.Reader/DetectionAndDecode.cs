@@ -6,26 +6,40 @@ public sealed record DetectionResult(
     double Pitch,
     double Scale,
     double ControlError,
+    double LeftControlScore,
+    double RightControlScore,
+    double AnchorLumaDelta,
     string SearchMode,
     Bgr24Color BlackAnchor,
     Bgr24Color WhiteAnchor);
+
+public sealed record SegmentProbe(
+    int X,
+    int Y,
+    Bgr24Color SampleColor);
 
 public sealed record SegmentSample(
     int SegmentIndex,
     byte Symbol,
     double Confidence,
     double Distance,
-    Bgr24Color SampleColor);
+    byte SecondChoiceSymbol,
+    double SecondChoiceDistance,
+    Bgr24Color SampleColor,
+    IReadOnlyList<SegmentProbe> Probes);
 
 public sealed record FrameValidationResult(
     bool IsAccepted,
     string Reason,
     DetectionResult? Detection,
     IReadOnlyList<SegmentSample> Samples,
-    CoreStatusFrame? Frame);
+    CoreStatusFrame? Frame,
+    TransportParseResult? ParseResult);
 
 internal readonly record struct NormalizedRgb(double R, double G, double B)
 {
+    public double Luma => (R * 0.299) + (G * 0.587) + (B * 0.114);
+
     public double DistanceTo(NormalizedRgb other)
     {
         var deltaR = R - other.R;
@@ -35,90 +49,59 @@ internal readonly record struct NormalizedRgb(double R, double G, double B)
     }
 }
 
-internal readonly record struct ColorClassification(byte Symbol, double Confidence, double Distance);
+internal readonly record struct ColorClassification(
+    byte Symbol,
+    double Confidence,
+    double Distance,
+    byte SecondChoiceSymbol,
+    double SecondChoiceDistance);
 
 public static class ColorStripAnalyzer
 {
-    private const double ControlRejectThreshold = 0.30;
-    private const double LeftOnlyControlRejectThreshold = 0.38;
-    private const double PayloadConfidenceThreshold = 0.10;
-    private const double PayloadDistanceThreshold = 0.40;
+    private const double LeftControlAcceptThreshold = 0.28;
+    private const double MinimumAnchorLumaDelta = 26.0;
+    private const double PayloadConfidenceThreshold = 0.08;
+    private const double PayloadDistanceThreshold = 0.52;
+    private static readonly (double X, double Y)[] ProbeOffsets =
+    {
+        (0.18, 0.08),
+        (0.50, 0.08),
+        (0.82, 0.08),
+        (0.32, 0.16),
+        (0.68, 0.16),
+        (0.50, 0.24)
+    };
 
     public static FrameValidationResult Analyze(Bgr24Frame image, StripProfile? profile = null)
     {
         profile ??= StripProfiles.Default;
-        if (!TryLocate(image, profile, out var detection, out var locateReason))
+
+        if (!TryFindBestCandidate(image, profile, out var candidate))
         {
-            return new FrameValidationResult(false, locateReason, detection, Array.Empty<SegmentSample>(), null);
+            return new FrameValidationResult(false, DescribeMissingStrip(image), null, Array.Empty<SegmentSample>(), null, null);
         }
 
-        var acceptedDetection = detection!;
-        var samples = SampleAllSegments(image, profile, acceptedDetection);
-        if (!ControlSegmentsMatch(profile, samples, acceptedDetection.SearchMode == "left-control-scan"))
+        if (candidate is null)
         {
-            return new FrameValidationResult(false, "Control marker mismatch.", detection, samples, null);
+            return new FrameValidationResult(false, "Pitch mismatch.", null, Array.Empty<SegmentSample>(), null, null);
         }
 
-        var payloadSymbols = new byte[profile.PayloadSymbolCount];
-        for (var index = 0; index < profile.PayloadSymbolCount; index++)
+        if (candidate.Frame is not null)
         {
-            var sample = samples[profile.PayloadStartIndex + index];
-            payloadSymbols[index] = sample.Symbol;
-            if (sample.Confidence < PayloadConfidenceThreshold || sample.Distance > PayloadDistanceThreshold)
-            {
-                return new FrameValidationResult(false, "Low color-classification confidence.", detection, samples, null);
-            }
+            return new FrameValidationResult(true, "Accepted", candidate.Detection, candidate.Samples, candidate.Frame, candidate.ParseResult);
         }
 
-        var bytes = FrameProtocol.DecodePayloadSymbolsToBytes(payloadSymbols);
-        if (!FrameProtocol.TryParseCoreFrameBytes(bytes, out var frame, out var reason))
-        {
-            return new FrameValidationResult(false, reason, detection, samples, null);
-        }
-
-        var acceptedReason = acceptedDetection.SearchMode == "left-control-scan"
-            ? "Accepted (left-control fallback)"
-            : "Accepted";
-        return new FrameValidationResult(true, acceptedReason, detection, samples, frame);
+        return new FrameValidationResult(false, candidate.Reason, candidate.Detection, candidate.Samples, null, candidate.ParseResult);
     }
 
-    private static bool TryLocate(Bgr24Frame image, StripProfile profile, out DetectionResult? detection, out string reason)
+    private static bool TryFindBestCandidate(Bgr24Frame image, StripProfile profile, out Candidate? candidate)
     {
-        if (TryLocateWithMode(image, profile, includeRightControl: true, "control-scan", out detection, out reason))
+        candidate = null;
+        Candidate? bestAccepted = null;
+        Candidate? bestRejected = null;
+
+        foreach (var scale in EnumerateScales())
         {
-            return true;
-        }
-
-        if (TryLocateWithMode(image, profile, includeRightControl: false, "left-control-scan", out detection, out reason))
-        {
-            return true;
-        }
-
-        if (detection is not null)
-        {
-            reason = "Control marker mismatch.";
-            return false;
-        }
-
-        reason = DescribeMissingStrip(image);
-        return false;
-    }
-
-    private static bool TryLocateWithMode(
-        Bgr24Frame image,
-        StripProfile profile,
-        bool includeRightControl,
-        string searchMode,
-        out DetectionResult? detection,
-        out string reason)
-    {
-        detection = null;
-        reason = "Control marker mismatch.";
-        Candidate? best = null;
-
-        for (var scaled = 94; scaled <= 106; scaled++)
-        {
-            var scale = scaled / 100.0;
             var pitch = profile.SegmentWidth * scale;
             var bandWidth = (int)Math.Ceiling(profile.SegmentCount * pitch);
             var bandHeight = (int)Math.Ceiling(profile.SegmentHeight * scale);
@@ -127,175 +110,220 @@ public static class ColorStripAnalyzer
                 continue;
             }
 
-            var maxX = Math.Min(Math.Max(0, image.Width - bandWidth), 12);
-            var maxY = Math.Min(Math.Max(0, image.Height - bandHeight), 8);
+            var maxX = Math.Min(Math.Max(0, image.Width - bandWidth), 4);
+            var maxY = Math.Min(Math.Max(0, image.Height - bandHeight), 2);
             for (var originY = 0; originY <= maxY; originY++)
             {
                 for (var originX = 0; originX <= maxX; originX++)
                 {
-                    var candidate = ScoreCandidate(image, profile, originX, originY, scale, includeRightControl);
-                    if (candidate is null)
+                    var current = EvaluateCandidate(image, profile, originX, originY, scale);
+                    if (current is null)
                     {
                         continue;
                     }
 
-                    if (best is null
-                        || (candidate.PayloadValidated && !best.PayloadValidated)
-                        || (candidate.PayloadValidated == best.PayloadValidated && candidate.ControlError < best.ControlError))
+                    if (current.Frame is not null)
                     {
-                        best = candidate;
+                        if (bestAccepted is null
+                            || current.Detection.LeftControlScore < bestAccepted.Detection.LeftControlScore
+                            || (Math.Abs(current.Detection.LeftControlScore - bestAccepted.Detection.LeftControlScore) < 0.0001
+                                && current.Detection.RightControlScore < bestAccepted.Detection.RightControlScore))
+                        {
+                            bestAccepted = current;
+                        }
+                    }
+                    else if (bestRejected is null
+                             || current.Detection.LeftControlScore < bestRejected.Detection.LeftControlScore
+                             || (Math.Abs(current.Detection.LeftControlScore - bestRejected.Detection.LeftControlScore) < 0.0001
+                                 && current.Detection.RightControlScore < bestRejected.Detection.RightControlScore))
+                    {
+                        bestRejected = current;
                     }
                 }
             }
         }
 
-        if (best is null)
-        {
-            return false;
-        }
-
-        detection = new DetectionResult(
-            best.OriginX,
-            best.OriginY,
-            best.Pitch,
-            best.Scale,
-            best.ControlError,
-            searchMode,
-            best.BlackAnchor,
-            best.WhiteAnchor);
-
-        var rejectThreshold = includeRightControl ? ControlRejectThreshold : LeftOnlyControlRejectThreshold;
-        if (best.ControlError > rejectThreshold)
-        {
-            return false;
-        }
-
-        if (!includeRightControl && !best.PayloadValidated)
-        {
-            return false;
-        }
-
-        reason = "Accepted";
-        return true;
+        candidate = bestAccepted ?? bestRejected;
+        return candidate is not null;
     }
 
-    private static Candidate? ScoreCandidate(Bgr24Frame image, StripProfile profile, int originX, int originY, double scale, bool includeRightControl)
+    private static IEnumerable<double> EnumerateScales()
+    {
+        for (var scaled = 32; scaled <= 40; scaled++)
+        {
+            yield return scaled / 100.0;
+        }
+
+        for (var scaled = 99; scaled <= 102; scaled++)
+        {
+            yield return scaled / 100.0;
+        }
+    }
+
+    private static Candidate? EvaluateCandidate(Bgr24Frame image, StripProfile profile, int originX, int originY, double scale)
     {
         var pitch = profile.SegmentWidth * scale;
         var segmentHeight = profile.SegmentHeight * scale;
-        var radius = Math.Max(0, (int)Math.Round(Math.Min(pitch, segmentHeight) * 0.12));
+        var radius = Math.Max(0, (int)Math.Round(Math.Min(pitch, segmentHeight) * 0.05));
 
-        var controlSamples = new List<(int SegmentIndex, byte ExpectedSymbol, Bgr24Color Color)>();
-        for (var index = 0; index < profile.LeftControl.Length; index++)
+        var leftBlackWhite = new List<Bgr24Color>(4);
+        for (var controlIndex = 0; controlIndex < 4; controlIndex++)
         {
-            controlSamples.Add((index, profile.LeftControl[index], SampleSegment(image, originX, originY, pitch, segmentHeight, index, radius)));
+            var measured = MeasureSegment(image, originX, originY, pitch, segmentHeight, controlIndex, radius);
+            leftBlackWhite.Add(measured.SampleColor);
         }
 
-        for (var index = 0; includeRightControl && index < profile.RightControl.Length; index++)
-        {
-            var segmentIndex = profile.SegmentCount - profile.RightControl.Length + index;
-            controlSamples.Add((segmentIndex, profile.RightControl[index], SampleSegment(image, originX, originY, pitch, segmentHeight, segmentIndex, radius)));
-        }
-
-        var blackAnchor = AverageAnchor(controlSamples, 0);
-        var whiteAnchor = AverageAnchor(controlSamples, 1);
-        if (GetLuma(whiteAnchor) - GetLuma(blackAnchor) < 40.0)
+        var blackAnchor = AverageColors(leftBlackWhite[0], leftBlackWhite[2]);
+        var whiteAnchor = AverageColors(leftBlackWhite[1], leftBlackWhite[3]);
+        var anchorLumaDelta = GetLuma(whiteAnchor) - GetLuma(blackAnchor);
+        if (anchorLumaDelta < MinimumAnchorLumaDelta)
         {
             return null;
         }
 
-        double totalError = 0;
-        foreach (var sample in controlSamples)
+        var detection = new DetectionResult(
+            originX,
+            originY,
+            pitch,
+            scale,
+            0,
+            0,
+            0,
+            anchorLumaDelta,
+            "fixed-profile",
+            blackAnchor,
+            whiteAnchor);
+
+        var samples = SampleAllSegments(image, profile, detection, radius);
+        var leftControlScore = ComputeControlScore(profile.LeftControl, 0, samples, profile, blackAnchor, whiteAnchor);
+        var rightControlStart = profile.SegmentCount - profile.RightControl.Length;
+        var rightControlScore = ComputeControlScore(profile.RightControl, rightControlStart, samples, profile, blackAnchor, whiteAnchor);
+        detection = detection with
         {
-            var normalizedSample = Normalize(sample.Color, blackAnchor, whiteAnchor);
-            var normalizedExpected = NormalizeIdeal(profile.GetPaletteColor(sample.ExpectedSymbol));
-            totalError += normalizedSample.DistanceTo(normalizedExpected);
+            ControlError = leftControlScore,
+            LeftControlScore = leftControlScore,
+            RightControlScore = rightControlScore
+        };
+
+        for (var grayscaleIndex = 0; grayscaleIndex < 4; grayscaleIndex++)
+        {
+            if (samples[grayscaleIndex].Symbol != profile.LeftControl[grayscaleIndex])
+            {
+                return new Candidate(detection, samples, null, null, "Control marker mismatch.");
+            }
         }
 
-        var controlError = totalError / controlSamples.Count;
-        var payloadValidated = includeRightControl || TryValidatePayloadCandidate(image, profile, originX, originY, pitch, scale, blackAnchor, whiteAnchor);
-        return new Candidate(originX, originY, pitch, scale, controlError, blackAnchor, whiteAnchor, payloadValidated);
+        if (leftControlScore > LeftControlAcceptThreshold)
+        {
+            return new Candidate(detection, samples, null, null, "Control marker mismatch.");
+        }
+
+        var payloadSymbols = new byte[profile.PayloadSymbolCount];
+        var hasLowConfidence = false;
+        for (var index = 0; index < profile.PayloadSymbolCount; index++)
+        {
+            var sample = samples[profile.PayloadStartIndex + index];
+            payloadSymbols[index] = sample.Symbol;
+            if (sample.Confidence < PayloadConfidenceThreshold || sample.Distance > PayloadDistanceThreshold)
+            {
+                hasLowConfidence = true;
+            }
+        }
+
+        var parseResult = FrameProtocol.AnalyzeCoreFrameBytes(FrameProtocol.DecodePayloadSymbolsToBytes(payloadSymbols));
+        if (parseResult.IsAccepted && parseResult.Frame is not null)
+        {
+            return new Candidate(detection, samples, parseResult.Frame, parseResult, "Accepted");
+        }
+
+        if (hasLowConfidence)
+        {
+            return new Candidate(detection, samples, null, parseResult, "Low color-classification confidence.");
+        }
+
+        return new Candidate(detection, samples, null, parseResult, parseResult.Reason);
     }
 
-    private static List<SegmentSample> SampleAllSegments(Bgr24Frame image, StripProfile profile, DetectionResult detection)
+    private static List<SegmentSample> SampleAllSegments(Bgr24Frame image, StripProfile profile, DetectionResult detection, int radius)
     {
         var segmentHeight = profile.SegmentHeight * detection.Scale;
-        var radius = Math.Max(0, (int)Math.Round(Math.Min(detection.Pitch, segmentHeight) * 0.12));
         var samples = new List<SegmentSample>(profile.SegmentCount);
         for (var segmentIndex = 0; segmentIndex < profile.SegmentCount; segmentIndex++)
         {
-            var sampleColor = SampleSegment(image, detection.OriginX, detection.OriginY, detection.Pitch, segmentHeight, segmentIndex, radius);
-            var classification = Classify(sampleColor, profile, detection.BlackAnchor, detection.WhiteAnchor);
-            samples.Add(new SegmentSample(segmentIndex, classification.Symbol, classification.Confidence, classification.Distance, sampleColor));
+            var measured = MeasureSegment(image, detection.OriginX, detection.OriginY, detection.Pitch, segmentHeight, segmentIndex, radius);
+            var classification = Classify(measured.SampleColor, profile, detection.BlackAnchor, detection.WhiteAnchor);
+            samples.Add(new SegmentSample(
+                segmentIndex,
+                classification.Symbol,
+                classification.Confidence,
+                classification.Distance,
+                classification.SecondChoiceSymbol,
+                classification.SecondChoiceDistance,
+                measured.SampleColor,
+                measured.Probes));
         }
 
         return samples;
     }
 
-    private static bool ControlSegmentsMatch(StripProfile profile, IReadOnlyList<SegmentSample> samples, bool leftOnly)
+    private static MeasuredSegment MeasureSegment(
+        Bgr24Frame image,
+        int originX,
+        int originY,
+        double pitch,
+        double segmentHeight,
+        int segmentIndex,
+        int radius)
     {
-        for (var index = 0; index < profile.LeftControl.Length; index++)
+        var probes = new List<SegmentProbe>(ProbeOffsets.Length);
+        foreach (var (probeX, probeY) in ProbeOffsets)
         {
-            if (samples[index].Symbol != profile.LeftControl[index])
-            {
-                return false;
-            }
+            var x = originX + ((segmentIndex + probeX) * pitch);
+            var y = originY + (probeY * segmentHeight);
+            var roundedX = (int)Math.Round(x);
+            var roundedY = (int)Math.Round(y);
+            probes.Add(new SegmentProbe(roundedX, roundedY, image.SampleAverage(x, y, radius)));
         }
 
-        if (leftOnly)
-        {
-            return true;
-        }
-
-        for (var index = 0; index < profile.RightControl.Length; index++)
-        {
-            var segmentIndex = profile.SegmentCount - profile.RightControl.Length + index;
-            if (samples[segmentIndex].Symbol != profile.RightControl[index])
-            {
-                return false;
-            }
-        }
-
-        return true;
+        return new MeasuredSegment(MedianColor(probes.Select(static probe => probe.SampleColor)), probes);
     }
 
-    private static Bgr24Color SampleSegment(Bgr24Frame image, int originX, int originY, double pitch, double segmentHeight, int segmentIndex, int radius)
+    private static double ComputeControlScore(
+        IReadOnlyList<byte> expectedSymbols,
+        int startIndex,
+        IReadOnlyList<SegmentSample> samples,
+        StripProfile profile,
+        Bgr24Color blackAnchor,
+        Bgr24Color whiteAnchor)
     {
-        var centerX = originX + ((segmentIndex + 0.5) * pitch);
-        var centerY = originY + Math.Max(2.0, segmentHeight * 0.25);
-        return image.SampleAverage(centerX, centerY, radius);
-    }
-
-    private static Bgr24Color AverageAnchor(IEnumerable<(int SegmentIndex, byte ExpectedSymbol, Bgr24Color Color)> samples, byte symbol)
-    {
-        long sumB = 0;
-        long sumG = 0;
-        long sumR = 0;
-        long count = 0;
-        foreach (var sample in samples)
+        double total = 0.0;
+        for (var index = 0; index < expectedSymbols.Count; index++)
         {
-            if (sample.ExpectedSymbol != symbol)
-            {
-                continue;
-            }
-
-            sumB += sample.Color.B;
-            sumG += sample.Color.G;
-            sumR += sample.Color.R;
-            count++;
+            total += ComputeControlSegmentError(samples[startIndex + index], expectedSymbols[index], profile, blackAnchor, whiteAnchor);
         }
 
-        if (count == 0)
-        {
-            return symbol == 0 ? Bgr24Color.Black : Bgr24Color.White;
-        }
-
-        return new Bgr24Color((byte)(sumB / count), (byte)(sumG / count), (byte)(sumR / count));
+        return total / expectedSymbols.Count;
     }
 
-    private static double GetLuma(Bgr24Color color)
+    private static double ComputeControlSegmentError(
+        SegmentSample sample,
+        byte expectedSymbol,
+        StripProfile profile,
+        Bgr24Color blackAnchor,
+        Bgr24Color whiteAnchor)
     {
-        return (color.R * 0.299) + (color.G * 0.587) + (color.B * 0.114);
+        var normalizedSample = Normalize(sample.SampleColor, blackAnchor, whiteAnchor);
+        var normalizedExpected = NormalizeIdeal(profile.GetPaletteColor(expectedSymbol));
+        var colorError = normalizedSample.DistanceTo(normalizedExpected);
+        var lumaError = Math.Abs(normalizedSample.Luma - normalizedExpected.Luma);
+        var symbolPenalty = sample.Symbol == expectedSymbol ? 0.0 : 0.12;
+
+        if (expectedSymbol == 0 || expectedSymbol == 1)
+        {
+            return (lumaError * 0.65) + (colorError * 0.25) + symbolPenalty;
+        }
+
+        return (colorError * 0.65) + (lumaError * 0.25) + symbolPenalty;
     }
 
     private static ColorClassification Classify(Bgr24Color sampleColor, StripProfile profile, Bgr24Color blackAnchor, Bgr24Color whiteAnchor)
@@ -304,6 +332,7 @@ public static class ColorStripAnalyzer
         var bestDistance = double.MaxValue;
         var secondDistance = double.MaxValue;
         byte bestSymbol = 0;
+        byte secondSymbol = 0;
 
         foreach (var entry in profile.Palette)
         {
@@ -312,18 +341,20 @@ public static class ColorStripAnalyzer
             if (distance < bestDistance)
             {
                 secondDistance = bestDistance;
+                secondSymbol = bestSymbol;
                 bestDistance = distance;
                 bestSymbol = entry.Symbol;
             }
             else if (distance < secondDistance)
             {
                 secondDistance = distance;
+                secondSymbol = entry.Symbol;
             }
         }
 
         var separation = secondDistance <= 0.0001 ? 1.0 : Math.Clamp((secondDistance - bestDistance) / secondDistance, 0.0, 1.0);
-        var absolute = Math.Clamp(1.0 - (bestDistance / 0.75), 0.0, 1.0);
-        return new ColorClassification(bestSymbol, separation * absolute, bestDistance);
+        var absolute = Math.Clamp(1.0 - (bestDistance / 0.90), 0.0, 1.0);
+        return new ColorClassification(bestSymbol, separation * absolute, bestDistance, secondSymbol, secondDistance);
     }
 
     private static string DescribeMissingStrip(Bgr24Frame image)
@@ -340,39 +371,6 @@ public static class ColorStripAnalyzer
         }
 
         return "Pitch mismatch.";
-    }
-
-    private static bool TryValidatePayloadCandidate(
-        Bgr24Frame image,
-        StripProfile profile,
-        int originX,
-        int originY,
-        double pitch,
-        double scale,
-        Bgr24Color blackAnchor,
-        Bgr24Color whiteAnchor)
-    {
-        var detection = new DetectionResult(originX, originY, pitch, scale, 0, "left-control-scan", blackAnchor, whiteAnchor);
-        var samples = SampleAllSegments(image, profile, detection);
-        if (!ControlSegmentsMatch(profile, samples, leftOnly: true))
-        {
-            return false;
-        }
-
-        var payloadSymbols = new byte[profile.PayloadSymbolCount];
-        for (var index = 0; index < profile.PayloadSymbolCount; index++)
-        {
-            var sample = samples[profile.PayloadStartIndex + index];
-            if (sample.Confidence < PayloadConfidenceThreshold || sample.Distance > PayloadDistanceThreshold)
-            {
-                return false;
-            }
-
-            payloadSymbols[index] = sample.Symbol;
-        }
-
-        var bytes = FrameProtocol.DecodePayloadSymbolsToBytes(payloadSymbols);
-        return FrameProtocol.TryParseCoreFrameBytes(bytes, out _, out _);
     }
 
     private static NormalizedRgb Normalize(Bgr24Color color, Bgr24Color blackAnchor, Bgr24Color whiteAnchor)
@@ -397,13 +395,39 @@ public static class ColorStripAnalyzer
         return Math.Clamp((value - black) / denominator, 0.0, 1.0);
     }
 
+    private static double GetLuma(Bgr24Color color)
+    {
+        return (color.R * 0.299) + (color.G * 0.587) + (color.B * 0.114);
+    }
+
+    private static Bgr24Color AverageColors(Bgr24Color left, Bgr24Color right)
+    {
+        return new Bgr24Color(
+            (byte)((left.B + right.B) / 2),
+            (byte)((left.G + right.G) / 2),
+            (byte)((left.R + right.R) / 2));
+    }
+
+    private static Bgr24Color MedianColor(IEnumerable<Bgr24Color> colors)
+    {
+        var materialized = colors.ToArray();
+        Array.Sort(materialized, static (left, right) => left.B.CompareTo(right.B));
+        var medianB = materialized[materialized.Length / 2].B;
+        Array.Sort(materialized, static (left, right) => left.G.CompareTo(right.G));
+        var medianG = materialized[materialized.Length / 2].G;
+        Array.Sort(materialized, static (left, right) => left.R.CompareTo(right.R));
+        var medianR = materialized[materialized.Length / 2].R;
+        return new Bgr24Color(medianB, medianG, medianR);
+    }
+
     private sealed record Candidate(
-        int OriginX,
-        int OriginY,
-        double Pitch,
-        double Scale,
-        double ControlError,
-        Bgr24Color BlackAnchor,
-        Bgr24Color WhiteAnchor,
-        bool PayloadValidated);
+        DetectionResult Detection,
+        IReadOnlyList<SegmentSample> Samples,
+        CoreStatusFrame? Frame,
+        TransportParseResult? ParseResult,
+        string Reason);
+
+    private sealed record MeasuredSegment(
+        Bgr24Color SampleColor,
+        IReadOnlyList<SegmentProbe> Probes);
 }

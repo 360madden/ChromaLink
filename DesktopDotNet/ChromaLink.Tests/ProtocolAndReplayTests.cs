@@ -64,9 +64,9 @@ public class ProtocolAndReplayTests
         var validation = ColorStripAnalyzer.Analyze(image, _profile);
 
         Assert.True(validation.IsAccepted, validation.Reason);
-        Assert.Equal("Accepted (left-control fallback)", validation.Reason);
         Assert.NotNull(validation.Detection);
-        Assert.Equal("left-control-scan", validation.Detection!.SearchMode);
+        Assert.Equal("fixed-profile", validation.Detection!.SearchMode);
+        Assert.True(validation.Detection.RightControlScore > validation.Detection.LeftControlScore);
     }
 
     [Fact]
@@ -78,5 +78,23 @@ public class ProtocolAndReplayTests
 
         Assert.False(validation.IsAccepted);
         Assert.Contains("blank surface", validation.Reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Analyzer_Accepts_RealClientScaledFixture()
+    {
+        var fixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "live-client-scale-035.bmp");
+        var image = BmpIO.Load(fixturePath);
+
+        var validation = ColorStripAnalyzer.Analyze(image, _profile);
+
+        Assert.True(validation.IsAccepted, validation.Reason);
+        Assert.NotNull(validation.Detection);
+        Assert.Equal("fixed-profile", validation.Detection!.SearchMode);
+        Assert.Equal(0.35, validation.Detection.Scale, 2);
+        Assert.Equal(2.8, validation.Detection.Pitch, 1);
+        Assert.NotNull(validation.ParseResult);
+        Assert.True(validation.ParseResult!.HeaderCrcValid);
+        Assert.True(validation.ParseResult.PayloadCrcValid);
     }
 }

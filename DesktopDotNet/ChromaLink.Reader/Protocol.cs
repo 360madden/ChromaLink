@@ -62,6 +62,17 @@ public sealed record CoreStatusFrame(
     uint PayloadCrc32C,
     byte[] TransportBytes);
 
+public sealed record TransportParseResult(
+    bool IsAccepted,
+    string Reason,
+    bool MagicValid,
+    bool ProtocolProfileValid,
+    bool FrameSchemaValid,
+    bool HeaderCrcValid,
+    bool PayloadCrcValid,
+    byte[] TransportBytes,
+    CoreStatusFrame? Frame);
+
 public static class TransportConstants
 {
     public const byte MagicC = (byte)'C';
@@ -170,51 +181,68 @@ public static class FrameProtocol
 
     public static bool TryParseCoreFrameBytes(ReadOnlySpan<byte> bytes, out CoreStatusFrame? frame, out string reason)
     {
-        frame = null;
+        var result = AnalyzeCoreFrameBytes(bytes);
+        frame = result.Frame;
+        reason = result.Reason;
+        return result.IsAccepted;
+    }
+
+    public static TransportParseResult AnalyzeCoreFrameBytes(ReadOnlySpan<byte> bytes)
+    {
+        CoreStatusFrame? frame = null;
+        var transportBytes = bytes.ToArray();
 
         if (bytes.Length != TransportConstants.TransportBytes)
         {
-            reason = $"Expected {TransportConstants.TransportBytes} transport bytes, got {bytes.Length}.";
-            return false;
+            return new TransportParseResult(
+                false,
+                $"Expected {TransportConstants.TransportBytes} transport bytes, got {bytes.Length}.",
+                false,
+                false,
+                false,
+                false,
+                false,
+                transportBytes,
+                null);
         }
 
-        if (bytes[0] != TransportConstants.MagicC || bytes[1] != TransportConstants.MagicL)
+        var magicValid = bytes[0] == TransportConstants.MagicC && bytes[1] == TransportConstants.MagicL;
+        if (!magicValid)
         {
-            reason = "Invalid magic/version.";
-            return false;
+            return new TransportParseResult(false, "Invalid magic/version.", false, false, false, false, false, transportBytes, null);
         }
 
         var protocolVersion = (byte)(bytes[2] >> 4);
         var profileId = (byte)(bytes[2] & 0x0F);
         var frameType = (byte)(bytes[3] >> 4);
         var schemaId = (byte)(bytes[3] & 0x0F);
-        if (protocolVersion != TransportConstants.ProtocolVersion || profileId != StripProfiles.Default.NumericId)
+        var protocolProfileValid = protocolVersion == TransportConstants.ProtocolVersion && profileId == StripProfiles.Default.NumericId;
+        if (!protocolProfileValid)
         {
-            reason = "Invalid magic/version.";
-            return false;
+            return new TransportParseResult(false, "Invalid magic/version.", true, false, false, false, false, transportBytes, null);
         }
 
-        if (frameType != TransportConstants.CoreFrameType || schemaId != TransportConstants.CoreSchemaId)
+        var frameSchemaValid = frameType == TransportConstants.CoreFrameType && schemaId == TransportConstants.CoreSchemaId;
+        if (!frameSchemaValid)
         {
-            reason = "Invalid magic/version.";
-            return false;
+            return new TransportParseResult(false, "Invalid magic/version.", true, true, false, false, false, transportBytes, null);
         }
 
         var expectedHeaderCrc = ComputeCrc16(bytes[..6]);
         var actualHeaderCrc = (ushort)((bytes[6] << 8) | bytes[7]);
-        if (expectedHeaderCrc != actualHeaderCrc)
+        var headerCrcValid = expectedHeaderCrc == actualHeaderCrc;
+        if (!headerCrcValid)
         {
-            reason = "Header CRC failure.";
-            return false;
+            return new TransportParseResult(false, "Header CRC failure.", true, true, true, false, false, transportBytes, null);
         }
 
         var payload = bytes.Slice(8, TransportConstants.PayloadBytes);
         var expectedPayloadCrc = ComputeCrc32C(payload);
         var actualPayloadCrc = (uint)((bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23]);
-        if (expectedPayloadCrc != actualPayloadCrc)
+        var payloadCrcValid = expectedPayloadCrc == actualPayloadCrc;
+        if (!payloadCrcValid)
         {
-            reason = "Payload CRC failure.";
-            return false;
+            return new TransportParseResult(false, "Payload CRC failure.", true, true, true, true, false, transportBytes, null);
         }
 
         var parsedPayload = new CoreStatusSnapshot(
@@ -243,8 +271,7 @@ public static class FrameProtocol
             parsedPayload,
             actualPayloadCrc,
             bytes.ToArray());
-        reason = "Accepted";
-        return true;
+        return new TransportParseResult(true, "Accepted", true, true, true, true, true, transportBytes, frame);
     }
 
     public static ushort ComputeCrc16(ReadOnlySpan<byte> bytes)

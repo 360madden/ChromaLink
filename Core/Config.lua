@@ -12,6 +12,9 @@ ChromaLink.Config = {
   showOnStartup = true,
   refreshIntervalSeconds = 0.10,
   protocolVersion = 1,
+  syntheticMode = {
+    enabled = false
+  },
   profile = {
     id = "P360C",
     numericId = 1,

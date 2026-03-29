@@ -20,8 +20,9 @@ This repo now targets a single live profile:
 
 Current proof level:
 - offline smoke, replay, bench, build, and tests are passing
-- live capture sees the running strip after `/reloadui`
-- live decode is not fully proven yet and still needs one more locator/classification tuning pass against the real client
+- live capture works against the running client with `DesktopDuplication` as the primary backend
+- live decode is proven on the current client and currently locks the real strip at `origin 0,0`, `pitch 2.8`, `scale 0.35`
+- capture runs now emit raw BMP, annotated BMP, and JSON sidecar diagnostics under `AppData\Local\ChromaLink\DesktopDotNet\out`
 
 ## Quick Start
 
@@ -52,7 +53,13 @@ dotnet run --project C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\Chr
 Capture the live top band:
 
 ```powershell
-dotnet run --project C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- capture-dump
+dotnet run --project C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- capture-dump --backend desktopdup
+```
+
+Run a short live decode:
+
+```powershell
+dotnet run --project C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- live 5 100 --backend desktopdup
 ```
 
 Open the inspector:
@@ -71,7 +78,8 @@ Wrapper scripts:
 - [Resize-RiftClient-640x360.cmd](C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\scripts\Resize-RiftClient-640x360.cmd)
 
 If RIFT was already running while Lua files changed, restart the client or reload the addon before expecting `capture-dump` or `live` to see the new strip.
-`capture-dump` compares both `ScreenBitBlt` and `PrintWindow` and reports which backend produced the most useful result.
+`capture-dump`, `live`, and `watch` accept `--backend desktopdup|screen|printwindow`.
+Default live backend order is `DesktopDuplication`, then `ScreenBitBlt`. `PrintWindow` is now debug-only.
 `Reload-RiftUi.cmd` sends the official RIFT `/reloadui` command to the active game window so you can refresh addon changes without restarting the client.
 
 ## Outputs
@@ -82,6 +90,8 @@ Reader artifacts are written under:
 Useful locations:
 - `fixtures\chromalink-color-core.bmp`
 - `out\chromalink-color-capture-dump.bmp`
+- `out\chromalink-color-capture-dump-annotated.bmp`
+- `out\chromalink-color-capture-dump.json`
 - `out\chromalink-color-first-reject.bmp`
 
 ## Source Of Truth

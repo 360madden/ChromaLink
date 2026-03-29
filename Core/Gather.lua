@@ -210,3 +210,20 @@ function ChromaLink.Gather.BuildCoreStatusSnapshot()
     targetCallingRelationPacked = ClampByte((targetCallingCode * 16) + relationCode)
   }
 end
+
+function ChromaLink.Gather.BuildSyntheticCoreStatusSnapshot()
+  return {
+    playerStateFlags = 7,
+    playerHealthPctQ8 = 198,
+    playerResourceKind = config.resourceKinds.mana,
+    playerResourcePctQ8 = 144,
+    targetStateFlags = 15,
+    targetHealthPctQ8 = 91,
+    targetResourceKind = config.resourceKinds.none,
+    targetResourcePctQ8 = 0,
+    playerLevel = 70,
+    targetLevel = 72,
+    playerCallingRolePacked = 49,
+    targetCallingRelationPacked = 66
+  }
+end

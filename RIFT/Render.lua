@@ -7,6 +7,55 @@ local function ApplyColor(frame, color)
   frame:SetBackgroundColor(color[1], color[2], color[3], color[4])
 end
 
+local function ComputeUiScale(rootFrame, profile)
+  local rootWidth = tonumber(rootFrame:GetWidth()) or profile.windowWidth
+  local rootHeight = tonumber(rootFrame:GetHeight()) or profile.windowHeight
+  local scaleX = rootWidth / profile.windowWidth
+  local scaleY = rootHeight / profile.windowHeight
+
+  if scaleX <= 0 then
+    scaleX = 1
+  end
+  if scaleY <= 0 then
+    scaleY = 1
+  end
+
+  return scaleX, scaleY, rootWidth, rootHeight
+end
+
+local function ApplyLayout(renderState)
+  local profile = renderState.profile
+  local scaleX, scaleY, rootWidth, rootHeight = ComputeUiScale(renderState.rootFrame, profile)
+  local index
+
+  if renderState.lastScaleX == scaleX and renderState.lastScaleY == scaleY then
+    return false
+  end
+
+  if renderState.band.ClearAllPoints ~= nil then
+    renderState.band:ClearAllPoints()
+  end
+  renderState.band:SetPoint("TOPLEFT", renderState.rootFrame, "TOPLEFT", 0, 0)
+  renderState.band:SetWidth(profile.bandWidth * scaleX)
+  renderState.band:SetHeight(profile.bandHeight * scaleY)
+
+  for index = 1, profile.segmentCount do
+    local segment = renderState.segments[index]
+    if segment.ClearAllPoints ~= nil then
+      segment:ClearAllPoints()
+    end
+    segment:SetPoint("TOPLEFT", renderState.band, "TOPLEFT", (index - 1) * profile.segmentWidth * scaleX, 0)
+    segment:SetWidth(profile.segmentWidth * scaleX)
+    segment:SetHeight(profile.segmentHeight * scaleY)
+  end
+
+  renderState.lastScaleX = scaleX
+  renderState.lastScaleY = scaleY
+  renderState.lastRootWidth = rootWidth
+  renderState.lastRootHeight = rootHeight
+  return true
+end
+
 function ChromaLink.Render.Initialize(rootFrame)
   local profile = config.profile
   local band = UI.CreateFrame("Frame", "ChromaLinkBand", rootFrame)
@@ -33,15 +82,28 @@ function ChromaLink.Render.Initialize(rootFrame)
 
   return {
     profile = profile,
+    rootFrame = rootFrame,
     band = band,
     segments = segments,
-    lastSymbols = lastSymbols
+    lastSymbols = lastSymbols,
+    lastScaleX = nil,
+    lastScaleY = nil,
+    lastRootWidth = nil,
+    lastRootHeight = nil
   }
+end
+
+function ChromaLink.Render.SyncLayout(renderState)
+  return ApplyLayout(renderState)
 end
 
 function ChromaLink.Render.Update(renderState, symbols)
   local changed = false
   local index
+
+  if ApplyLayout(renderState) then
+    changed = true
+  end
 
   for index = 1, renderState.profile.segmentCount do
     local symbol = symbols[index] or 0
