@@ -127,8 +127,8 @@ public static class ColorStripAnalyzer
                 continue;
             }
 
-            var maxX = Math.Min(Math.Max(0, image.Width - bandWidth), 24);
-            var maxY = Math.Min(Math.Max(0, image.Height - bandHeight), 24);
+            var maxX = Math.Min(Math.Max(0, image.Width - bandWidth), 12);
+            var maxY = Math.Min(Math.Max(0, image.Height - bandHeight), 8);
             for (var originY = 0; originY <= maxY; originY++)
             {
                 for (var originX = 0; originX <= maxX; originX++)
@@ -262,7 +262,7 @@ public static class ColorStripAnalyzer
     private static Bgr24Color SampleSegment(Bgr24Frame image, int originX, int originY, double pitch, double segmentHeight, int segmentIndex, int radius)
     {
         var centerX = originX + ((segmentIndex + 0.5) * pitch);
-        var centerY = originY + (segmentHeight / 2.0);
+        var centerY = originY + Math.Max(2.0, segmentHeight * 0.25);
         return image.SampleAverage(centerX, centerY, radius);
     }
 
