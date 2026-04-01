@@ -22,70 +22,79 @@ Current proof level:
 - offline smoke, replay, bench, build, and tests are passing
 - live capture works against the running client with `DesktopDuplication` as the primary backend
 - live decode is proven on the current client and currently locks the real strip at `origin 0,0`, `pitch 2.8`, `scale 0.35`
-- capture runs now emit raw BMP, annotated BMP, and JSON sidecar diagnostics under `AppData\Local\ChromaLink\DesktopDotNet\out`
+- capture runs emit raw BMP, annotated BMP, and JSON sidecar diagnostics under `AppData\\Local\\ChromaLink\\DesktopDotNet\\out`
 
 ## Quick Start
 
-Prepare the RIFT window:
+### 1) Build once
 
 ```powershell
-dotnet run --project C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- prepare-window 32 32
+dotnet build .\DesktopDotNet\ChromaLink.sln
 ```
 
-Generate and verify a synthetic color-strip fixture:
+### 2) Prepare the RIFT window
 
 ```powershell
-dotnet run --project C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- smoke
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- prepare-window 32 32
 ```
 
-Replay a saved capture:
+### 3) Generate + verify synthetic fixture
 
 ```powershell
-dotnet run --project C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- replay C:\Users\mrkoo\AppData\Local\ChromaLink\DesktopDotNet\fixtures\chromalink-color-core.bmp
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- smoke
 ```
 
-Run the replay bench:
+### 4) Replay a saved capture
 
 ```powershell
-dotnet run --project C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- bench
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- replay "$env:LOCALAPPDATA\ChromaLink\DesktopDotNet\fixtures\chromalink-color-core.bmp"
 ```
 
-Capture the live top band:
+### 5) Capture + decode live strip
 
 ```powershell
-dotnet run --project C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- capture-dump --backend desktopdup
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- capture-dump --backend desktopdup
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- live 5 100 --backend desktopdup
 ```
 
-Run a short live decode:
+### 6) Open inspector
 
 ```powershell
-dotnet run --project C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- live 5 100 --backend desktopdup
+dotnet run --project .\DesktopDotNet\ChromaLink.Inspector\ChromaLink.Inspector.csproj
 ```
 
-Open the inspector:
+## CLI Command Surface
 
-```powershell
-dotnet run --project C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\DesktopDotNet\ChromaLink.Inspector\ChromaLink.Inspector.csproj
-```
+`ChromaLink.Cli` currently supports:
+- `smoke`
+- `replay <bmpPath>`
+- `live [sampleCount] [sleepMs]`
+- `watch [durationSeconds] [sleepMs]`
+- `bench`
+- `capture-dump`
+- `prepare-window [left] [top]`
 
-Wrapper scripts:
-- [Prepare-ChromaLink-640x360.cmd](C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\scripts\Prepare-ChromaLink-640x360.cmd)
-- [Smoke-ChromaLink.cmd](C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\scripts\Smoke-ChromaLink.cmd)
-- [Bench-ChromaLink.cmd](C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\scripts\Bench-ChromaLink.cmd)
-- [Live-ChromaLink.cmd](C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\scripts\Live-ChromaLink.cmd)
-- [Open-ChromaLink-Inspector.cmd](C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\scripts\Open-ChromaLink-Inspector.cmd)
-- [Reload-RiftUi.cmd](C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\scripts\Reload-RiftUi.cmd)
-- [Resize-RiftClient-640x360.cmd](C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\scripts\Resize-RiftClient-640x360.cmd)
+Capture command backend flag:
+- `--backend desktopdup|screen|printwindow`
+- default live backend order: `DesktopDuplication`, then `ScreenBitBlt`
+- `PrintWindow` is debug-only
 
-If RIFT was already running while Lua files changed, restart the client or reload the addon before expecting `capture-dump` or `live` to see the new strip.
-`capture-dump`, `live`, and `watch` accept `--backend desktopdup|screen|printwindow`.
-Default live backend order is `DesktopDuplication`, then `ScreenBitBlt`. `PrintWindow` is now debug-only.
-`Reload-RiftUi.cmd` sends the official RIFT `/reloadui` command to the active game window so you can refresh addon changes without restarting the client.
+## Wrapper Scripts
+
+- [Prepare-ChromaLink-640x360.cmd](scripts/Prepare-ChromaLink-640x360.cmd)
+- [Smoke-ChromaLink.cmd](scripts/Smoke-ChromaLink.cmd)
+- [Bench-ChromaLink.cmd](scripts/Bench-ChromaLink.cmd)
+- [Live-ChromaLink.cmd](scripts/Live-ChromaLink.cmd)
+- [Open-ChromaLink-Inspector.cmd](scripts/Open-ChromaLink-Inspector.cmd)
+- [Reload-RiftUi.cmd](scripts/Reload-RiftUi.cmd)
+- [Resize-RiftClient-640x360.cmd](scripts/Resize-RiftClient-640x360.cmd)
+
+`Reload-RiftUi.cmd` sends the official RIFT `/reloadui` command to the active game window so addon changes can be refreshed without restarting the client.
 
 ## Outputs
 
 Reader artifacts are written under:
-`C:\Users\mrkoo\AppData\Local\ChromaLink\DesktopDotNet`
+- `%LOCALAPPDATA%\ChromaLink\DesktopDotNet`
 
 Useful locations:
 - `fixtures\chromalink-color-core.bmp`
@@ -94,8 +103,28 @@ Useful locations:
 - `out\chromalink-color-capture-dump.json`
 - `out\chromalink-color-first-reject.bmp`
 
+## What Still Needs Development
+
+The project is stable for the first vertical slice, but still intentionally narrow. High-impact next work:
+
+1. **Broader payload coverage**
+   - add additional frame schemas beyond `coreStatus`
+   - formalize schema versioning and negotiation plan
+
+2. **Live robustness and calibration**
+   - reduce sensitivity to UI scaling drift and color/gamma shifts
+   - improve auto-lock and recovery after temporary decode loss
+
+3. **Diagnostics quality**
+   - richer reject reason reporting grouped by capture, geometry, and symbol decode phases
+   - easier side-by-side replay tools for "good vs bad" frame comparisons
+
+4. **Operational ergonomics**
+   - single command for end-to-end local validation (`build + test + smoke + replay + bench`)
+   - documented tuning profiles for common monitor/resolution setups
+
 ## Source Of Truth
 
-- Product direction lives in [PROJECT_PROMPT.md](C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\PROJECT_PROMPT.md)
-- Active desktop solution lives at [DesktopDotNet/ChromaLink.sln](C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\DesktopDotNet\ChromaLink.sln)
-- Barcode-style and archive branches are reference only
+- Product direction: [PROJECT_PROMPT.md](PROJECT_PROMPT.md)
+- Active desktop solution: [DesktopDotNet/ChromaLink.sln](DesktopDotNet/ChromaLink.sln)
+- Barcode-style and archive branches are reference-only
