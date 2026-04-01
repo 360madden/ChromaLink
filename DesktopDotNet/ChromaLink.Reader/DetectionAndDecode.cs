@@ -62,6 +62,9 @@ public static class ColorStripAnalyzer
     private const double MinimumAnchorLumaDelta = 26.0;
     private const double PayloadConfidenceThreshold = 0.08;
     private const double PayloadDistanceThreshold = 0.52;
+    private const int DefaultSearchMaxOffsetX = 4;
+    private const int WideSearchMaxOffsetX = 320;
+    private const int DefaultSearchMaxOffsetY = 2;
     private static readonly (double X, double Y)[] ProbeOffsets =
     {
         (0.18, 0.08),
@@ -110,8 +113,8 @@ public static class ColorStripAnalyzer
                 continue;
             }
 
-            var maxX = Math.Min(Math.Max(0, image.Width - bandWidth), 4);
-            var maxY = Math.Min(Math.Max(0, image.Height - bandHeight), 2);
+            var maxX = Math.Min(Math.Max(0, image.Width - bandWidth), ResolveSearchMaxOffsetX(image, profile));
+            var maxY = Math.Min(Math.Max(0, image.Height - bandHeight), DefaultSearchMaxOffsetY);
             for (var originY = 0; originY <= maxY; originY++)
             {
                 for (var originX = 0; originX <= maxX; originX++)
@@ -158,6 +161,18 @@ public static class ColorStripAnalyzer
         {
             yield return scaled / 100.0;
         }
+    }
+
+    private static int ResolveSearchMaxOffsetX(Bgr24Frame image, StripProfile profile)
+    {
+        // Live captures larger than the fixed profile width may host the strip away from the
+        // crowded top-left HUD zone, so search a wider horizontal window there.
+        if (image.Width > profile.WindowWidth)
+        {
+            return WideSearchMaxOffsetX;
+        }
+
+        return DefaultSearchMaxOffsetX;
     }
 
     private static Candidate? EvaluateCandidate(Bgr24Frame image, StripProfile profile, int originX, int originY, double scale)

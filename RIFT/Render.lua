@@ -2,63 +2,185 @@ ChromaLink = ChromaLink or {}
 ChromaLink.Render = {}
 
 local config = ChromaLink.Config
+local probeBarBackground = { 0.45, 0.45, 0.45, 0.95 }
 
 local function ApplyColor(frame, color)
   frame:SetBackgroundColor(color[1], color[2], color[3], color[4])
 end
 
-local function ComputeUiScale(rootFrame, profile)
-  local rootWidth = tonumber(rootFrame:GetWidth()) or profile.windowWidth
-  local rootHeight = tonumber(rootFrame:GetHeight()) or profile.windowHeight
-  local scaleX = rootWidth / profile.windowWidth
-  local scaleY = rootHeight / profile.windowHeight
-
-  if scaleX <= 0 then
-    scaleX = 1
-  end
-  if scaleY <= 0 then
-    scaleY = 1
+local function ReadDimension(frame, methodName, fallback)
+  if frame == nil or frame[methodName] == nil then
+    return fallback
   end
 
-  return scaleX, scaleY, rootWidth, rootHeight
+  local ok, value = pcall(function()
+    return frame[methodName](frame)
+  end)
+
+  value = tonumber(value) or fallback
+  if not ok or value == nil or value <= 0 then
+    return fallback
+  end
+
+  return value
+end
+
+local function CreateProbeBar(rootFrame, profile)
+  local diagnosticsConfig = config.layoutDiagnostics
+  if diagnosticsConfig == nil or not diagnosticsConfig.enabled then
+    return nil
+  end
+
+  local probeBar = UI.CreateFrame("Frame", "ChromaLinkProbeBar", rootFrame)
+  local markers = {}
+  local symbols = diagnosticsConfig.probeMarkerSymbols or {}
+
+  probeBar:SetPoint(
+    "TOPLEFT",
+    rootFrame,
+    "TOPLEFT",
+    diagnosticsConfig.probeBarOffsetX or 0,
+    diagnosticsConfig.probeBarOffsetY or 32)
+  probeBar:SetWidth(profile.bandWidth)
+  probeBar:SetHeight(diagnosticsConfig.probeBarHeight or 8)
+  probeBar:SetLayer(config.requestedLayer + 2)
+  ApplyColor(probeBar, probeBarBackground)
+
+  for index, symbol in ipairs(symbols) do
+    local marker = UI.CreateFrame("Frame", "ChromaLinkProbeMarker" .. tostring(index), probeBar)
+    marker:SetLayer(config.requestedLayer + 3)
+    ApplyColor(marker, config.GetPaletteColor(symbol))
+    markers[index] = {
+      frame = marker,
+      fraction = (#symbols > 1) and ((index - 1) / (#symbols - 1)) or 0
+    }
+  end
+
+  return {
+    bar = probeBar,
+    markers = markers
+  }
+end
+
+local function ComputeLayout(renderState)
+  local profile = renderState.profile
+  local diagnosticsConfig = config.layoutDiagnostics or {}
+  local anchorFrame = renderState.anchorFrame or UIParent or renderState.rootFrame
+  local anchorWidth = ReadDimension(anchorFrame, "GetWidth", profile.windowWidth)
+  local anchorHeight = ReadDimension(anchorFrame, "GetHeight", profile.windowHeight)
+  local probeBarHeight = 0
+  local probeBarBottom = 0
+  local rootWidth = profile.bandWidth
+  local rootHeight = profile.bandHeight
+  local requestedLeft = tonumber(config.stripOffsetX) or 0
+  local requestedTop = tonumber(config.stripOffsetY) or 0
+
+  if renderState.probeBar ~= nil then
+    probeBarHeight = tonumber(diagnosticsConfig.probeBarHeight) or 12
+    probeBarBottom = (tonumber(diagnosticsConfig.probeBarOffsetY) or 32) + probeBarHeight
+    if probeBarBottom > rootHeight then
+      rootHeight = probeBarBottom
+    end
+  end
+
+  local maxLeft = math.max(0, anchorWidth - rootWidth)
+  local maxTop = math.max(0, anchorHeight - rootHeight)
+  local rootLeft = math.max(0, math.min(requestedLeft, maxLeft))
+  local rootTop = math.max(0, math.min(requestedTop, maxTop))
+
+  return {
+    anchorFrame = anchorFrame,
+    anchorWidth = anchorWidth,
+    anchorHeight = anchorHeight,
+    rootLeft = rootLeft,
+    rootTop = rootTop,
+    rootWidth = rootWidth,
+    rootHeight = rootHeight,
+    probeBarHeight = probeBarHeight
+  }
 end
 
 local function ApplyLayout(renderState)
   local profile = renderState.profile
-  local scaleX, scaleY, rootWidth, rootHeight = ComputeUiScale(renderState.rootFrame, profile)
+  local diagnosticsConfig = config.layoutDiagnostics or {}
+  local layout = ComputeLayout(renderState)
   local index
 
-  if renderState.lastScaleX == scaleX and renderState.lastScaleY == scaleY then
+  if renderState.lastRootLeft == layout.rootLeft
+      and renderState.lastRootTop == layout.rootTop
+      and renderState.lastRootWidth == layout.rootWidth
+      and renderState.lastRootHeight == layout.rootHeight
+      and renderState.lastAnchorWidth == layout.anchorWidth
+      and renderState.lastAnchorHeight == layout.anchorHeight then
     return false
   end
+
+  if renderState.rootFrame.ClearAllPoints ~= nil then
+    renderState.rootFrame:ClearAllPoints()
+  end
+  renderState.rootFrame:SetPoint("TOPLEFT", layout.anchorFrame, "TOPLEFT", layout.rootLeft, layout.rootTop)
+  renderState.rootFrame:SetWidth(layout.rootWidth)
+  renderState.rootFrame:SetHeight(layout.rootHeight)
 
   if renderState.band.ClearAllPoints ~= nil then
     renderState.band:ClearAllPoints()
   end
   renderState.band:SetPoint("TOPLEFT", renderState.rootFrame, "TOPLEFT", 0, 0)
-  renderState.band:SetWidth(profile.bandWidth * scaleX)
-  renderState.band:SetHeight(profile.bandHeight * scaleY)
+  renderState.band:SetWidth(profile.bandWidth)
+  renderState.band:SetHeight(profile.bandHeight)
 
   for index = 1, profile.segmentCount do
     local segment = renderState.segments[index]
     if segment.ClearAllPoints ~= nil then
       segment:ClearAllPoints()
     end
-    segment:SetPoint("TOPLEFT", renderState.band, "TOPLEFT", (index - 1) * profile.segmentWidth * scaleX, 0)
-    segment:SetWidth(profile.segmentWidth * scaleX)
-    segment:SetHeight(profile.segmentHeight * scaleY)
+    segment:SetPoint("TOPLEFT", renderState.band, "TOPLEFT", (index - 1) * profile.segmentWidth, 0)
+    segment:SetWidth(profile.segmentWidth)
+    segment:SetHeight(profile.segmentHeight)
   end
 
-  renderState.lastScaleX = scaleX
-  renderState.lastScaleY = scaleY
-  renderState.lastRootWidth = rootWidth
-  renderState.lastRootHeight = rootHeight
+  if renderState.probeBar ~= nil then
+    local probeBarLeft = diagnosticsConfig.probeBarOffsetX or 0
+    local probeBarTop = diagnosticsConfig.probeBarOffsetY or 32
+    local probeBarWidth = profile.bandWidth
+    local probeBarHeight = diagnosticsConfig.probeBarHeight or 12
+    local markerWidth = diagnosticsConfig.probeMarkerWidth or 20
+    local markerHeight = probeBarHeight
+
+    if renderState.probeBar.bar.ClearAllPoints ~= nil then
+      renderState.probeBar.bar:ClearAllPoints()
+    end
+    renderState.probeBar.bar:SetPoint("TOPLEFT", renderState.rootFrame, "TOPLEFT", probeBarLeft, probeBarTop)
+    renderState.probeBar.bar:SetWidth(probeBarWidth)
+    renderState.probeBar.bar:SetHeight(probeBarHeight)
+
+    for index = 1, #renderState.probeBar.markers do
+      local markerState = renderState.probeBar.markers[index]
+      local marker = markerState.frame
+      local x = markerState.fraction * math.max(0, probeBarWidth - markerWidth)
+
+      if marker.ClearAllPoints ~= nil then
+        marker:ClearAllPoints()
+      end
+      marker:SetPoint("TOPLEFT", renderState.probeBar.bar, "TOPLEFT", x, 0)
+      marker:SetWidth(markerWidth)
+      marker:SetHeight(markerHeight)
+    end
+  end
+
+  renderState.lastRootLeft = layout.rootLeft
+  renderState.lastRootTop = layout.rootTop
+  renderState.lastRootWidth = layout.rootWidth
+  renderState.lastRootHeight = layout.rootHeight
+  renderState.lastAnchorWidth = layout.anchorWidth
+  renderState.lastAnchorHeight = layout.anchorHeight
   return true
 end
 
-function ChromaLink.Render.Initialize(rootFrame)
+function ChromaLink.Render.Initialize(rootFrame, anchorFrame)
   local profile = config.profile
   local band = UI.CreateFrame("Frame", "ChromaLinkBand", rootFrame)
+  local probeBar = CreateProbeBar(rootFrame, profile)
   local segments = {}
   local lastSymbols = {}
   local index
@@ -83,13 +205,17 @@ function ChromaLink.Render.Initialize(rootFrame)
   return {
     profile = profile,
     rootFrame = rootFrame,
+    anchorFrame = anchorFrame,
     band = band,
+    probeBar = probeBar,
     segments = segments,
     lastSymbols = lastSymbols,
-    lastScaleX = nil,
-    lastScaleY = nil,
+    lastRootLeft = nil,
+    lastRootTop = nil,
     lastRootWidth = nil,
-    lastRootHeight = nil
+    lastRootHeight = nil,
+    lastAnchorWidth = nil,
+    lastAnchorHeight = nil
   }
 end
 
