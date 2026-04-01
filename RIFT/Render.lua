@@ -62,9 +62,23 @@ local function CreateProbeBar(rootFrame, profile)
   }
 end
 
+local function CreateQuietZone(rootFrame)
+  local quietZoneConfig = config.quietZone
+  if quietZoneConfig == nil or not quietZoneConfig.enabled then
+    return nil
+  end
+
+  local quietZone = UI.CreateFrame("Frame", "ChromaLinkQuietZone", rootFrame)
+  quietZone:SetPoint("TOPLEFT", rootFrame, "TOPLEFT", 0, 0)
+  quietZone:SetLayer(config.requestedLayer - 1)
+  ApplyColor(quietZone, config.GetPaletteColor(quietZoneConfig.backgroundSymbol or 0))
+  return quietZone
+end
+
 local function ComputeLayout(renderState)
   local profile = renderState.profile
   local diagnosticsConfig = config.layoutDiagnostics or {}
+  local quietZoneConfig = config.quietZone or {}
   local anchorFrame = renderState.anchorFrame or UIParent or renderState.rootFrame
   local anchorWidth = ReadDimension(anchorFrame, "GetWidth", profile.windowWidth)
   local anchorHeight = ReadDimension(anchorFrame, "GetHeight", profile.windowHeight)
@@ -74,6 +88,15 @@ local function ComputeLayout(renderState)
   local rootHeight = profile.bandHeight
   local requestedLeft = tonumber(config.stripOffsetX) or 0
   local requestedTop = tonumber(config.stripOffsetY) or 0
+
+  if quietZoneConfig.enabled and quietZoneConfig.fullAnchorWidth then
+    rootWidth = anchorWidth
+    requestedLeft = 0
+  end
+
+  if quietZoneConfig.enabled then
+    rootHeight = math.max(rootHeight, tonumber(quietZoneConfig.height) or profile.bandHeight)
+  end
 
   if renderState.probeBar ~= nil then
     probeBarHeight = tonumber(diagnosticsConfig.probeBarHeight) or 12
@@ -100,10 +123,33 @@ local function ComputeLayout(renderState)
   }
 end
 
+local function ResolveDisplayScale(profile, layout)
+  local scaleX = tonumber(profile.displayScaleX) or tonumber(profile.displayScale) or 1
+  local scaleY = tonumber(profile.displayScaleY) or tonumber(profile.displayScale) or 1
+  local anchorWidth = layout.anchorWidth or profile.windowWidth
+
+  if anchorWidth > profile.windowWidth then
+    scaleX = tonumber(profile.wideClientDisplayScaleX) or scaleX
+    scaleY = tonumber(profile.wideClientDisplayScaleY) or scaleY
+  end
+
+  if scaleX <= 0 then
+    scaleX = 1
+  end
+  if scaleY <= 0 then
+    scaleY = 1
+  end
+
+  return scaleX, scaleY
+end
+
 local function ApplyLayout(renderState)
   local profile = renderState.profile
   local diagnosticsConfig = config.layoutDiagnostics or {}
   local layout = ComputeLayout(renderState)
+  local displayScaleX, displayScaleY = ResolveDisplayScale(profile, layout)
+  local bandWidth = profile.bandWidth * displayScaleX
+  local bandHeight = profile.bandHeight * displayScaleY
   local index
 
   if renderState.lastRootLeft == layout.rootLeft
@@ -126,23 +172,32 @@ local function ApplyLayout(renderState)
     renderState.band:ClearAllPoints()
   end
   renderState.band:SetPoint("TOPLEFT", renderState.rootFrame, "TOPLEFT", 0, 0)
-  renderState.band:SetWidth(profile.bandWidth)
-  renderState.band:SetHeight(profile.bandHeight)
+  renderState.band:SetWidth(bandWidth)
+  renderState.band:SetHeight(bandHeight)
+
+  if renderState.quietZone ~= nil then
+    if renderState.quietZone.ClearAllPoints ~= nil then
+      renderState.quietZone:ClearAllPoints()
+    end
+    renderState.quietZone:SetPoint("TOPLEFT", renderState.rootFrame, "TOPLEFT", 0, 0)
+    renderState.quietZone:SetWidth(layout.rootWidth)
+    renderState.quietZone:SetHeight(layout.rootHeight)
+  end
 
   for index = 1, profile.segmentCount do
     local segment = renderState.segments[index]
     if segment.ClearAllPoints ~= nil then
       segment:ClearAllPoints()
     end
-    segment:SetPoint("TOPLEFT", renderState.band, "TOPLEFT", (index - 1) * profile.segmentWidth, 0)
-    segment:SetWidth(profile.segmentWidth)
-    segment:SetHeight(profile.segmentHeight)
+    segment:SetPoint("TOPLEFT", renderState.band, "TOPLEFT", (index - 1) * profile.segmentWidth * displayScaleX, 0)
+    segment:SetWidth(profile.segmentWidth * displayScaleX)
+    segment:SetHeight(profile.segmentHeight * displayScaleY)
   end
 
   if renderState.probeBar ~= nil then
     local probeBarLeft = diagnosticsConfig.probeBarOffsetX or 0
     local probeBarTop = diagnosticsConfig.probeBarOffsetY or 32
-    local probeBarWidth = profile.bandWidth
+    local probeBarWidth = bandWidth
     local probeBarHeight = diagnosticsConfig.probeBarHeight or 12
     local markerWidth = diagnosticsConfig.probeMarkerWidth or 20
     local markerHeight = probeBarHeight
@@ -179,6 +234,9 @@ end
 
 function ChromaLink.Render.Initialize(rootFrame, anchorFrame)
   local profile = config.profile
+  local defaultScaleX = tonumber(profile.displayScaleX) or tonumber(profile.displayScale) or 1
+  local defaultScaleY = tonumber(profile.displayScaleY) or tonumber(profile.displayScale) or 1
+  local quietZone = CreateQuietZone(rootFrame)
   local band = UI.CreateFrame("Frame", "ChromaLinkBand", rootFrame)
   local probeBar = CreateProbeBar(rootFrame, profile)
   local segments = {}
@@ -186,16 +244,21 @@ function ChromaLink.Render.Initialize(rootFrame, anchorFrame)
   local index
 
   band:SetPoint("TOPLEFT", rootFrame, "TOPLEFT", 0, 0)
-  band:SetWidth(profile.bandWidth)
-  band:SetHeight(profile.bandHeight)
+  band:SetWidth(profile.bandWidth * defaultScaleX)
+  band:SetHeight(profile.bandHeight * defaultScaleY)
   band:SetLayer(config.requestedLayer)
   ApplyColor(band, config.GetPaletteColor(0))
 
   for index = 1, profile.segmentCount do
     local segment = UI.CreateFrame("Frame", "ChromaLinkSegment" .. tostring(index), band)
-    segment:SetPoint("TOPLEFT", band, "TOPLEFT", (index - 1) * profile.segmentWidth, 0)
-    segment:SetWidth(profile.segmentWidth)
-    segment:SetHeight(profile.segmentHeight)
+    segment:SetPoint(
+      "TOPLEFT",
+      band,
+      "TOPLEFT",
+      (index - 1) * profile.segmentWidth * defaultScaleX,
+      0)
+    segment:SetWidth(profile.segmentWidth * defaultScaleX)
+    segment:SetHeight(profile.segmentHeight * defaultScaleY)
     segment:SetLayer(config.requestedLayer + 1)
     ApplyColor(segment, config.GetPaletteColor(0))
     segments[index] = segment
@@ -206,6 +269,7 @@ function ChromaLink.Render.Initialize(rootFrame, anchorFrame)
     profile = profile,
     rootFrame = rootFrame,
     anchorFrame = anchorFrame,
+    quietZone = quietZone,
     band = band,
     probeBar = probeBar,
     segments = segments,

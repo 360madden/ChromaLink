@@ -100,6 +100,9 @@ local function InstallLayoutDiagnostics(state)
 
   ChromaLink.Diagnostics.AttachLayoutTrace(state.context, "layout.context")
   ChromaLink.Diagnostics.AttachLayoutTrace(state.root, "layout.root")
+  if state.render.quietZone ~= nil then
+    ChromaLink.Diagnostics.AttachLayoutTrace(state.render.quietZone, "layout.quietZone")
+  end
   ChromaLink.Diagnostics.AttachLayoutTrace(state.render.band, "layout.band")
 
   if state.render.probeBar ~= nil then

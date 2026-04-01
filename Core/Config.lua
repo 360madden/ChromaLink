@@ -25,6 +25,12 @@ ChromaLink.Config = {
     probeMarkerWidth = 20,
     probeMarkerSymbols = { 6, 5, 7, 3, 2 }
   },
+  quietZone = {
+    enabled = false,
+    fullAnchorWidth = true,
+    height = 48,
+    backgroundSymbol = 0
+  },
   preferHighestAvailableStrata = true,
   protocolVersion = 1,
   syntheticMode = {
@@ -41,7 +47,11 @@ ChromaLink.Config = {
     segmentWidth = 8,
     segmentHeight = 24,
     payloadStartIndex = 9,
-    payloadSymbolCount = 64
+    payloadSymbolCount = 64,
+    displayScaleX = 1.0,
+    displayScaleY = 1.0,
+    wideClientDisplayScaleX = 1.0,
+    wideClientDisplayScaleY = 1.0
   },
   controlLeft = { 0, 1, 0, 1, 2, 3, 4, 5 },
   controlRight = { 5, 4, 3, 2, 1, 0, 1, 0 },

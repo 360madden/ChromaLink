@@ -162,6 +162,62 @@ Current live behavior of that checkpoint:
 - At `1600x900`, the addon can be pushed into near-full-size geometry, but clearing the left side of the HUD without losing the right tail remains unresolved.
 - The remaining `1600x900` problem now looks less like "the strip is always tiny" and more like a real render-space/anchor-space boundary problem affecting the tail when the strip is shifted.
 
+## Helper / Quiet-Zone Experiments
+
+After the layout investigation, a second pass explored the "helper addon" idea in a practical form.
+
+### Native UI movement feasibility
+
+The local audited API copy showed:
+
+- `Native` supports inspection methods like `ReadAll`, `ReadPoint`, `GetBounds`
+- `Native` supports `SetLayer` and `SetStrata`
+- `Native` does **not** expose `SetPoint` / `SetParent` the way addon-created `Frame` objects do
+
+That means a helper addon can likely reorder some native draw priority, but it does **not** appear to have a clean general-purpose way to permanently reposition arbitrary native RIFT UI elements.
+
+So the practical helper direction became:
+
+- create a reserved opaque "quiet zone" behind ChromaLink
+- keep the strip above that zone
+- use the quiet zone to visually clear the capture band without globally scaling or rewriting the whole RIFT UI
+
+### Quiet-zone result
+
+A full-width opaque black quiet zone across the capture band did help:
+
+- it removed outside UI contamination from the top band
+- it preserved the known-good `640x360` decode while active in some configurations
+- at `1600x900`, it improved the left-side control quality compared with the same layout without the quiet zone
+
+However it did **not** solve the whole problem:
+
+- the right control tail at `1600x900` still collapsed toward black
+- the strip itself still looked partially distorted or truncated before decode
+
+### Slight horizontal compression result
+
+The old `ChromaLink2` code path had `displayScaleX` / `displayScaleY`, so a similar experiment was tested in the current addon.
+
+When the strip was rendered slightly narrower horizontally on wide clients:
+
+- `1600x900` improved noticeably:
+  - detection moved to `origin 0,0`
+  - scale shifted to `0.90`
+  - left control improved to `0 1 0 1 2 4 5 2`
+  - right control improved from all-black to `1 0 0 0 0 0 0 0`
+- but `640x360` regressed, producing an invalid parse
+
+So slight horizontal compression is a promising **high-resolution-only** lever, but not yet a safe universal default.
+
+## Current Status After Helper Experiments
+
+- The stable baseline remains the previously committed fixed-anchor checkpoint.
+- Quiet-zone and wide-client compression work are still useful findings, but they are not yet mature enough to leave enabled as defaults.
+- The next serious choice is whether to:
+  - keep prioritizing the `640x360` baseline and treat wide-resolution behavior as secondary
+  - or build a dedicated helper/high-resolution mode that intentionally trades some geometry assumptions for cleaner wide-client rendering
+
 ## Repeat The Sweep
 
 Run either command from the repo root:
