@@ -453,6 +453,8 @@ artifacts\package\
 ├── Bridge-ChromaLink.cmd
 ├── README.md
 ├── package-manifest.json
+├── Status-ChromaLinkStack.cmd
+├── Stop-ChromaLinkStack.cmd
 ├── Start-ChromaLinkStack.cmd
 ├── Open-ChromaLinkDashboard.cmd
 └── desktop\
@@ -484,12 +486,16 @@ Package-emitted launchers are intentionally narrow:
 
 - `Bridge-ChromaLink.cmd`
 - `Start-ChromaLinkStack.cmd`
+- `Status-ChromaLinkStack.cmd`
+- `Stop-ChromaLinkStack.cmd`
 - `Open-ChromaLinkDashboard.cmd`
 
 Packaged launcher roles:
 
 - `Bridge-ChromaLink.cmd` starts the packaged CLI in `watch` mode so the rolling snapshot stays fresh
 - `Start-ChromaLinkStack.cmd` starts the packaged CLI watch loop, HTTP bridge, and monitor together
+- `Status-ChromaLinkStack.cmd` reports local endpoint health, snapshot freshness, and package-local process counts
+- `Stop-ChromaLinkStack.cmd` stops only the packaged CLI, HTTP bridge, and monitor processes from that package folder
 - `Open-ChromaLinkDashboard.cmd` opens the local dashboard URL
 
 The broader helper surface in `scripts/` stays repo-native. That includes launchers such as `Open-ChromaLink-LiveStack.cmd`, `Open-ChromaLink-Monitor.cmd`, status helpers, stop helpers, and the probe/readiness scripts.

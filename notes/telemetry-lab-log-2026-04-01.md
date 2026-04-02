@@ -249,6 +249,69 @@ Keep.
 
 ---
 
+## 2026-04-02 - Session AG - packaged lifecycle helpers
+
+### Goal
+
+Make the packaged handoff folder operationally self-contained by adding package-native status and stop helpers.
+
+### Change
+
+- extend `scripts/Package-ChromaLinkDesktop.ps1` to emit:
+  - `Status-ChromaLinkStack.cmd`
+  - `Status-ChromaLinkStack.ps1`
+  - `Stop-ChromaLinkStack.cmd`
+  - `Stop-ChromaLinkStack.ps1`
+- keep the lifecycle scripts package-local by matching only executables under the package `desktop\` root
+- add launcher metadata for the new helpers to `package-manifest.json`
+- fix the packaging restore path with `--force-evaluate` so `win-x64` publish succeeds reliably after a normal `dotnet test`
+
+### Why
+
+Once the package could start a true live stack, the next practical gap was lifecycle control. The handoff folder still needed its own status and stop path, and the first validation pass exposed a restore bug that would have made packaging flaky in normal use.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+.\scripts\Package-ChromaLinkDesktop.ps1
+```
+
+```powershell
+cmd /c .\artifacts\package\Start-ChromaLinkStack.cmd
+```
+
+```powershell
+cmd /c .\artifacts\package\Status-ChromaLinkStack.cmd
+```
+
+```powershell
+cmd /c .\artifacts\package\Stop-ChromaLinkStack.cmd
+```
+
+### Result
+
+- tests passed: `20/20`
+- packaging now succeeds reliably after runtime-aware restore re-evaluation
+- the generated package now includes:
+  - `Bridge-ChromaLink.cmd`
+  - `Start-ChromaLinkStack.cmd`
+  - `Status-ChromaLinkStack.cmd`
+  - `Stop-ChromaLinkStack.cmd`
+  - `Open-ChromaLinkDashboard.cmd`
+- packaged status reported endpoint health, snapshot freshness, and package-local process counts
+- packaged stop cleanly stopped the packaged `ChromaLink.Cli`, `ChromaLink.HttpBridge`, and `ChromaLink.Monitor` processes
+- a follow-up packaged status check returned package-local process counts to zero
+
+### Decision
+
+Keep.
+
+---
+
 ## 2026-04-01 - Session B - quiet default diagnostics
 
 ### Goal
