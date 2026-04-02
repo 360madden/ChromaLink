@@ -152,7 +152,7 @@ $readmePath = Join-Path $OutputRoot "README.md"
 @'
 # ChromaLink Desktop Package
 
-This folder is a predictable publish output assembled from the source repo.
+This folder is the runnable product view assembled from the source repo.
 
 Layout:
 
@@ -177,20 +177,22 @@ Notes:
 - Source commit: `__SOURCE_COMMIT__`
 - The package is framework-dependent unless `-SelfContained` is used.
 - launcher windows start minimized by default to reduce the chance of covering the RIFT client during live capture
-- `Open-ChromaLink-Product.cmd` is the fastest first-run path. It starts the background stack, waits for readiness, and then opens the monitor.
+- if you are actively playing, prefer `Start-ChromaLinkStack.cmd` first so the bridge stays in the background
+- `Open-ChromaLink-Product.cmd` is the fastest guided first-run path. It starts the background stack, waits for readiness, and then opens the monitor.
 - `Bridge-ChromaLink.cmd` starts the packaged CLI in `watch` mode so it can keep the rolling snapshot fresh.
 - `Start-ChromaLinkStack.cmd` starts the packaged CLI watch loop plus HTTP bridge without opening UI.
 - `Open-ChromaLink-Monitor.cmd` opens the packaged monitor explicitly.
+- `Open-ChromaLinkDashboard.cmd` opens the local browser dashboard explicitly.
 - `Status-ChromaLinkStack.cmd` reports bridge endpoint health, snapshot freshness, and package-local process counts.
 - `Stop-ChromaLinkStack.cmd` stops only the packaged CLI, HTTP bridge, and monitor processes from this package folder.
 - Each project folder keeps the published executable and its supporting DLLs together.
 
 First-run workflow:
 
-1. Double-click `Open-ChromaLink-Product.cmd` for the normal product path.
-2. If you want background-only startup, use `Start-ChromaLinkStack.cmd`.
-3. If something looks wrong, run `Status-ChromaLinkStack.cmd`.
-4. Use `Open-ChromaLinkDashboard.cmd` if you prefer the browser view.
+1. If you are about to play, start with `Start-ChromaLinkStack.cmd`.
+2. Use `Open-ChromaLink-Product.cmd` when you want the guided path that also opens the monitor.
+3. If you want UI later, open `Open-ChromaLink-Monitor.cmd` or `Open-ChromaLinkDashboard.cmd`.
+4. If something looks wrong, run `Status-ChromaLinkStack.cmd`.
 5. Use `Stop-ChromaLinkStack.cmd` when you are done.
 '@ | Set-Content -LiteralPath $readmePath -Encoding utf8
 

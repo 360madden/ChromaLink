@@ -84,6 +84,44 @@ Keep.
 
 ---
 
+## 2026-04-02 - Session AD - release candidate polish
+
+### Goal
+
+Finish a low-risk release-candidate polish pass, then push the current productization chain.
+
+### Change
+
+- added a short pre-execution plan note for the final release-candidate pass
+- updated the generated package README wording to favor background-first startup while actively playing
+- aligned the repo README, release checklist, and changelog with that package-facing guidance
+
+### Why
+
+The package flow already works, but the first-run story still leaned a little too hard toward opening helper UI immediately. For live RIFT use, the safer default is background stack first and UI only when needed.
+
+### Verification
+
+- `dotnet test .\DesktopDotNet\ChromaLink.sln`
+- `.\scripts\Package-ChromaLinkDesktop.ps1`
+- `.\scripts\Package-ChromaLinkDesktop-SelfContained.cmd`
+- inspected the generated `README.md` in:
+  - `artifacts\package`
+  - `artifacts\package-selfcontained`
+
+### Result
+
+- full solution tests passed: `20/20`
+- default package build succeeded
+- self-contained package build succeeded
+- both generated package READMEs now steer operators toward background-first startup while playing
+
+### Decision
+
+- Keep.
+
+---
+
 ## 2026-04-02 - Session AD - packaged desktop output layout
 
 ### Goal

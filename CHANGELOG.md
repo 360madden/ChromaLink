@@ -5,6 +5,7 @@
 - Added a package-first launcher flow with package identity in the manifest.
 - Added package lifecycle helpers and a self-contained release wrapper.
 - Separated background stack startup from explicit UI-opening helpers.
+- Polished the release-candidate package guidance toward background-first live play.
 
 ## 0.1.0-dev
 

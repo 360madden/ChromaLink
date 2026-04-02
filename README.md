@@ -527,6 +527,12 @@ Packaged launcher roles:
 - `Stop-ChromaLinkStack.cmd` stops only the packaged CLI, HTTP bridge, and monitor processes from that package folder
 - `Open-ChromaLinkDashboard.cmd` opens the local dashboard URL
 
+Live-play guidance:
+
+- if you are actively playing, prefer `Start-ChromaLinkStack.cmd` first so the bridge stays in the background
+- open `Open-ChromaLink-Monitor.cmd` or `Open-ChromaLinkDashboard.cmd` only when you actually want UI on top
+- use `Open-ChromaLink-Product.cmd` when you want the guided first-run path and are comfortable with the monitor opening after readiness
+
 The broader helper surface in `scripts/` stays repo-native. That includes launchers such as `Open-ChromaLink-LiveStack.cmd`, `Open-ChromaLink-Monitor.cmd`, status helpers, stop helpers, and the probe/readiness scripts.
 
 Packaged workflow:

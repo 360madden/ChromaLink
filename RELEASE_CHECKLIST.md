@@ -20,6 +20,7 @@ Use this checklist when preparing a ChromaLink release package.
    or
    `.\artifacts\package-selfcontained\Open-ChromaLink-Product.cmd`
 5. Confirm `Status-ChromaLinkStack.cmd` reports a ready/healthy stack, then stop it.
+6. Re-check the generated package `README.md` if package-facing wording changed in the source repo.
 
 ## Release Artifacts
 
