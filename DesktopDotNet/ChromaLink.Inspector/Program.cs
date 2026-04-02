@@ -36,6 +36,7 @@ internal sealed class InspectorForm : Form
 
     private string? _currentPath;
     private DateTime _currentWriteTimeUtc;
+    private DateTime _currentLiveSnapshotWriteTimeUtc;
 
     public InspectorForm(string[] args)
     {
@@ -81,6 +82,11 @@ internal sealed class InspectorForm : Form
 
         _refreshTimer.Tick += (_, _) =>
         {
+            if (RefreshLiveSnapshotIfChanged())
+            {
+                return;
+            }
+
             if (_autoRefreshCheckBox.Checked)
             {
                 LoadLatestCapture(force: false);
@@ -138,6 +144,31 @@ internal sealed class InspectorForm : Form
         _pathLabel.Text = path;
         _currentPath = path;
         _currentWriteTimeUtc = File.GetLastWriteTimeUtc(path);
+    }
+
+    private bool RefreshLiveSnapshotIfChanged()
+    {
+        var snapshotPath = GetLiveTelemetrySnapshotPath();
+        if (string.IsNullOrWhiteSpace(snapshotPath) || !File.Exists(snapshotPath))
+        {
+            return false;
+        }
+
+        var writeTime = File.GetLastWriteTimeUtc(snapshotPath);
+        if (writeTime == _currentLiveSnapshotWriteTimeUtc)
+        {
+            return false;
+        }
+
+        _currentLiveSnapshotWriteTimeUtc = writeTime;
+        if (!string.IsNullOrWhiteSpace(_currentPath) && File.Exists(_currentPath))
+        {
+            LoadFromPath(_currentPath);
+            return true;
+        }
+
+        LoadLatestCapture(force: true);
+        return true;
     }
 
     private static string BuildSummary(string path, Bgr24Frame frame, FrameValidationResult analysis)
@@ -231,6 +262,8 @@ internal sealed class InspectorForm : Form
             }
         }
 
+        AppendLiveSnapshotSummary(builder);
+
         builder.AppendLine("Segments:");
         foreach (var sample in analysis.Samples)
         {
@@ -244,6 +277,73 @@ internal sealed class InspectorForm : Form
         }
 
         return builder.ToString();
+    }
+
+    private static void AppendLiveSnapshotSummary(StringBuilder builder)
+    {
+        var snapshotPath = GetLiveTelemetrySnapshotPath();
+        if (string.IsNullOrWhiteSpace(snapshotPath) || !File.Exists(snapshotPath))
+        {
+            return;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(snapshotPath));
+            var root = document.RootElement;
+
+            builder.AppendLine("LiveBridge:");
+            builder.AppendLine($"  Snapshot: {snapshotPath}");
+
+            if (root.TryGetProperty("aggregate", out var aggregate))
+            {
+                builder.AppendLine($"  Ready: {aggregate.GetProperty("ready").GetBoolean()}");
+                builder.AppendLine($"  AcceptedFrames: {aggregate.GetProperty("acceptedFrames").GetInt32()}");
+                builder.AppendLine($"  LastUpdatedUtc: {aggregate.GetProperty("lastUpdatedUtc").GetDateTimeOffset():O}");
+
+                AppendSnapshotFrame(builder, aggregate, "CoreStatus", "coreStatus");
+                AppendSnapshotFrame(builder, aggregate, "PlayerVitals", "playerVitals");
+                AppendSnapshotFrame(builder, aggregate, "PlayerPosition", "playerPosition");
+            }
+
+            if (root.TryGetProperty("metrics", out var metrics))
+            {
+                builder.AppendLine($"  AcceptedSamples: {metrics.GetProperty("acceptedSamples").GetInt32()}");
+                builder.AppendLine($"  RejectedSamples: {metrics.GetProperty("rejectedSamples").GetInt32()}");
+                builder.AppendLine($"  LastReason: {metrics.GetProperty("lastReason").GetString()}");
+            }
+
+            if (root.TryGetProperty("lastBackend", out var lastBackend))
+            {
+                builder.AppendLine($"  LastBackend: {lastBackend.GetString()}");
+            }
+        }
+        catch (Exception ex)
+        {
+            builder.AppendLine("LiveBridge:");
+            builder.AppendLine($"  Snapshot: {snapshotPath}");
+            builder.AppendLine($"  ReadError: {ex.GetType().Name}: {ex.Message}");
+        }
+    }
+
+    private static void AppendSnapshotFrame(StringBuilder builder, JsonElement aggregate, string label, string propertyName)
+    {
+        if (!aggregate.TryGetProperty(propertyName, out var frame) || frame.ValueKind != JsonValueKind.Object)
+        {
+            builder.AppendLine($"  {label}: missing");
+            return;
+        }
+
+        var sequence = frame.TryGetProperty("sequence", out var sequenceProperty) ? sequenceProperty.GetInt32() : -1;
+        var reservedFlags = frame.TryGetProperty("reservedFlags", out var flagsProperty) ? flagsProperty.GetInt32() : -1;
+        var observedAt = frame.TryGetProperty("observedAtUtc", out var observedProperty) ? observedProperty.GetDateTimeOffset() : default;
+        builder.AppendLine(
+            $"  {label}: seq={sequence} flags=0x{reservedFlags:X2} observed={observedAt:O}");
+    }
+
+    private static string? GetLiveTelemetrySnapshotPath()
+    {
+        return Path.Combine(PathProvider.RootDirectory, "out", "chromalink-live-telemetry.json");
     }
 
     private static void AppendSidecarSummary(StringBuilder builder, string sidecarPath)
@@ -268,6 +368,11 @@ internal sealed class InspectorForm : Form
                 $"CaptureRect: {captureRect.GetProperty("left").GetInt32()},{captureRect.GetProperty("top").GetInt32()} {captureRect.GetProperty("width").GetInt32()}x{captureRect.GetProperty("height").GetInt32()}");
         }
 
+        AppendObserverSidecarSummary(builder, root);
+    }
+
+    private static void AppendObserverSidecarSummary(StringBuilder builder, JsonElement root)
+    {
         if (root.TryGetProperty("observerLane", out var observerLane) && observerLane.ValueKind == JsonValueKind.Object)
         {
             builder.AppendLine(
