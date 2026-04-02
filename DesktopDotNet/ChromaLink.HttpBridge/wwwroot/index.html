@@ -246,23 +246,20 @@
 
     .kv {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-columns: minmax(112px, 0.8fr) minmax(0, 1.2fr);
       gap: 9px 12px;
-      align-items: center;
+      align-items: start;
     }
 
     .kv span {
       color: var(--muted);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      line-height: 1.35;
     }
 
     .kv strong {
       text-align: right;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
     }
 
     .mono {
@@ -279,7 +276,7 @@
       display: grid;
       grid-template-columns: auto 1fr auto;
       gap: 10px;
-      align-items: center;
+      align-items: start;
       padding: 10px 12px;
       border-radius: 12px;
       border: 1px solid rgba(255, 255, 255, 0.05);
@@ -291,21 +288,39 @@
       line-height: 1;
     }
 
-    .frame-row strong {
+    .frame-name {
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .frame-meta {
+      color: var(--muted);
+      line-height: 1.35;
+      text-align: right;
       white-space: nowrap;
     }
 
-    .frame-row span {
-      color: var(--muted);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    .frame-list-spaced {
+      margin-top: 14px;
     }
 
     .footer {
       margin-top: 16px;
       color: var(--muted);
       font-size: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      align-items: center;
+    }
+
+    .footer-item {
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      background: rgba(255, 255, 255, 0.03);
+      line-height: 1.35;
+      overflow-wrap: anywhere;
     }
 
     @media (max-width: 1180px) {
@@ -339,8 +354,9 @@
       }
 
       .kv strong,
-      .frame-row strong {
+      .frame-meta {
         text-align: left;
+        white-space: normal;
       }
     }
   </style>
@@ -467,7 +483,7 @@
           <span class="pill warn" id="pages-pill">waiting</span>
         </div>
         <div class="kv mono" id="pages-kv"></div>
-        <div class="frame-list mono" id="frame-list" style="margin-top: 14px;"></div>
+        <div class="frame-list frame-list-spaced mono" id="frame-list"></div>
       </article>
     </section>
 
@@ -573,7 +589,7 @@
         .sort((left, right) => right[1] - left[1]);
 
       if (!entries.length) {
-        frameList.innerHTML = '<div class="frame-row"><strong>No accepted frame counts yet</strong><span>waiting</span><span class="dot warn">•</span></div>';
+        frameList.innerHTML = '<div class="frame-row"><span class="dot warn">•</span><strong class="frame-name">No accepted frame counts yet</strong><span class="frame-meta">waiting</span></div>';
         return;
       }
 
@@ -581,10 +597,30 @@
         .map(([name, count]) => `
           <div class="frame-row">
             <span class="dot good">•</span>
-            <strong>${name}</strong>
-            <span>${count}</span>
+            <strong class="frame-name">${name}</strong>
+            <span class="frame-meta">${count}</span>
           </div>`)
         .join('');
+    }
+
+    function setFooterSummary(snapshot) {
+      const updatedAt = new Date(snapshot.generatedAtUtc ?? Date.now()).toLocaleString();
+      const latestFrame = snapshot.lastFrame ? `${snapshot.lastFrame.frameType} #${snapshot.lastFrame.sequence}` : 'n/a';
+      const acceptedSamples = asText(snapshot.metrics?.acceptedSamples, 0);
+      const rejectedSamples = asText(snapshot.metrics?.rejectedSamples, 0);
+
+      footerText.replaceChildren(
+        footerItem(`Updated ${updatedAt}`),
+        footerItem(`Latest frame: ${latestFrame}`),
+        footerItem(`Accepted samples: ${acceptedSamples} / Rejected: ${rejectedSamples}`)
+      );
+    }
+
+    function footerItem(text) {
+      const item = document.createElement('span');
+      item.className = 'footer-item';
+      item.textContent = text;
+      return item;
     }
 
     function render() {
@@ -727,10 +763,7 @@
 
       renderFrameCounts(snapshot.metrics?.frameTypeCounts);
 
-      footerText.textContent =
-        `Updated ${new Date(snapshot.generatedAtUtc ?? Date.now()).toLocaleString()} | ` +
-        `Latest frame: ${snapshot.lastFrame ? `${snapshot.lastFrame.frameType} #${snapshot.lastFrame.sequence}` : 'n/a'} | ` +
-        `Accepted samples: ${asText(snapshot.metrics?.acceptedSamples, 0)} / Rejected: ${asText(snapshot.metrics?.rejectedSamples, 0)}`;
+      setFooterSummary(snapshot);
     }
 
     async function refresh() {

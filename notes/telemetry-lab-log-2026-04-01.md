@@ -91,6 +91,41 @@ Keep.
 
 ---
 
+## 2026-04-02 - Session AD - dashboard layout polish
+
+### Goal
+
+Fix the most obvious dashboard layout issues without changing telemetry scope or the bridge contract.
+
+### Change
+
+- let dashboard key/value rows wrap instead of forcing single-line ellipsis
+- make frame activity rows tolerate longer frame names with better wrapping and alignment
+- replace the single long footer sentence with wrapped status chips
+- remove the remaining inline margin style from the generic pages frame list
+- document the plan in `notes/next-product-plan-2026-04-02-dashboard-layout-polish.md`
+
+### Why
+
+The upgraded dashboard was functionally strong, but long paths, frame names, and footer text could clip or feel cramped, especially on narrower windows.
+
+### Verification
+
+- built `DesktopDotNet/ChromaLink.HttpBridge/ChromaLink.HttpBridge.csproj`
+- confirmed the dashboard page still compiles cleanly with the updated markup and script helpers
+
+### Result
+
+- long values now wrap more gracefully in telemetry cards
+- frame activity rows are less likely to clip useful names
+- the footer reads as separate status items instead of one compressed line
+
+### Decision
+
+Keep.
+
+---
+
 ## 2026-04-02 - Session AE - dashboard upgrade and pinned access
 
 ### Goal
