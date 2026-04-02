@@ -1481,3 +1481,79 @@ Keep.
 ### Saved Checkpoint
 
 - pending commit for browser dashboard launch alignment
+
+---
+
+## 2026-04-07 - Session AA - lifecycle flow docs
+
+### Goal
+
+Document the current operational flow for ChromaLink: start, inspect, verify, and stop.
+
+### Change
+
+- add a concise lifecycle section to the README
+- keep the start/inspect/verify/stop flow aligned with the actual tools that exist now
+- preserve the distinction between:
+  - rolling snapshot
+  - live monitor
+  - browser dashboard
+  - HTTP bridge
+  - readiness script
+
+### Why
+
+The project already had all the pieces; the missing part was a concise operational path that tells a user how the stack fits together end to end.
+
+### Verification
+
+- re-read the updated README section for ordering and tool names
+- confirmed the docs still reflect the current launcher set
+
+### Result
+
+- the README now describes a practical lifecycle flow without inventing new behavior
+- the browser dashboard, monitor, inspector, and bridge each have a clear role in that flow
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for lifecycle flow docs
+
+---
+
+## 2026-04-07 - Session AB - lifecycle status and stop docs
+
+### Goal
+
+Keep the lifecycle docs aligned with the actual stack helpers now present in the worktree.
+
+### Change
+
+- update the README lifecycle flow to mention the stack-level status helper alongside the bridge probe and bridge-specific status command
+- keep the start / inspect / verify / stop wording concise and consistent with the live monitor, browser dashboard, HTTP bridge, and readiness tooling
+
+### Why
+
+The lifecycle section was already in place, but the newer status and stop wrappers made it worth tightening the docs so the recommended flow names the actual commands a user can run.
+
+### Verification
+
+- reread the lifecycle section for start / inspect / verify / stop ordering
+- confirmed the helper names match the scripts already in the worktree
+
+### Result
+
+- the README now points at the practical stack helpers instead of relying on generic stop language
+- the lifecycle path stays aligned with the current bridge, dashboard, monitor, and readiness scripts
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for lifecycle status and stop docs
