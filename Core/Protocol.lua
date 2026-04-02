@@ -179,6 +179,7 @@ local function BuildFrame(payload, frameType, schemaId, sequence)
   bytes[5] = ClampByte(sequence)
   reservedFlags = reservedFlags + ClampByte(headerFlags.multiFrameRotation)
   reservedFlags = reservedFlags + ClampByte(headerFlags.playerPosition)
+  reservedFlags = reservedFlags + ClampByte(headerFlags.playerCast)
   bytes[6] = ClampByte(reservedFlags)
 
   headerCrc = ComputeCrc16(bytes, 1, 6)

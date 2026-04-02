@@ -23,7 +23,7 @@ ChromaLink is intentionally narrow right now. The active baseline is:
 - fixed control markers on both edges
 - fast heartbeat frame: `coreStatus`
 - proven rotating expansions: `playerVitals`, `playerPosition`
-- new test-proven cast expansion: `playerCast`
+- proven cast expansion: `playerCast`
 
 Current live proof:
 
@@ -34,8 +34,7 @@ Current live proof:
   - `origin 0,0`
   - `pitch 2.8`
   - `scale 0.35`
-- live captures now decode `CoreStatus`, `PlayerVitals`, and `PlayerPosition` on the running client
-- `PlayerCast` is now implemented and test-proven in the transport and reader path; live reload validation is the next in-client check
+- live captures now decode `CoreStatus`, `PlayerVitals`, `PlayerPosition`, and `PlayerCast` on the running client
 - capture sessions emit raw BMP, annotated BMP, and JSON sidecars under `%LOCALAPPDATA%\ChromaLink\DesktopDotNet\out`
 
 ## How It Works
@@ -224,22 +223,18 @@ The current strip carries `24` transport bytes per frame and now supports more t
   - duration / remaining time (`Q4`, quarter-second units)
   - short transport-safe spell label (`8` bytes)
 
-The current addon rotation keeps `coreStatus` as the dominant heartbeat and periodically inserts `playerVitals`, `playerPosition`, and `playerCast` to increase throughput over time instead of widening the strip. The current live README baseline after `/reloadui` produced:
+The current addon rotation keeps `coreStatus` as the dominant heartbeat and periodically inserts `playerVitals`, `playerPosition`, and `playerCast` to increase throughput over time instead of widening the strip. A recent live sample after `/reloadui` produced:
 
-- `35` accepted `CoreStatus` frames
-- `12` accepted `PlayerVitals` frames
-- `13` accepted `PlayerPosition` frames
-- `ReservedFlags: 0x03`, confirming the live addon loaded the newer multi-frame build
+- `46` accepted `CoreStatus` frames
+- `13` accepted `PlayerVitals` frames
+- `10` accepted `PlayerPosition` frames
+- `10` accepted `PlayerCast` frames
+- `ReservedFlags: 0x07`, confirming the live addon loaded the cast-capable multi-frame build
 
-`PlayerCast` is already implemented and covered by tests, but it has not yet been reloaded and sampled from the running client in this README baseline.
-
-The header `ReservedFlags` byte is now used as a live build-capability marker. Current expected value is `0x03`, which means:
+The header `ReservedFlags` byte is now used as a live build-capability marker. Current expected value is `0x07`, which means:
 
 - `0x01` = multi-frame rotation capable
 - `0x02` = player-position capable
-
-Once the running client reloads onto the cast-capable build, the expected value will become `0x07`, which also includes:
-
 - `0x04` = player-cast capable
 
 That gives live captures a direct way to prove whether the running addon actually loaded a newer telemetry build.

@@ -114,7 +114,10 @@ The RIFT API exposes a real castbar inspection surface, so this is the next high
 - full solution tests passed: `21/21`
 - `PlayerCast` now round-trips through renderer/analyzer tests
 - the aggregate and rolling snapshot now surface cast telemetry
-- live RIFT validation is still pending a safe `/reloadui` + capture pass
+- initial live RIFT validation then confirmed:
+  - `FrameCount[PlayerCast/schema-1]: 10`
+  - `ReservedFlags: 0x07`
+  - aggregate cast observation present on the running client
 
 ### Decision
 
