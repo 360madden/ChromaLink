@@ -48,6 +48,10 @@ ChromaLink.Config = {
   },
   preferHighestAvailableStrata = true,
   protocolVersion = 1,
+  headerFlags = {
+    multiFrameRotation = 1,
+    playerPosition = 2
+  },
   frameTypes = {
     coreStatus = 1,
     playerVitals = 2,

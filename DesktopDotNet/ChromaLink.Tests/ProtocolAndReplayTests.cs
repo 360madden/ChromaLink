@@ -18,6 +18,7 @@ public class ProtocolAndReplayTests
         Assert.NotNull(validation.Frame);
         var frame = Assert.IsType<CoreStatusFrame>(validation.Frame);
         Assert.Equal(FrameType.CoreStatus, frame.Header.FrameType);
+        Assert.Equal(TransportConstants.HeaderCapabilities, (HeaderCapabilityFlags)frame.Header.ReservedFlags);
         Assert.Equal(198, frame.Payload.PlayerHealthPctQ8);
         Assert.Equal(91, frame.Payload.TargetHealthPctQ8);
     }
@@ -32,6 +33,7 @@ public class ProtocolAndReplayTests
         Assert.True(validation.IsAccepted, validation.Reason);
         var frame = Assert.IsType<PlayerVitalsFrame>(validation.Frame);
         Assert.Equal(FrameType.PlayerVitals, frame.Header.FrameType);
+        Assert.Equal(TransportConstants.HeaderCapabilities, (HeaderCapabilityFlags)frame.Header.ReservedFlags);
         Assert.Equal((uint)3260, frame.Payload.HealthCurrent);
         Assert.Equal((ushort)100, frame.Payload.ResourceCurrent);
     }
@@ -46,6 +48,7 @@ public class ProtocolAndReplayTests
         Assert.True(validation.IsAccepted, validation.Reason);
         var frame = Assert.IsType<PlayerPositionFrame>(validation.Frame);
         Assert.Equal(FrameType.PlayerPosition, frame.Header.FrameType);
+        Assert.Equal(TransportConstants.HeaderCapabilities, (HeaderCapabilityFlags)frame.Header.ReservedFlags);
         Assert.Equal(123.45f, frame.Payload.X, 2);
         Assert.Equal(200.67f, frame.Payload.Y, 2);
         Assert.Equal(-50.12f, frame.Payload.Z, 2);

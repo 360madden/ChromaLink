@@ -195,6 +195,13 @@ The current strip carries `24` transport bytes per frame and now supports more t
 
 The current addon rotation keeps `coreStatus` as the dominant heartbeat and periodically inserts `playerVitals` and `playerPosition` to increase throughput over time instead of widening the strip.
 
+The header `ReservedFlags` byte is now used as a live build-capability marker. Current expected value is `0x03`, which means:
+
+- `0x01` = multi-frame rotation capable
+- `0x02` = player-position capable
+
+That gives live captures a direct way to prove whether the running addon actually loaded a newer telemetry build.
+
 ## Wrapper Scripts
 
 Useful helper scripts:

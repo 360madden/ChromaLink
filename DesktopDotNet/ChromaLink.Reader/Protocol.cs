@@ -17,6 +17,14 @@ public enum ResourceKind : byte
     Planar = 5
 }
 
+[Flags]
+public enum HeaderCapabilityFlags : byte
+{
+    None = 0,
+    MultiFrameRotation = 1 << 0,
+    PlayerPosition = 1 << 1
+}
+
 public sealed record TelemetryFrameHeader(
     byte ProtocolVersion,
     byte ProfileId,
@@ -131,6 +139,9 @@ public static class TransportConstants
     public const int PayloadBytes = 12;
     public const int PayloadCrcBytes = 4;
     public const int PayloadSymbols = 64;
+    public const HeaderCapabilityFlags HeaderCapabilities =
+        HeaderCapabilityFlags.MultiFrameRotation |
+        HeaderCapabilityFlags.PlayerPosition;
 }
 
 public static class FrameProtocol
@@ -415,7 +426,7 @@ public static class FrameProtocol
         bytes[2] = (byte)((TransportConstants.ProtocolVersion << 4) | (profileId & 0x0F));
         bytes[3] = (byte)(((byte)frameType << 4) | (schemaId & 0x0F));
         bytes[4] = sequence;
-        bytes[5] = 0;
+        bytes[5] = (byte)TransportConstants.HeaderCapabilities;
 
         var headerCrc = ComputeCrc16(bytes.AsSpan(0, 6));
         bytes[6] = (byte)(headerCrc >> 8);

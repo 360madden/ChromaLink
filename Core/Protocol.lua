@@ -3,6 +3,7 @@ ChromaLink.Protocol = {}
 
 local config = ChromaLink.Config
 local frameTypes = config.frameTypes or { coreStatus = 1, playerVitals = 2 }
+local headerFlags = config.headerFlags or { multiFrameRotation = 1, playerPosition = 2 }
 
 local function ClampByte(value)
   local number = tonumber(value) or 0
@@ -169,13 +170,16 @@ local function BuildFrame(payload, frameType, schemaId, sequence)
   local payloadCrc
   local payloadSymbols
   local index
+  local reservedFlags = 0
 
   bytes[1] = string.byte("C")
   bytes[2] = string.byte("L")
   bytes[3] = (config.protocolVersion * 16) + config.profile.numericId
   bytes[4] = (frameType * 16) + schemaId
   bytes[5] = ClampByte(sequence)
-  bytes[6] = 0
+  reservedFlags = reservedFlags + ClampByte(headerFlags.multiFrameRotation)
+  reservedFlags = reservedFlags + ClampByte(headerFlags.playerPosition)
+  bytes[6] = ClampByte(reservedFlags)
 
   headerCrc = ComputeCrc16(bytes, 1, 6)
   AppendBigEndian16(bytes, 7, headerCrc)

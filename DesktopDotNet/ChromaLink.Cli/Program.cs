@@ -308,6 +308,7 @@ internal sealed class CliApp
         Console.WriteLine($"FrameType: {frame.Header.FrameType}");
         Console.WriteLine($"Schema: {frame.Header.SchemaId}");
         Console.WriteLine($"Sequence: {frame.Header.Sequence}");
+        Console.WriteLine($"ReservedFlags: 0x{frame.Header.ReservedFlags:X2} ({DescribeHeaderFlags((HeaderCapabilityFlags)frame.Header.ReservedFlags)})");
 
         switch (frame)
         {
@@ -341,6 +342,33 @@ internal sealed class CliApp
                 Console.WriteLine($"PositionZ: {position.Payload.Z:F2}");
                 break;
         }
+    }
+
+    private static string DescribeHeaderFlags(HeaderCapabilityFlags flags)
+    {
+        if (flags == HeaderCapabilityFlags.None)
+        {
+            return "none";
+        }
+
+        var labels = new List<string>();
+        if (flags.HasFlag(HeaderCapabilityFlags.MultiFrameRotation))
+        {
+            labels.Add("multi-frame");
+        }
+
+        if (flags.HasFlag(HeaderCapabilityFlags.PlayerPosition))
+        {
+            labels.Add("player-position");
+        }
+
+        var unknown = (byte)(flags & ~(TransportConstants.HeaderCapabilities));
+        if (unknown != 0)
+        {
+            labels.Add($"unknown:0x{unknown:X2}");
+        }
+
+        return string.Join(", ", labels);
     }
 
     private List<CaptureAttempt> CaptureAndAnalyze(nint hwnd, IReadOnlyList<CaptureBackend> backends)

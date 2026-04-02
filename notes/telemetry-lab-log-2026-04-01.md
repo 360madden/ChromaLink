@@ -821,3 +821,49 @@ Keep.
 
 ### Saved Checkpoint
 ```
+
+---
+
+## 2026-04-02 - Session P - header capability proof flags
+
+### Goal
+
+Make a normal live capture prove whether the running addon has loaded the newer multi-frame telemetry build.
+
+### Change
+
+- repurpose the existing reserved header byte as explicit build-capability flags
+- set `0x01` for multi-frame rotation support
+- set `0x02` for player-position support
+- teach the CLI frame summary to print `ReservedFlags` in hex plus readable labels
+- add round-trip assertions so every supported frame type preserves the expected capability flags
+
+### Why
+
+The live client was still behaving like the older two-frame rotation after `/reloadui`. A strip-level proof marker is safer and more trustworthy than chat text or focus-sensitive slash-command output because it rides inside the same pixels the reader is already decoding.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- smoke
+```
+
+### Result
+
+- tests passed: `12/12`
+- `smoke` passed
+- CLI frame summaries now print `ReservedFlags: 0x03 (multi-frame, player-position)`
+- the local reader path can now prove build capability directly from decoded strip bytes
+- live RIFT proof is still pending a safe `/reloadui`
+
+### Decision
+
+Keep if tests and smoke pass.
+
+### Saved Checkpoint
+
+- pending commit for header capability proof flags
