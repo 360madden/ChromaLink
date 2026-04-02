@@ -105,8 +105,8 @@ local function InstallLayoutDiagnostics(state)
   end
   ChromaLink.Diagnostics.AttachLayoutTrace(state.render.band, "layout.band")
 
-  if state.render.probeBar ~= nil then
-    ChromaLink.Diagnostics.AttachLayoutTrace(state.render.probeBar.bar, "layout.probeBar")
+  if state.render.observerLane ~= nil then
+    ChromaLink.Diagnostics.AttachLayoutTrace(state.render.observerLane.bar, "layout.observerLane")
   end
 
   local nativeFrames = {
@@ -177,6 +177,7 @@ end
 function ChromaLink.Bootstrap.LogStatus(includeNativeFrames)
   local state = ChromaLink.Bootstrap.state
   local diagnosticsConfig = ChromaLink.Config.layoutDiagnostics or {}
+  local observerConfig = ChromaLink.Config.observerLane or {}
   local nativeFrames
   local entry
 
@@ -186,11 +187,12 @@ function ChromaLink.Bootstrap.LogStatus(includeNativeFrames)
   end
 
   ChromaLink.Diagnostics.Log(string.format(
-    "Status: seq=%d lastReason=%s diag=%s traces=%s.",
+    "Status: seq=%d lastReason=%s diag=%s traces=%s observer=%s.",
     tonumber(state.sequence) or 0,
     tostring(state.lastReason or "unknown"),
     diagnosticsConfig.enabled and "on" or "off",
-    diagnosticsConfig.logEvents and "on" or "off"))
+    diagnosticsConfig.logEvents and "on" or "off",
+    observerConfig.enabled and "on" or "off"))
   ChromaLink.Diagnostics.Log(string.format(
     "Anchor=%s strata=%s.",
     tostring(state.layoutAnchorReason or "context"),
@@ -201,8 +203,8 @@ function ChromaLink.Bootstrap.LogStatus(includeNativeFrames)
   if state.render ~= nil then
     LogFrameStatus("layout.band", state.render.band, "status")
     LogFrameStatus("layout.quietZone", state.render.quietZone, "status")
-    if state.render.probeBar ~= nil then
-      LogFrameStatus("layout.probeBar", state.render.probeBar.bar, "status")
+    if state.render.observerLane ~= nil then
+      LogFrameStatus("layout.observerLane", state.render.observerLane.bar, "status")
     end
   end
 
@@ -221,6 +223,26 @@ function ChromaLink.Bootstrap.LogStatus(includeNativeFrames)
   for _, entry in ipairs(nativeFrames) do
     LogFrameStatus(entry.label, entry.frame, "status")
   end
+end
+
+function ChromaLink.Bootstrap.SetObserverEnabled(enabled)
+  local state = ChromaLink.Bootstrap.state
+  local observerConfig = ChromaLink.Config.observerLane
+
+  if observerConfig == nil then
+    ChromaLink.Diagnostics.Log("Observer lane is unavailable in this build.")
+    return
+  end
+
+  observerConfig.enabled = enabled and true or false
+
+  if state == nil or state.render == nil then
+    ChromaLink.Diagnostics.Log("Observer lane setting updated; reload the addon to apply it.")
+    return
+  end
+
+  ChromaLink.Render.SetObserverEnabled(state.render, observerConfig.enabled)
+  ChromaLink.Diagnostics.Log("Observer lane " .. (observerConfig.enabled and "enabled" or "disabled") .. ".")
 end
 
 function ChromaLink.Bootstrap.Initialize()

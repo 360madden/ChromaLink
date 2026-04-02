@@ -2,8 +2,6 @@ ChromaLink = ChromaLink or {}
 ChromaLink.Render = {}
 
 local config = ChromaLink.Config
-local probeBarBackground = { 0.45, 0.45, 0.45, 0.95 }
-
 local function ApplyColor(frame, color)
   frame:SetBackgroundColor(color[1], color[2], color[3], color[4])
 end
@@ -25,31 +23,34 @@ local function ReadDimension(frame, methodName, fallback)
   return value
 end
 
-local function CreateProbeBar(rootFrame, profile)
-  local diagnosticsConfig = config.layoutDiagnostics
-  if diagnosticsConfig == nil or not diagnosticsConfig.enabled then
+local function CreateObserverLane(rootFrame, profile)
+  local observerConfig = config.observerLane
+  if observerConfig == nil then
     return nil
   end
 
-  local probeBar = UI.CreateFrame("Frame", "ChromaLinkProbeBar", rootFrame)
+  local probeBar = UI.CreateFrame("Frame", "ChromaLinkObserverLane", rootFrame)
   local markers = {}
-  local symbols = diagnosticsConfig.probeMarkerSymbols or {}
+  local symbols = observerConfig.markerSymbols or {}
+  local backgroundColor = observerConfig.backgroundColor or { 0.45, 0.45, 0.45, 0.95 }
 
   probeBar:SetPoint(
     "TOPLEFT",
     rootFrame,
     "TOPLEFT",
-    diagnosticsConfig.probeBarOffsetX or 0,
-    diagnosticsConfig.probeBarOffsetY or 32)
+    0,
+    observerConfig.offsetY or 32)
   probeBar:SetWidth(profile.bandWidth)
-  probeBar:SetHeight(diagnosticsConfig.probeBarHeight or 8)
+  probeBar:SetHeight(observerConfig.height or 8)
   probeBar:SetLayer(config.requestedLayer + 2)
-  ApplyColor(probeBar, probeBarBackground)
+  ApplyColor(probeBar, backgroundColor)
+  probeBar:SetVisible(observerConfig.enabled and true or false)
 
   for index, symbol in ipairs(symbols) do
-    local marker = UI.CreateFrame("Frame", "ChromaLinkProbeMarker" .. tostring(index), probeBar)
+    local marker = UI.CreateFrame("Frame", "ChromaLinkObserverMarker" .. tostring(index), probeBar)
     marker:SetLayer(config.requestedLayer + 3)
     ApplyColor(marker, config.GetPaletteColor(symbol))
+    marker:SetVisible(observerConfig.enabled and true or false)
     markers[index] = {
       frame = marker,
       fraction = (#symbols > 1) and ((index - 1) / (#symbols - 1)) or 0
@@ -58,7 +59,8 @@ local function CreateProbeBar(rootFrame, profile)
 
   return {
     bar = probeBar,
-    markers = markers
+    markers = markers,
+    enabled = observerConfig.enabled and true or false
   }
 end
 
@@ -77,13 +79,11 @@ end
 
 local function ComputeLayout(renderState)
   local profile = renderState.profile
-  local diagnosticsConfig = config.layoutDiagnostics or {}
   local quietZoneConfig = config.quietZone or {}
+  local observerConfig = config.observerLane or {}
   local anchorFrame = renderState.anchorFrame or UIParent or renderState.rootFrame
   local anchorWidth = ReadDimension(anchorFrame, "GetWidth", profile.windowWidth)
   local anchorHeight = ReadDimension(anchorFrame, "GetHeight", profile.windowHeight)
-  local probeBarHeight = 0
-  local probeBarBottom = 0
   local rootWidth = profile.bandWidth
   local rootHeight = profile.bandHeight
   local requestedLeft = tonumber(config.stripOffsetX) or 0
@@ -98,9 +98,9 @@ local function ComputeLayout(renderState)
     rootHeight = math.max(rootHeight, tonumber(quietZoneConfig.height) or profile.bandHeight)
   end
 
-  if renderState.probeBar ~= nil then
-    probeBarHeight = tonumber(diagnosticsConfig.probeBarHeight) or 12
-    probeBarBottom = (tonumber(diagnosticsConfig.probeBarOffsetY) or 32) + probeBarHeight
+  if renderState.observerLane ~= nil and renderState.observerLane.enabled then
+    local probeBarHeight = tonumber(observerConfig.height) or 12
+    local probeBarBottom = (tonumber(observerConfig.offsetY) or 32) + probeBarHeight
     if probeBarBottom > rootHeight then
       rootHeight = probeBarBottom
     end
@@ -118,14 +118,13 @@ local function ComputeLayout(renderState)
     rootLeft = rootLeft,
     rootTop = rootTop,
     rootWidth = rootWidth,
-    rootHeight = rootHeight,
-    probeBarHeight = probeBarHeight
+    rootHeight = rootHeight
   }
 end
 
 local function ApplyLayout(renderState)
   local profile = renderState.profile
-  local diagnosticsConfig = config.layoutDiagnostics or {}
+  local observerConfig = config.observerLane or {}
   local layout = ComputeLayout(renderState)
   local displayScaleX = tonumber(profile.displayScaleX) or tonumber(profile.displayScale) or 1
   local displayScaleY = tonumber(profile.displayScaleY) or tonumber(profile.displayScale) or 1
@@ -183,32 +182,34 @@ local function ApplyLayout(renderState)
     segment:SetHeight(profile.segmentHeight * displayScaleY)
   end
 
-  if renderState.probeBar ~= nil then
-    local probeBarLeft = diagnosticsConfig.probeBarOffsetX or 0
-    local probeBarTop = diagnosticsConfig.probeBarOffsetY or 32
+  if renderState.observerLane ~= nil then
+    local probeBarLeft = 0
+    local probeBarTop = observerConfig.offsetY or 32
     local probeBarWidth = bandWidth
-    local probeBarHeight = diagnosticsConfig.probeBarHeight or 12
-    local markerWidth = diagnosticsConfig.probeMarkerWidth or 20
+    local probeBarHeight = observerConfig.height or 12
+    local markerWidth = observerConfig.markerWidth or 20
     local markerHeight = probeBarHeight
 
-    if renderState.probeBar.bar.ClearAllPoints ~= nil then
-      renderState.probeBar.bar:ClearAllPoints()
+    if renderState.observerLane.bar.ClearAllPoints ~= nil then
+      renderState.observerLane.bar:ClearAllPoints()
     end
-    renderState.probeBar.bar:SetPoint("TOPLEFT", renderState.rootFrame, "TOPLEFT", probeBarLeft, probeBarTop)
-    renderState.probeBar.bar:SetWidth(probeBarWidth)
-    renderState.probeBar.bar:SetHeight(probeBarHeight)
+    renderState.observerLane.bar:SetPoint("TOPLEFT", renderState.rootFrame, "TOPLEFT", probeBarLeft, probeBarTop)
+    renderState.observerLane.bar:SetWidth(probeBarWidth)
+    renderState.observerLane.bar:SetHeight(probeBarHeight)
+    renderState.observerLane.bar:SetVisible(renderState.observerLane.enabled)
 
-    for index = 1, #renderState.probeBar.markers do
-      local markerState = renderState.probeBar.markers[index]
+    for index = 1, #renderState.observerLane.markers do
+      local markerState = renderState.observerLane.markers[index]
       local marker = markerState.frame
       local x = markerState.fraction * math.max(0, probeBarWidth - markerWidth)
 
       if marker.ClearAllPoints ~= nil then
         marker:ClearAllPoints()
       end
-      marker:SetPoint("TOPLEFT", renderState.probeBar.bar, "TOPLEFT", x, 0)
+      marker:SetPoint("TOPLEFT", renderState.observerLane.bar, "TOPLEFT", x, 0)
       marker:SetWidth(markerWidth)
       marker:SetHeight(markerHeight)
+      marker:SetVisible(renderState.observerLane.enabled)
     end
   end
 
@@ -227,7 +228,7 @@ function ChromaLink.Render.Initialize(rootFrame, anchorFrame)
   local defaultScaleY = tonumber(profile.displayScaleY) or tonumber(profile.displayScale) or 1
   local quietZone = CreateQuietZone(rootFrame)
   local band = UI.CreateFrame("Frame", "ChromaLinkBand", rootFrame)
-  local probeBar = CreateProbeBar(rootFrame, profile)
+  local observerLane = CreateObserverLane(rootFrame, profile)
   local segments = {}
   local lastSymbols = {}
   local index
@@ -260,7 +261,7 @@ function ChromaLink.Render.Initialize(rootFrame, anchorFrame)
     anchorFrame = anchorFrame,
     quietZone = quietZone,
     band = band,
-    probeBar = probeBar,
+    observerLane = observerLane,
     segments = segments,
     lastSymbols = lastSymbols,
     lastRootLeft = nil,
@@ -273,6 +274,15 @@ function ChromaLink.Render.Initialize(rootFrame, anchorFrame)
 end
 
 function ChromaLink.Render.SyncLayout(renderState)
+  return ApplyLayout(renderState)
+end
+
+function ChromaLink.Render.SetObserverEnabled(renderState, enabled)
+  if renderState == nil or renderState.observerLane == nil then
+    return false
+  end
+
+  renderState.observerLane.enabled = enabled and true or false
   return ApplyLayout(renderState)
 end
 

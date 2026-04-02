@@ -31,6 +31,14 @@ ChromaLink.Config = {
     height = 48,
     backgroundSymbol = 0
   },
+  observerLane = {
+    enabled = false,
+    offsetY = 32,
+    height = 12,
+    backgroundColor = { 0.45, 0.45, 0.45, 0.95 },
+    markerWidth = 20,
+    markerSymbols = { 0, 1, 2, 3, 4, 5, 6, 7 }
+  },
   preferHighestAvailableStrata = true,
   protocolVersion = 1,
   syntheticMode = {

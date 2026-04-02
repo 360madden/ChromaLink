@@ -23,7 +23,7 @@ local function SetTraceMode(enabled)
 end
 
 local function PrintHelp()
-  ChromaLink.Diagnostics.Log("Commands: /cl status | /cl diag | /cl refresh | /cl traces on|off")
+  ChromaLink.Diagnostics.Log("Commands: /cl status | /cl diag | /cl refresh | /cl observer on|off|status | /cl traces on|off")
 end
 
 function ChromaLink.Commands.OnSlashCommand(_, commandText)
@@ -45,6 +45,23 @@ function ChromaLink.Commands.OnSlashCommand(_, commandText)
     ChromaLink.Bootstrap.SafeRefresh(true, "slash-refresh")
     ChromaLink.Diagnostics.Log("Forced strip refresh requested.")
     return
+  end
+
+  if command == "observer" then
+    if option == "on" then
+      ChromaLink.Bootstrap.SetObserverEnabled(true)
+      return
+    end
+
+    if option == "off" then
+      ChromaLink.Bootstrap.SetObserverEnabled(false)
+      return
+    end
+
+    if option == "status" or option == "" then
+      ChromaLink.Diagnostics.Log("Observer lane is " .. ((ChromaLink.Config.observerLane or {}).enabled and "on" or "off") .. ".")
+      return
+    end
   end
 
   if command == "traces" then

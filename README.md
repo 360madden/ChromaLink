@@ -82,6 +82,7 @@ In-game slash commands:
 - `/cl status` prints the current ChromaLink layout summary
 - `/cl diag` adds nearby native RIFT frame summaries for overlap/debug checks
 - `/cl refresh` forces an immediate strip refresh
+- `/cl observer on|off|status` toggles an optional calibration lane below the strip for extra capture diagnostics
 - `/cl traces on|off` arms or disables verbose layout tracing for the next `/reloadui`
 
 ## Wrapper Scripts
