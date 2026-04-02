@@ -22,6 +22,7 @@ Working rules:
 - do not drift back into the old monochrome barcode/matrix transport
 - prefer explicit reject reasons over silent heuristics
 - keep docs honest about what is proven and what is pending
+- optimize the strip for machine readability first; human readability or visual elegance is optional
 
 Current transport contract:
 - segments `1-8` and `73-80` are fixed control markers

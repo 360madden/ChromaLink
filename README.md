@@ -9,6 +9,8 @@ ChromaLink is a reliability-first optical telemetry project for RIFT. A Lua addo
 
 The important constraint is also the point of the project: the game-to-desktop bridge is the on-screen strip itself. If live capture or replay fails, that failure is visible and debuggable in pixels rather than hidden behind an opaque integration.
 
+Design rule: the strip only needs to be machine-readable. Human readability is optional, and decoder margin matters more than visual elegance.
+
 ## Current Scope
 
 ChromaLink is intentionally narrow right now. The active baseline is:

@@ -563,6 +563,46 @@ Keep.
 
 ---
 
+## 2026-04-01 - Session L - machine readability rule
+
+### Goal
+
+Make the strip-design priority explicit so future work does not accidentally optimize for appearance over decode reliability.
+
+### Change
+
+- add an explicit strip-design rule to `PROJECT_PROMPT.md`
+- add the same principle to the README introduction
+
+### Why
+
+This project only succeeds if the strip remains reliably machine-readable under live capture. A visible reminder in the core docs helps keep future design decisions aligned with that goal.
+
+### Verification
+
+```powershell
+Get-Content -Raw .\PROJECT_PROMPT.md
+```
+
+```powershell
+Get-Content -TotalCount 12 .\README.md
+```
+
+### Result
+
+- the project docs now clearly state that machine readability comes first
+- visual neatness is documented as secondary to decoder margin
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for machine readability rule
+
+---
+
 ## Current Stable Baseline At End Of Log
 
 - target client: `640x360`
