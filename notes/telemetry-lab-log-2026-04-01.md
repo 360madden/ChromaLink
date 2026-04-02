@@ -301,6 +301,54 @@ Keep.
 
 ---
 
+## 2026-04-01 - Session F - visual observer artifact overlay
+
+### Goal
+
+Make saved capture artifacts visually explain observer-lane results without requiring manual JSON inspection.
+
+### Change
+
+- extend observer marker diagnostics with:
+  - sampled rectangle bounds
+  - sampled center coordinates
+- draw observer marker rectangles and centers into the annotated BMP artifact
+- extend the inspector sidecar summary to list observer marker rectangles
+
+### Why
+
+The observer sidecar had become useful, but saved captures still required reading JSON to understand which observer markers matched or where they were sampled. Visual overlays make replay/debugging much faster.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- capture-dump
+```
+
+### Result
+
+- tests passed: `9/9`
+- capture-dump still succeeded
+- current observer sidecar fields now include marker bounds
+- the latest capture sidecar reported:
+  - `observerLane.probablyVisible = true`
+  - `matchedMarkers = 8/8`
+- annotated BMP artifacts now have explicit observer marker visuals
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for visual observer artifact overlay
+
+---
+
 ## Current Stable Baseline At End Of Log
 
 - target client: `640x360`

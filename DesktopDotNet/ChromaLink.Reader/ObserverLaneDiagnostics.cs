@@ -8,6 +8,10 @@ public sealed record ObserverLaneMarkerSample(
     double Distance,
     byte SecondChoiceSymbol,
     double SecondChoiceDistance,
+    int Left,
+    int Top,
+    int Width,
+    int Height,
     int CenterX,
     int CenterY,
     Bgr24Color SampleColor);
@@ -52,8 +56,12 @@ public static class ObserverLaneAnalyzer
                 ? index / (double)(observer.MarkerSymbols.Length - 1)
                 : 0.0;
             var left = fraction * Math.Max(0, profile.BandWidth - observer.MarkerWidth);
-            var centerX = (int)Math.Round(originX + ((left + (observer.MarkerWidth / 2.0)) * scale));
-            var centerY = (int)Math.Round(originY + ((observer.OffsetY + (observer.Height / 2.0)) * scale));
+            var scaledLeft = (int)Math.Round(originX + (left * scale));
+            var scaledTop = (int)Math.Round(originY + (observer.OffsetY * scale));
+            var scaledWidth = Math.Max(1, (int)Math.Round(observer.MarkerWidth * scale));
+            var scaledHeight = Math.Max(1, (int)Math.Round(observer.Height * scale));
+            var centerX = scaledLeft + (scaledWidth / 2);
+            var centerY = scaledTop + (scaledHeight / 2);
             var color = image.SampleAverage(centerX, centerY, 1);
             var classification = Classify(color, profile);
             var expected = observer.MarkerSymbols[index];
@@ -72,6 +80,10 @@ public static class ObserverLaneAnalyzer
                 classification.Distance,
                 classification.SecondChoiceSymbol,
                 classification.SecondChoiceDistance,
+                scaledLeft,
+                scaledTop,
+                scaledWidth,
+                scaledHeight,
                 centerX,
                 centerY,
                 color));

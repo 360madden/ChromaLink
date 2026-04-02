@@ -62,6 +62,9 @@ internal static class DiagnosticsArtifacts
         using var segmentPen = new Pen(Color.LimeGreen, 1);
         using var roiPen = new Pen(Color.Gold, 1);
         using var sampleBrush = new SolidBrush(Color.DeepPink);
+        using var observerMatchPen = new Pen(Color.DeepSkyBlue, 1);
+        using var observerMismatchPen = new Pen(Color.OrangeRed, 1);
+        using var observerCenterBrush = new SolidBrush(Color.Cyan);
         using var textBrush = new SolidBrush(Color.White);
         using var bgBrush = new SolidBrush(Color.FromArgb(185, 0, 0, 0));
         using var font = new Font("Consolas", 8.0f, FontStyle.Regular, GraphicsUnit.Pixel);
@@ -94,6 +97,13 @@ internal static class DiagnosticsArtifacts
         }
 
         var observerReport = ObserverLaneAnalyzer.Analyze(capture.Image, profile, validation.Detection);
+        foreach (var marker in observerReport.Markers)
+        {
+            var pen = marker.ExpectedSymbol == marker.ObservedSymbol ? observerMatchPen : observerMismatchPen;
+            graphics.DrawRectangle(pen, marker.Left, marker.Top, Math.Max(1, marker.Width - 1), Math.Max(1, marker.Height - 1));
+            graphics.FillEllipse(observerCenterBrush, marker.CenterX - 1, marker.CenterY - 1, 3, 3);
+        }
+
         var summaryLines = BuildOverlayLines(profile, capture, validation, observerReport);
         var overlayWidth = 430;
         var overlayHeight = (summaryLines.Count * 11) + 8;
@@ -188,6 +198,10 @@ internal static class DiagnosticsArtifacts
                         distance = marker.Distance,
                         secondChoiceSymbol = marker.SecondChoiceSymbol,
                         secondChoiceDistance = marker.SecondChoiceDistance,
+                        left = marker.Left,
+                        top = marker.Top,
+                        width = marker.Width,
+                        height = marker.Height,
                         centerX = marker.CenterX,
                         centerY = marker.CenterY,
                         sampleColor = new

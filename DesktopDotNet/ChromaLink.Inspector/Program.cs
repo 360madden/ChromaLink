@@ -253,6 +253,15 @@ internal sealed class InspectorForm : Form
                 $"ObserverLane: visible={observerLane.GetProperty("probablyVisible").GetBoolean()} matched={observerLane.GetProperty("matchedMarkers").GetInt32()}/{observerLane.GetProperty("totalMarkers").GetInt32()} conf={observerLane.GetProperty("averageConfidence").GetDouble():F3}");
             builder.AppendLine($"ObserverExpected: {observerLane.GetProperty("expectedPattern").GetString()}");
             builder.AppendLine($"ObserverObserved: {observerLane.GetProperty("observedPattern").GetString()}");
+
+            if (observerLane.TryGetProperty("markers", out var markers) && markers.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var marker in markers.EnumerateArray())
+                {
+                    builder.AppendLine(
+                        $"  marker[{marker.GetProperty("markerIndex").GetInt32()}]: expected={marker.GetProperty("expectedSymbol").GetInt32()} observed={marker.GetProperty("observedSymbol").GetInt32()} conf={marker.GetProperty("confidence").GetDouble():F3} rect={marker.GetProperty("left").GetInt32()},{marker.GetProperty("top").GetInt32()} {marker.GetProperty("width").GetInt32()}x{marker.GetProperty("height").GetInt32()}");
+                }
+            }
         }
     }
 
