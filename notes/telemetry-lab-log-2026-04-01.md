@@ -696,7 +696,10 @@ dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- smo
 - inspector build succeeded
 - smoke remained accepted
 - the transport now supports more than one frame type while keeping the same strip size
-- live RIFT validation of the new rotation is still pending a `/reloadui`
+- live RIFT validation confirmed after `/reloadui`
+- sampled live captures decoded both:
+  - `CoreStatus`
+  - `PlayerVitals`
 
 ### Decision
 
@@ -704,7 +707,18 @@ Keep.
 
 ### Saved Checkpoint
 
-- pending commit for multi-frame throughput expansion
+- commit `796499c` - `add rotating multi-frame telemetry`
+
+### Live Validation Notes
+
+After `/reloadui`, repeated `capture-dump` runs showed accepted live decodes alternating across frame types. Sample observations included:
+
+- `CoreStatus`, schema `1`, sequence `137`
+- `PlayerVitals`, schema `1`, sequence `155`
+- `PlayerVitals`, schema `1`, sequence `179`
+- `PlayerVitals`, schema `1`, sequence `203`
+- `CoreStatus`, schema `1`, sequence `222`
+- `PlayerVitals`, schema `1`, sequence `247`
 
 ---
 

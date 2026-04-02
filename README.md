@@ -22,7 +22,7 @@ ChromaLink is intentionally narrow right now. The active baseline is:
 - fixed `8-color` alphabet
 - fixed control markers on both edges
 - fast heartbeat frame: `coreStatus`
-- first throughput expansion in code: `playerVitals`
+- proven rotating expansion: `playerVitals`
 
 Current live proof:
 
@@ -33,6 +33,7 @@ Current live proof:
   - `origin 0,0`
   - `pitch 2.8`
   - `scale 0.35`
+- live captures now decode both `CoreStatus` and `PlayerVitals` on the running client
 - capture sessions emit raw BMP, annotated BMP, and JSON sidecars under `%LOCALAPPDATA%\ChromaLink\DesktopDotNet\out`
 
 ## How It Works
