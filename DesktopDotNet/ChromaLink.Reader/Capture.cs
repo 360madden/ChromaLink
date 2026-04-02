@@ -52,14 +52,6 @@ public static class WindowCaptureService
                 (candidate.ProcessName.Equals("rift", StringComparison.OrdinalIgnoreCase)
                  || candidate.ProcessName.Equals("rift_x64", StringComparison.OrdinalIgnoreCase)));
 
-        process ??= Process
-            .GetProcesses()
-            .FirstOrDefault(static candidate =>
-                candidate.MainWindowHandle != nint.Zero &&
-                candidate.MainWindowTitle.StartsWith("RIFT", StringComparison.OrdinalIgnoreCase) &&
-                !candidate.MainWindowTitle.Contains("Minion", StringComparison.OrdinalIgnoreCase) &&
-                !candidate.MainWindowTitle.Contains("Glyph", StringComparison.OrdinalIgnoreCase));
-
         return process?.MainWindowHandle ?? nint.Zero;
     }
 

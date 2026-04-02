@@ -86,7 +86,7 @@ internal sealed class CliApp
         var hwnd = WindowCaptureService.FindRiftWindow();
         if (hwnd == nint.Zero)
         {
-            return Fail("No likely RIFT window was found.");
+            return Fail("No likely RIFT window was found. Expected a rift or rift_x64 game process.");
         }
 
         var attempts = CaptureAndAnalyze(hwnd, invocation.Backends);
@@ -137,7 +137,7 @@ internal sealed class CliApp
         var hwnd = WindowCaptureService.FindRiftWindow();
         if (hwnd == nint.Zero)
         {
-            return Fail("No likely RIFT window was found.");
+            return Fail("No likely RIFT window was found. Expected a rift or rift_x64 game process.");
         }
 
         var left = args.Length >= 2 ? int.Parse(args[1]) : 32;
@@ -195,7 +195,7 @@ internal sealed class CliApp
         var hwnd = WindowCaptureService.FindRiftWindow();
         if (hwnd == nint.Zero)
         {
-            return Fail("No likely RIFT window was found.");
+            return Fail("No likely RIFT window was found. Expected a rift or rift_x64 game process.");
         }
 
         var iterationLimit = watchMode

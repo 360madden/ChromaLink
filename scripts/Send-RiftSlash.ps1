@@ -1,9 +1,18 @@
 param(
   [Parameter(Mandatory = $true)]
-  [string]$CommandText
+  [string]$CommandText,
+
+  [switch]$DryRun
 )
 
 Add-Type -AssemblyName System.Windows.Forms
+
+$commonPath = Join-Path $PSScriptRoot "Rift-HelperCommon.ps1"
+if (-not (Test-Path -LiteralPath $commonPath)) {
+    throw "Shared RIFT helper script not found at $commonPath"
+}
+
+. $commonPath
 
 $signature = @"
 using System;
@@ -29,22 +38,22 @@ public static class ChromaLinkSlashTools
 
 Add-Type -TypeDefinition $signature -Language CSharp
 
-$process = Get-Process |
-    Where-Object {
-        $_.MainWindowHandle -ne 0 -and (
-            $_.ProcessName -ieq 'rift' -or
-            $_.ProcessName -ieq 'rift_x64' -or
-            ($_.MainWindowTitle -like 'RIFT*' -and $_.MainWindowTitle -notlike '*Minion*')
-        )
-    } |
-    Select-Object -First 1
+$process = Get-ChromaLinkRiftProcess
 
 if (-not $process) {
-    throw "No likely RIFT window was found."
+    throw "No likely RIFT window was found. Expected a rift or rift_x64 game process."
 }
 
 $handle = $process.MainWindowHandle
-if ([ChromaLinkSlashTools]::IsIconic($handle)) {
+$windowSnapshot = Get-ChromaLinkRiftWindowSnapshot -Handle ([System.IntPtr]$handle)
+$isMinimized = [bool]$windowSnapshot.IsMinimized
+
+if ($DryRun) {
+    Write-ChromaLinkRiftDryRunSummary -Title "ChromaLink Slash Dry Run" -Process $process -Mode "focus-sendkeys-chat" -CommandText $CommandText
+    return
+}
+
+if ($isMinimized) {
     [void][ChromaLinkSlashTools]::ShowWindowAsync($handle, [ChromaLinkSlashTools]::SwRestore)
     Start-Sleep -Milliseconds 250
 }

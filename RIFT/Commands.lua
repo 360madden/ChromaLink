@@ -41,7 +41,7 @@ local function PrintRotationStatus()
 end
 
 local function PrintHelp()
-  ChromaLink.Diagnostics.Log("Commands: /cl status | /cl build | /cl rotation | /cl diag | /cl refresh | /cl observer on|off|status | /cl compensate on|off|status | /cl traces on|off")
+  ChromaLink.Diagnostics.Log("Commands: /cl status | /cl build | /cl rotation | /cl diag | /cl refresh | /cl abilities status|export | /cl observer on|off|status | /cl compensate on|off|status | /cl traces on|off")
 end
 
 function ChromaLink.Commands.OnSlashCommand(_, commandText)
@@ -73,6 +73,23 @@ function ChromaLink.Commands.OnSlashCommand(_, commandText)
     ChromaLink.Bootstrap.SafeRefresh(true, "slash-refresh")
     ChromaLink.Diagnostics.Log("Forced strip refresh requested.")
     return
+  end
+
+  if command == "abilities" or command == "ability" then
+    if ChromaLink.AbilityExport == nil then
+      ChromaLink.Diagnostics.Log("Ability export support is unavailable in this build.")
+      return
+    end
+
+    if option == "status" or option == "" then
+      ChromaLink.AbilityExport.LogStatus()
+      return
+    end
+
+    if option == "export" or option == "refresh" then
+      ChromaLink.AbilityExport.RequestExport("slash-" .. option, true)
+      return
+    end
   end
 
   if command == "observer" then

@@ -79,15 +79,6 @@ function Get-RiftWindowProcess {
     return $directMatch
   }
 
-  $titleMatch = $candidates | Where-Object {
-    ($_.MainWindowTitle -match '^RIFT(\b|$)') -and
-    ($_.MainWindowTitle -notmatch 'Minion')
-  } | Select-Object -First 1
-
-  if ($null -ne $titleMatch) {
-    return $titleMatch
-  }
-
   return $null
 }
 
@@ -166,7 +157,7 @@ function Get-OuterSize {
 
 $process = Get-RiftWindowProcess
 if ($null -eq $process) {
-  Write-Error "No RIFT window was found. Start the game in windowed mode first."
+  Write-Error "No likely RIFT window was found. Expected a rift or rift_x64 game process in windowed mode."
 }
 
 $handle = [System.IntPtr]$process.MainWindowHandle

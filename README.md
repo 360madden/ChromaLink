@@ -163,6 +163,8 @@ ChromaLink exposes a small slash-command surface inside RIFT:
 - `/cl rotate`
 - `/cl diag`
 - `/cl refresh`
+- `/cl abilities status`
+- `/cl abilities export`
 - `/cl observer on`
 - `/cl observer off`
 - `/cl observer status`
@@ -171,6 +173,25 @@ ChromaLink exposes a small slash-command surface inside RIFT:
 - `/cl compensate status`
 - `/cl traces on`
 - `/cl traces off`
+
+ChromaLink now also keeps a character-scoped ability export snapshot in SavedVariables. It gathers the live player ability book through `Inspect.Ability.New.List()` / `Inspect.Ability.New.Detail()`, stores both the full sorted list and an offensive-candidate subset, and refreshes automatically on addon load, ability-add events, role changes, and the next save cycle.
+
+The in-memory snapshot refreshes immediately inside the addon; the on-disk SavedVariables file updates on the next normal RIFT save cycle such as `/reloadui`, logout, or exit.
+
+Saved export variable:
+
+- `ChromaLink_AbilityExport` in the character SavedVariables file for the ChromaLink addon
+
+The export is machine-oriented and includes:
+
+- player metadata (`name`, `level`, `calling`, `role`)
+- counts for `total`, `active`, and `offensive`
+- `abilities`
+- `offensiveAbilities`
+- `rawText`
+- `offensiveRawText`
+
+`/cl abilities status` prints the current snapshot summary in-game. `/cl abilities export` forces an immediate refresh attempt, but the feature does not rely on chat input to keep the export current.
 
 What they are for:
 
@@ -411,8 +432,12 @@ Useful helper scripts:
 - [scripts/Open-ChromaLinkTelemetryFolder.cmd](scripts/Open-ChromaLinkTelemetryFolder.cmd)
 - [scripts/Test-ChromaLinkTelemetryReady.cmd](scripts/Test-ChromaLinkTelemetryReady.cmd)
 - [scripts/Open-ChromaLink-Inspector.cmd](scripts/Open-ChromaLink-Inspector.cmd)
+- [scripts/Get-RiftInputReadiness.cmd](scripts/Get-RiftInputReadiness.cmd)
+- [scripts/Get-RiftAbilityExport.cmd](scripts/Get-RiftAbilityExport.cmd)
 - [scripts/Reload-RiftUi.cmd](scripts/Reload-RiftUi.cmd)
 - [scripts/Send-RiftSlash.cmd](scripts/Send-RiftSlash.cmd)
+- [scripts/Trigger-RiftActionBar.cmd](scripts/Trigger-RiftActionBar.cmd)
+- [scripts/Trigger-RiftMainBar.cmd](scripts/Trigger-RiftMainBar.cmd)
 - [scripts/Resize-RiftClient-640x360.cmd](scripts/Resize-RiftClient-640x360.cmd)
 - [scripts/Sweep-RiftResolutions.ps1](scripts/Sweep-RiftResolutions.ps1)
 
@@ -425,6 +450,30 @@ Examples:
 ```powershell
 .\scripts\Sweep-RiftResolutions.ps1 -Resolutions @('640x360') -ReloadUi -ObserverLane on
 ```
+
+```powershell
+.\scripts\Send-RiftSlash.cmd /reloadui
+.\scripts\Get-RiftInputReadiness.cmd
+.\scripts\Get-RiftInputReadiness.cmd -RequireExpectedClientSize
+.\scripts\Get-RiftAbilityExport.cmd
+.\scripts\Get-RiftAbilityExport.cmd -Json
+.\scripts\Send-RiftSlash.cmd /cl status -DryRun
+.\scripts\Reload-RiftUi.cmd -DryRun
+.\scripts\Trigger-RiftActionBar.cmd 5
+.\scripts\Trigger-RiftMainBar.cmd 1
+.\scripts\Trigger-RiftMainBar.cmd 5 -DryRun
+.\scripts\Trigger-RiftMainBar.cmd 5 -Focus
+```
+
+`Send-RiftSlash.cmd` is the existing chat-command helper. `Trigger-RiftMainBar.cmd` is the matching external input helper for the first RIFT main action bar and currently supports slots `1-12`, mapped to the default key row `1 2 3 4 5 6 7 8 9 0 - =`.
+
+`Trigger-RiftActionBar.cmd` is a clearer alias for the same helper when you want to think in terms of the currently active default main action bar instead of the older internal script name.
+
+`Get-RiftInputReadiness.cmd` is the consolidated preflight report. It compares the live RIFT process/window/client state against the last-saved `%APPDATA%\RIFT\rift.cfg` baseline and reports whether background main-bar input, focus-based chat input, and ChromaLink capture are currently ready. Add `-RequireExpectedClientSize` when you want it to fail unless the live client matches the expected `640x360` ChromaLink profile.
+
+`Get-RiftAbilityExport.cmd` reads the latest persisted `ChromaLink_AbilityExport` snapshot from the RIFT `SavedVariables` tree and prints the current character plus the exported offensive ability table. Add `-Json` for machine-readable output or `-All` to include the full exported ability book instead of just the offensive subset.
+
+`Trigger-RiftMainBar.cmd` now defaults to background `PostMessage` mode so it can fire a main-bar slot without stealing focus. Use `-Focus` only as the fallback path when you explicitly want the older foreground activation behavior. `-Background` is still accepted for clarity or backward compatibility. `-DryRun` prints the exact PID, process, window title, live window/client geometry, last-saved `rift.cfg` baseline, slot, key, and delivery mode without sending anything. Treat background posting as game-specific: many games ignore unfocused `WM_KEYDOWN` / `WM_KEYUP` messages, so ChromaLink or manual confirmation is still needed.
 
 ## Bridge Output
 
@@ -525,9 +574,9 @@ For an automation-friendly readiness check that exits nonzero when the bridge is
 .\scripts\Test-ChromaLinkTelemetryReady.cmd
 ```
 
-`Reload-RiftUi.cmd` sends the normal RIFT `/reloadui` command to the active game window.
+`Reload-RiftUi.cmd` sends the normal RIFT `/reloadui` command to the active game window. `-DryRun` previews the target PID/title, live window/client geometry, and last-saved `rift.cfg` baseline, then confirms that it would use the focus-based chat path.
 
-`Send-RiftSlash.cmd` can send other ChromaLink slash commands when we explicitly want scripted in-game control.
+`Send-RiftSlash.cmd` can send other ChromaLink slash commands when we explicitly want scripted in-game control. `-DryRun` previews the target PID/title, live window/client geometry, last-saved `rift.cfg` baseline, and the exact command text without sending it.
 
 The slash-sender helpers now abort if RIFT does not actually become the foreground window, which is safer than typing into another app by mistake.
 

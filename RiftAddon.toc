@@ -15,5 +15,10 @@ RunOnStartup = {
   "RIFT/ErrorTrap.lua",
   "RIFT/Render.lua",
   "RIFT/Bootstrap.lua",
+  "RIFT/AbilityExport.lua",
   "RIFT/Commands.lua"
+}
+
+SavedVariables = {
+  ChromaLink_AbilityExport = "character",
 }
