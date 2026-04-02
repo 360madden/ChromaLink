@@ -1,8 +1,9 @@
 # ChromaLink
 
-[![.NET 9](https://img.shields.io/badge/.NET-9-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
-[![Lua 5.1](https://img.shields.io/badge/Lua-5.1-blue?logo=lua)](https://www.lua.org/)
-[![RIFT MMO](https://img.shields.io/badge/RIFT-MMO-FF6B35)](https://www.riftgame.com/)
+[![.NET 9](https://img.shields.io/badge/.NET-9-5C2D91?logo=dotnet)](https://dotnet.microsoft.com/)
+[![Lua 5.1](https://img.shields.io/badge/Lua-5.1-2C2D72?logo=lua)](https://www.lua.org/)
+[![RIFT MMO](https://img.shields.io/badge/RIFT-MMO-FF7A2F)](https://www.riftgame.com/)
+[![License MIT](https://img.shields.io/badge/License-MIT-97CA00)](#)
 
 ChromaLink is a reliability-first optical telemetry project for RIFT. A Lua addon renders a structured color strip inside the game client, and a `.NET 9` desktop reader captures that strip from the window, decodes it, and turns it into usable telemetry plus diagnostics.
 

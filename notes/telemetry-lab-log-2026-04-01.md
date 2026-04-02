@@ -436,6 +436,43 @@ Keep.
 
 ---
 
+## 2026-04-01 - Session I - README badge polish
+
+### Goal
+
+Make the top badge row look closer to the cleaner project style we want to present publicly.
+
+### Change
+
+- tune the README badge row colors
+- add a `License MIT` badge
+- keep the existing project links while making the top line feel more intentional
+
+### Why
+
+The structure rewrite made the README stronger, and a cleaner badge row finishes the first visual impression without affecting any runtime behavior.
+
+### Verification
+
+```powershell
+Get-Content -TotalCount 8 .\README.md
+```
+
+### Result
+
+- the top of the README now better matches the visual style we want
+- the project now exposes license info directly in the badge row
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for README badge polish
+
+---
+
 ## Current Stable Baseline At End Of Log
 
 - target client: `640x360`
