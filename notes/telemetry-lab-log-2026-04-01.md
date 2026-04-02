@@ -28,6 +28,118 @@ For each new experiment or checkpoint, record:
 
 ---
 
+## 2026-04-02 - Session AF2 - expanded telemetry capability pass
+
+### Goal
+
+Add the next practical telemetry slices requested for leader/follower and HUD use without changing strip geometry:
+
+- finer cast timing and cast target hints
+- explicit mana/energy/power pools
+- combo / charge / planar / absorb
+- target coordinates
+- follow-unit status for party-follow workflows
+
+### Change
+
+- documented the pre-execution plan in `notes/next-product-plan-2026-04-02-expanded-telemetry-capabilities.md`
+- expanded Lua config, gather, protocol, and bootstrap rotation to support:
+  - `playerResources`
+  - `playerCombat`
+  - `targetPosition`
+  - `followUnitStatus`
+- upgraded `playerCast` payload to carry:
+  - centisecond duration / remaining
+  - cast target code
+  - compact `5`-byte spell label
+- updated the .NET reader, aggregate, CLI, rolling snapshot contract, and inspector for the new frame set
+- added round-trip and snapshot-contract coverage for the expanded frame set
+
+### Why
+
+These are high-value stats already exposed by the RIFT API and they fit the current transport model better as additional rotating slices than as a wider strip or denser single heartbeat.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+dotnet build .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj
+```
+
+```powershell
+dotnet build .\DesktopDotNet\ChromaLink.Inspector\ChromaLink.Inspector.csproj
+```
+
+### Result
+
+- full solution tests passed: `25/25`
+- CLI build succeeded
+- inspector build succeeded
+- aggregate and snapshot contract now surface the expanded slices without changing readiness semantics
+- readiness still depends on the proven baseline:
+  - `CoreStatus`
+  - `PlayerVitals`
+  - `PlayerPosition`
+- expanded slices are now code-proven and test-covered
+
+### Decision
+
+Keep.
+
+---
+
+## 2026-04-02 - Session AF3 - expanded telemetry live proof
+
+### Goal
+
+Prove the expanded telemetry build on the running RIFT client after code-side verification was green.
+
+### Change
+
+- reloaded the addon with `/reloadui`
+- sampled a longer live capture pass against the running client with the proven `PrintWindow` backend
+
+### Verification
+
+```powershell
+cmd /c .\scripts\Reload-RiftUi.cmd
+```
+
+```powershell
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- live 160 60 --backend printwindow
+```
+
+### Result
+
+- live decode stayed accepted at:
+  - `origin 0,0`
+  - `pitch 2.8`
+  - `scale 0.35`
+- frame counts included every expanded slice:
+  - `CoreStatus`: `73`
+  - `PlayerVitals`: `12`
+  - `PlayerPosition`: `11`
+  - `PlayerCast`: `10`
+  - `PlayerResources`: `9`
+  - `PlayerCombat`: `11`
+  - `TargetPosition`: `12`
+  - `FollowUnitStatus`: `8`
+- live aggregate observations showed:
+  - self coordinates populated
+  - explicit energy and planar values populated
+  - target/follow slices decode cleanly even when the current session has no active target or watched group member
+- live frame summary printed:
+  - `ReservedFlags: 0x3F (multi-frame, player-position, player-cast, expanded-stats, target-position, follow-unit-status)`
+
+### Decision
+
+Keep.
+
+---
+
 ## 2026-04-01 - Session A - `640x360` baseline recovery
 
 ### Goal

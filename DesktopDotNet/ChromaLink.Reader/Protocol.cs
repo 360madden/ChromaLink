@@ -5,7 +5,11 @@ public enum FrameType : byte
     CoreStatus = 1,
     PlayerVitals = 2,
     PlayerPosition = 3,
-    PlayerCast = 4
+    PlayerCast = 4,
+    PlayerResources = 5,
+    PlayerCombat = 6,
+    TargetPosition = 7,
+    FollowUnitStatus = 8
 }
 
 public enum ResourceKind : byte
@@ -24,7 +28,10 @@ public enum HeaderCapabilityFlags : byte
     None = 0,
     MultiFrameRotation = 1 << 0,
     PlayerPosition = 1 << 1,
-    PlayerCast = 1 << 2
+    PlayerCast = 1 << 2,
+    ExpandedStats = 1 << 3,
+    TargetPosition = 1 << 4,
+    FollowUnitStatus = 1 << 5
 }
 
 public sealed record TelemetryFrameHeader(
@@ -85,6 +92,82 @@ public readonly record struct PlayerVitalsSnapshot(
     }
 }
 
+public readonly record struct PlayerPositionSnapshot(float X, float Y, float Z)
+{
+    public static PlayerPositionSnapshot CreateSynthetic()
+    {
+        return new PlayerPositionSnapshot(123.45f, 200.67f, -50.12f);
+    }
+}
+
+public readonly record struct PlayerCastSnapshot(
+    byte CastFlags,
+    byte ProgressPctQ8,
+    ushort DurationCenti,
+    ushort RemainingCenti,
+    byte CastTargetCode,
+    string SpellLabel)
+{
+    public static PlayerCastSnapshot CreateSynthetic()
+    {
+        return new PlayerCastSnapshot(0b0001_1001, 96, 250, 150, 2, "HEALI");
+    }
+}
+
+public readonly record struct PlayerResourcesSnapshot(
+    ushort ManaCurrent,
+    ushort ManaMax,
+    ushort EnergyCurrent,
+    ushort EnergyMax,
+    ushort PowerCurrent,
+    ushort PowerMax)
+{
+    public static PlayerResourcesSnapshot CreateSynthetic()
+    {
+        return new PlayerResourcesSnapshot(4200, 5000, 85, 100, 12, 100);
+    }
+}
+
+public readonly record struct PlayerCombatSnapshot(
+    byte CombatFlags,
+    byte Combo,
+    ushort ChargeCurrent,
+    ushort ChargeMax,
+    ushort PlanarCurrent,
+    ushort PlanarMax,
+    ushort Absorb)
+{
+    public static PlayerCombatSnapshot CreateSynthetic()
+    {
+        return new PlayerCombatSnapshot(15, 4, 80, 100, 3, 6, 250);
+    }
+}
+
+public readonly record struct TargetPositionSnapshot(float X, float Y, float Z)
+{
+    public static TargetPositionSnapshot CreateSynthetic()
+    {
+        return new TargetPositionSnapshot(128.75f, 201.50f, -48.25f);
+    }
+}
+
+public readonly record struct FollowUnitStatusSnapshot(
+    byte Slot,
+    byte FollowFlags,
+    float X,
+    float Y,
+    float Z,
+    byte HealthPctQ8,
+    byte ResourcePctQ8,
+    byte Level,
+    byte CallingRolePacked)
+{
+    public static FollowUnitStatusSnapshot CreateSynthetic()
+    {
+        return new FollowUnitStatusSnapshot(1, 143, 7123.5f, 865.0f, 3010.5f, 222, 144, 70, 0x31);
+    }
+}
+
 public sealed record CoreStatusFrame(
     TelemetryFrameHeader Header,
     CoreStatusSnapshot Payload,
@@ -99,14 +182,6 @@ public sealed record PlayerVitalsFrame(
     byte[] TransportBytes)
     : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
 
-public readonly record struct PlayerPositionSnapshot(float X, float Y, float Z)
-{
-    public static PlayerPositionSnapshot CreateSynthetic()
-    {
-        return new PlayerPositionSnapshot(123.45f, 200.67f, -50.12f);
-    }
-}
-
 public sealed record PlayerPositionFrame(
     TelemetryFrameHeader Header,
     PlayerPositionSnapshot Payload,
@@ -114,22 +189,37 @@ public sealed record PlayerPositionFrame(
     byte[] TransportBytes)
     : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
 
-public readonly record struct PlayerCastSnapshot(
-    byte CastFlags,
-    byte ProgressPctQ8,
-    byte DurationQ4,
-    byte RemainingQ4,
-    string SpellLabel)
-{
-    public static PlayerCastSnapshot CreateSynthetic()
-    {
-        return new PlayerCastSnapshot(0b0000_1001, 96, 10, 6, "HEALING");
-    }
-}
-
 public sealed record PlayerCastFrame(
     TelemetryFrameHeader Header,
     PlayerCastSnapshot Payload,
+    uint PayloadCrc32C,
+    byte[] TransportBytes)
+    : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
+
+public sealed record PlayerResourcesFrame(
+    TelemetryFrameHeader Header,
+    PlayerResourcesSnapshot Payload,
+    uint PayloadCrc32C,
+    byte[] TransportBytes)
+    : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
+
+public sealed record PlayerCombatFrame(
+    TelemetryFrameHeader Header,
+    PlayerCombatSnapshot Payload,
+    uint PayloadCrc32C,
+    byte[] TransportBytes)
+    : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
+
+public sealed record TargetPositionFrame(
+    TelemetryFrameHeader Header,
+    TargetPositionSnapshot Payload,
+    uint PayloadCrc32C,
+    byte[] TransportBytes)
+    : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
+
+public sealed record FollowUnitStatusFrame(
+    TelemetryFrameHeader Header,
+    FollowUnitStatusSnapshot Payload,
     uint PayloadCrc32C,
     byte[] TransportBytes)
     : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
@@ -158,6 +248,14 @@ public static class TransportConstants
     public const byte PlayerPositionSchemaId = 1;
     public const byte PlayerCastFrameType = 4;
     public const byte PlayerCastSchemaId = 1;
+    public const byte PlayerResourcesFrameType = 5;
+    public const byte PlayerResourcesSchemaId = 1;
+    public const byte PlayerCombatFrameType = 6;
+    public const byte PlayerCombatSchemaId = 1;
+    public const byte TargetPositionFrameType = 7;
+    public const byte TargetPositionSchemaId = 1;
+    public const byte FollowUnitStatusFrameType = 8;
+    public const byte FollowUnitStatusSchemaId = 1;
     public const int TransportBytes = 24;
     public const int HeaderBytes = 8;
     public const int PayloadBytes = 12;
@@ -166,7 +264,10 @@ public static class TransportConstants
     public const HeaderCapabilityFlags HeaderCapabilities =
         HeaderCapabilityFlags.MultiFrameRotation |
         HeaderCapabilityFlags.PlayerPosition |
-        HeaderCapabilityFlags.PlayerCast;
+        HeaderCapabilityFlags.PlayerCast |
+        HeaderCapabilityFlags.ExpandedStats |
+        HeaderCapabilityFlags.TargetPosition |
+        HeaderCapabilityFlags.FollowUnitStatus;
 }
 
 public static class FrameProtocol
@@ -213,10 +314,60 @@ public static class FrameProtocol
         Span<byte> payload = stackalloc byte[TransportConstants.PayloadBytes];
         payload[0] = snapshot.CastFlags;
         payload[1] = snapshot.ProgressPctQ8;
-        payload[2] = snapshot.DurationQ4;
-        payload[3] = snapshot.RemainingQ4;
-        WriteAsciiLabel(payload, 4, 8, snapshot.SpellLabel);
+        WriteUInt16BigEndian(payload, 2, snapshot.DurationCenti);
+        WriteUInt16BigEndian(payload, 4, snapshot.RemainingCenti);
+        payload[6] = snapshot.CastTargetCode;
+        WriteAsciiLabel(payload, 7, 5, snapshot.SpellLabel);
         return BuildFrameBytes(profileId, sequence, FrameType.PlayerCast, TransportConstants.PlayerCastSchemaId, payload);
+    }
+
+    public static byte[] BuildPlayerResourcesFrameBytes(byte profileId, byte sequence, PlayerResourcesSnapshot snapshot)
+    {
+        Span<byte> payload = stackalloc byte[TransportConstants.PayloadBytes];
+        WriteUInt16BigEndian(payload, 0, snapshot.ManaCurrent);
+        WriteUInt16BigEndian(payload, 2, snapshot.ManaMax);
+        WriteUInt16BigEndian(payload, 4, snapshot.EnergyCurrent);
+        WriteUInt16BigEndian(payload, 6, snapshot.EnergyMax);
+        WriteUInt16BigEndian(payload, 8, snapshot.PowerCurrent);
+        WriteUInt16BigEndian(payload, 10, snapshot.PowerMax);
+        return BuildFrameBytes(profileId, sequence, FrameType.PlayerResources, TransportConstants.PlayerResourcesSchemaId, payload);
+    }
+
+    public static byte[] BuildPlayerCombatFrameBytes(byte profileId, byte sequence, PlayerCombatSnapshot snapshot)
+    {
+        Span<byte> payload = stackalloc byte[TransportConstants.PayloadBytes];
+        payload[0] = snapshot.CombatFlags;
+        payload[1] = snapshot.Combo;
+        WriteUInt16BigEndian(payload, 2, snapshot.ChargeCurrent);
+        WriteUInt16BigEndian(payload, 4, snapshot.ChargeMax);
+        WriteUInt16BigEndian(payload, 6, snapshot.PlanarCurrent);
+        WriteUInt16BigEndian(payload, 8, snapshot.PlanarMax);
+        WriteUInt16BigEndian(payload, 10, snapshot.Absorb);
+        return BuildFrameBytes(profileId, sequence, FrameType.PlayerCombat, TransportConstants.PlayerCombatSchemaId, payload);
+    }
+
+    public static byte[] BuildTargetPositionFrameBytes(byte profileId, byte sequence, TargetPositionSnapshot snapshot)
+    {
+        Span<byte> payload = stackalloc byte[TransportConstants.PayloadBytes];
+        WriteInt32BigEndian(payload, 0, FloatToFixed(snapshot.X));
+        WriteInt32BigEndian(payload, 4, FloatToFixed(snapshot.Y));
+        WriteInt32BigEndian(payload, 8, FloatToFixed(snapshot.Z));
+        return BuildFrameBytes(profileId, sequence, FrameType.TargetPosition, TransportConstants.TargetPositionSchemaId, payload);
+    }
+
+    public static byte[] BuildFollowUnitStatusFrameBytes(byte profileId, byte sequence, FollowUnitStatusSnapshot snapshot)
+    {
+        Span<byte> payload = stackalloc byte[TransportConstants.PayloadBytes];
+        payload[0] = snapshot.Slot;
+        payload[1] = snapshot.FollowFlags;
+        WriteInt16BigEndian(payload, 2, FloatToFixedQ2(snapshot.X));
+        WriteInt16BigEndian(payload, 4, FloatToFixedQ2(snapshot.Y));
+        WriteInt16BigEndian(payload, 6, FloatToFixedQ2(snapshot.Z));
+        payload[8] = snapshot.HealthPctQ8;
+        payload[9] = snapshot.ResourcePctQ8;
+        payload[10] = snapshot.Level;
+        payload[11] = snapshot.CallingRolePacked;
+        return BuildFrameBytes(profileId, sequence, FrameType.FollowUnitStatus, TransportConstants.FollowUnitStatusSchemaId, payload);
     }
 
     public static byte[] EncodeBytesToPayloadSymbols(ReadOnlySpan<byte> bytes)
@@ -413,9 +564,55 @@ public static class FrameProtocol
                 new PlayerCastSnapshot(
                     payload[0],
                     payload[1],
-                    payload[2],
-                    payload[3],
-                    ReadAsciiLabel(payload, 4, 8)),
+                    ReadUInt16BigEndian(payload, 2),
+                    ReadUInt16BigEndian(payload, 4),
+                    payload[6],
+                    ReadAsciiLabel(payload, 7, 5)),
+                actualPayloadCrc,
+                bytes.ToArray()),
+            FrameType.PlayerResources => new PlayerResourcesFrame(
+                header,
+                new PlayerResourcesSnapshot(
+                    ReadUInt16BigEndian(payload, 0),
+                    ReadUInt16BigEndian(payload, 2),
+                    ReadUInt16BigEndian(payload, 4),
+                    ReadUInt16BigEndian(payload, 6),
+                    ReadUInt16BigEndian(payload, 8),
+                    ReadUInt16BigEndian(payload, 10)),
+                actualPayloadCrc,
+                bytes.ToArray()),
+            FrameType.PlayerCombat => new PlayerCombatFrame(
+                header,
+                new PlayerCombatSnapshot(
+                    payload[0],
+                    payload[1],
+                    ReadUInt16BigEndian(payload, 2),
+                    ReadUInt16BigEndian(payload, 4),
+                    ReadUInt16BigEndian(payload, 6),
+                    ReadUInt16BigEndian(payload, 8),
+                    ReadUInt16BigEndian(payload, 10)),
+                actualPayloadCrc,
+                bytes.ToArray()),
+            FrameType.TargetPosition => new TargetPositionFrame(
+                header,
+                new TargetPositionSnapshot(
+                    FixedToFloat(ReadInt32BigEndian(payload, 0)),
+                    FixedToFloat(ReadInt32BigEndian(payload, 4)),
+                    FixedToFloat(ReadInt32BigEndian(payload, 8))),
+                actualPayloadCrc,
+                bytes.ToArray()),
+            FrameType.FollowUnitStatus => new FollowUnitStatusFrame(
+                header,
+                new FollowUnitStatusSnapshot(
+                    payload[0],
+                    payload[1],
+                    FixedQ2ToFloat(ReadInt16BigEndian(payload, 2)),
+                    FixedQ2ToFloat(ReadInt16BigEndian(payload, 4)),
+                    FixedQ2ToFloat(ReadInt16BigEndian(payload, 6)),
+                    payload[8],
+                    payload[9],
+                    payload[10],
+                    payload[11]),
                 actualPayloadCrc,
                 bytes.ToArray()),
             _ => null
@@ -496,6 +693,10 @@ public static class FrameProtocol
             FrameType.PlayerVitals => schemaId == TransportConstants.PlayerVitalsSchemaId,
             FrameType.PlayerPosition => schemaId == TransportConstants.PlayerPositionSchemaId,
             FrameType.PlayerCast => schemaId == TransportConstants.PlayerCastSchemaId,
+            FrameType.PlayerResources => schemaId == TransportConstants.PlayerResourcesSchemaId,
+            FrameType.PlayerCombat => schemaId == TransportConstants.PlayerCombatSchemaId,
+            FrameType.TargetPosition => schemaId == TransportConstants.TargetPositionSchemaId,
+            FrameType.FollowUnitStatus => schemaId == TransportConstants.FollowUnitStatusSchemaId,
             _ => false
         };
     }
@@ -535,6 +736,13 @@ public static class FrameProtocol
         payload[offset + 1] = (byte)(value & 0xFF);
     }
 
+    private static void WriteInt16BigEndian(Span<byte> payload, int offset, short value)
+    {
+        var u = unchecked((ushort)value);
+        payload[offset] = (byte)(u >> 8);
+        payload[offset + 1] = (byte)(u & 0xFF);
+    }
+
     private static void WriteUInt32BigEndian(Span<byte> payload, int offset, uint value)
     {
         payload[offset] = (byte)(value >> 24);
@@ -555,6 +763,12 @@ public static class FrameProtocol
     private static ushort ReadUInt16BigEndian(ReadOnlySpan<byte> payload, int offset)
     {
         return (ushort)((payload[offset] << 8) | payload[offset + 1]);
+    }
+
+    private static short ReadInt16BigEndian(ReadOnlySpan<byte> payload, int offset)
+    {
+        var u = (ushort)((payload[offset] << 8) | payload[offset + 1]);
+        return unchecked((short)u);
     }
 
     private static uint ReadUInt32BigEndian(ReadOnlySpan<byte> payload, int offset)
@@ -578,4 +792,13 @@ public static class FrameProtocol
         (int)Math.Round(value * 100.0f, MidpointRounding.AwayFromZero);
 
     private static float FixedToFloat(int value) => value / 100.0f;
+
+    private static short FloatToFixedQ2(float value)
+    {
+        var scaled = (int)Math.Round(value * 2.0f, MidpointRounding.AwayFromZero);
+        scaled = Math.Clamp(scaled, short.MinValue, short.MaxValue);
+        return (short)scaled;
+    }
+
+    private static float FixedQ2ToFloat(short value) => value / 2.0f;
 }

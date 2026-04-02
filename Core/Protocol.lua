@@ -2,8 +2,24 @@ ChromaLink = ChromaLink or {}
 ChromaLink.Protocol = {}
 
 local config = ChromaLink.Config
-local frameTypes = config.frameTypes or { coreStatus = 1, playerVitals = 2, playerPosition = 3, playerCast = 4 }
-local headerFlags = config.headerFlags or { multiFrameRotation = 1, playerPosition = 2, playerCast = 4 }
+local frameTypes = config.frameTypes or {
+  coreStatus = 1,
+  playerVitals = 2,
+  playerPosition = 3,
+  playerCast = 4,
+  playerResources = 5,
+  playerCombat = 6,
+  targetPosition = 7,
+  followUnitStatus = 8
+}
+local headerFlags = config.headerFlags or {
+  multiFrameRotation = 1,
+  playerPosition = 2,
+  playerCast = 4,
+  expandedStats = 8,
+  targetPosition = 16,
+  followUnitStatus = 32
+}
 
 local function ClampByte(value)
   local number = tonumber(value) or 0
@@ -125,6 +141,27 @@ local function FloatToFixedInt32(value)
   return scaled
 end
 
+local function FloatToFixedInt16Q2(value)
+  local number = tonumber(value) or 0
+  local scaled = math.floor(number * 2 + 0.5)
+  if number < 0 then
+    scaled = math.ceil(number * 2 - 0.5)
+  end
+
+  if scaled < -32768 then
+    scaled = -32768
+  end
+  if scaled > 32767 then
+    scaled = 32767
+  end
+
+  if scaled < 0 then
+    scaled = scaled + 65536
+  end
+
+  return scaled
+end
+
 function ChromaLink.Protocol.EncodeBytesToSymbols(bytes)
   local symbols = {}
   local symbolIndex
@@ -180,6 +217,9 @@ local function BuildFrame(payload, frameType, schemaId, sequence)
   reservedFlags = reservedFlags + ClampByte(headerFlags.multiFrameRotation)
   reservedFlags = reservedFlags + ClampByte(headerFlags.playerPosition)
   reservedFlags = reservedFlags + ClampByte(headerFlags.playerCast)
+  reservedFlags = reservedFlags + ClampByte(headerFlags.expandedStats)
+  reservedFlags = reservedFlags + ClampByte(headerFlags.targetPosition)
+  reservedFlags = reservedFlags + ClampByte(headerFlags.followUnitStatus)
   bytes[6] = ClampByte(reservedFlags)
 
   headerCrc = ComputeCrc16(bytes, 1, 6)
@@ -236,14 +276,74 @@ function ChromaLink.Protocol.BuildPlayerCastFrame(snapshot, sequence)
   local payload = {
     ClampByte(snapshot.castFlags),
     ClampByte(snapshot.progressPctQ8),
-    ClampByte(snapshot.durationQ4),
-    ClampByte(snapshot.remainingQ4)
+    0,
+    0,
+    0,
+    0,
+    ClampByte(snapshot.castTargetCode)
   }
   local index
 
-  for index = 1, 8 do
-    payload[4 + index] = ClampByte(snapshot.spellLabelBytes and snapshot.spellLabelBytes[index] or 32)
+  AppendBigEndian16(payload, 3, snapshot.durationCenti)
+  AppendBigEndian16(payload, 5, snapshot.remainingCenti)
+
+  for index = 1, 5 do
+    payload[7 + index] = ClampByte(snapshot.spellLabelBytes and snapshot.spellLabelBytes[index] or 32)
   end
 
   return BuildFrame(payload, frameTypes.playerCast, 1, sequence)
+end
+
+function ChromaLink.Protocol.BuildPlayerResourcesFrame(snapshot, sequence)
+  local payload = {}
+  AppendBigEndian16(payload, 1, snapshot.manaCurrent)
+  AppendBigEndian16(payload, 3, snapshot.manaMax)
+  AppendBigEndian16(payload, 5, snapshot.energyCurrent)
+  AppendBigEndian16(payload, 7, snapshot.energyMax)
+  AppendBigEndian16(payload, 9, snapshot.powerCurrent)
+  AppendBigEndian16(payload, 11, snapshot.powerMax)
+  return BuildFrame(payload, frameTypes.playerResources, 1, sequence)
+end
+
+function ChromaLink.Protocol.BuildPlayerCombatFrame(snapshot, sequence)
+  local payload = {
+    ClampByte(snapshot.combatFlags),
+    ClampByte(snapshot.combo)
+  }
+  AppendBigEndian16(payload, 3, snapshot.chargeCurrent)
+  AppendBigEndian16(payload, 5, snapshot.chargeMax)
+  AppendBigEndian16(payload, 7, snapshot.planarCurrent)
+  AppendBigEndian16(payload, 9, snapshot.planarMax)
+  AppendBigEndian16(payload, 11, snapshot.absorb)
+  return BuildFrame(payload, frameTypes.playerCombat, 1, sequence)
+end
+
+function ChromaLink.Protocol.BuildTargetPositionFrame(snapshot, sequence)
+  local payload = {}
+  AppendBigEndian32(payload, 1, FloatToFixedInt32(snapshot.x))
+  AppendBigEndian32(payload, 5, FloatToFixedInt32(snapshot.y))
+  AppendBigEndian32(payload, 9, FloatToFixedInt32(snapshot.z))
+  return BuildFrame(payload, frameTypes.targetPosition, 1, sequence)
+end
+
+function ChromaLink.Protocol.BuildFollowUnitStatusFrame(snapshot, sequence)
+  local payload = {
+    ClampByte(snapshot.slot),
+    ClampByte(snapshot.followFlags),
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    ClampByte(snapshot.healthPctQ8),
+    ClampByte(snapshot.resourcePctQ8),
+    ClampByte(snapshot.level),
+    ClampByte(snapshot.callingRolePacked)
+  }
+
+  AppendBigEndian16(payload, 3, FloatToFixedInt16Q2(snapshot.xQ2))
+  AppendBigEndian16(payload, 5, FloatToFixedInt16Q2(snapshot.yQ2))
+  AppendBigEndian16(payload, 7, FloatToFixedInt16Q2(snapshot.zQ2))
+  return BuildFrame(payload, frameTypes.followUnitStatus, 1, sequence)
 end

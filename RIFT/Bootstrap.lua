@@ -154,11 +154,91 @@ local function FormatHeaderFlags(headerFlags)
     table.insert(labels, "player-cast")
   end
 
+  if headerFlags.expandedStats ~= nil and headerFlags.expandedStats ~= 0 then
+    table.insert(labels, "expanded-stats")
+  end
+
+  if headerFlags.targetPosition ~= nil and headerFlags.targetPosition ~= 0 then
+    table.insert(labels, "target-position")
+  end
+
+  if headerFlags.followUnitStatus ~= nil and headerFlags.followUnitStatus ~= 0 then
+    table.insert(labels, "follow-unit-status")
+  end
+
   if #labels == 0 then
     return "none"
   end
 
   return table.concat(labels, ", ")
+end
+
+local function BuildSyntheticFrame(frameKind, sequence)
+  local snapshot
+  local _, symbols
+
+  if frameKind == "playerVitals" then
+    snapshot = ChromaLink.Gather.BuildSyntheticPlayerVitalsSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildPlayerVitalsFrame(snapshot, sequence)
+  elseif frameKind == "playerPosition" then
+    snapshot = ChromaLink.Gather.BuildSyntheticPlayerPositionSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildPlayerPositionFrame(snapshot, sequence)
+  elseif frameKind == "playerCast" then
+    snapshot = ChromaLink.Gather.BuildSyntheticPlayerCastSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildPlayerCastFrame(snapshot, sequence)
+  elseif frameKind == "playerResources" then
+    snapshot = ChromaLink.Gather.BuildSyntheticPlayerResourcesSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildPlayerResourcesFrame(snapshot, sequence)
+  elseif frameKind == "playerCombat" then
+    snapshot = ChromaLink.Gather.BuildSyntheticPlayerCombatSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildPlayerCombatFrame(snapshot, sequence)
+  elseif frameKind == "targetPosition" then
+    snapshot = ChromaLink.Gather.BuildSyntheticTargetPositionSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildTargetPositionFrame(snapshot, sequence)
+  elseif frameKind == "followUnitStatus" then
+    snapshot = ChromaLink.Gather.BuildSyntheticFollowUnitStatusSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildFollowUnitStatusFrame(snapshot, sequence)
+  else
+    snapshot = ChromaLink.Gather.BuildSyntheticCoreStatusSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildCoreFrame(snapshot, sequence)
+    frameKind = "coreStatus"
+  end
+
+  return frameKind, snapshot, symbols
+end
+
+local function BuildLiveFrame(frameKind, sequence)
+  local snapshot
+  local _, symbols
+
+  if frameKind == "playerVitals" then
+    snapshot = ChromaLink.Gather.BuildPlayerVitalsSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildPlayerVitalsFrame(snapshot, sequence)
+  elseif frameKind == "playerPosition" then
+    snapshot = ChromaLink.Gather.BuildPlayerPositionSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildPlayerPositionFrame(snapshot, sequence)
+  elseif frameKind == "playerCast" then
+    snapshot = ChromaLink.Gather.BuildPlayerCastSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildPlayerCastFrame(snapshot, sequence)
+  elseif frameKind == "playerResources" then
+    snapshot = ChromaLink.Gather.BuildPlayerResourcesSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildPlayerResourcesFrame(snapshot, sequence)
+  elseif frameKind == "playerCombat" then
+    snapshot = ChromaLink.Gather.BuildPlayerCombatSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildPlayerCombatFrame(snapshot, sequence)
+  elseif frameKind == "targetPosition" then
+    snapshot = ChromaLink.Gather.BuildTargetPositionSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildTargetPositionFrame(snapshot, sequence)
+  elseif frameKind == "followUnitStatus" then
+    snapshot = ChromaLink.Gather.BuildFollowUnitStatusSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildFollowUnitStatusFrame(snapshot, sequence)
+  else
+    snapshot = ChromaLink.Gather.BuildCoreStatusSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildCoreFrame(snapshot, sequence)
+    frameKind = "coreStatus"
+  end
+
+  return frameKind, snapshot, symbols
 end
 
 function ChromaLink.Bootstrap.Refresh(forceRefresh, reason)
@@ -184,35 +264,9 @@ function ChromaLink.Bootstrap.Refresh(forceRefresh, reason)
   frameKind = rotation[rotationIndex] or "coreStatus"
 
   if ChromaLink.Config.syntheticMode ~= nil and ChromaLink.Config.syntheticMode.enabled then
-    if frameKind == "playerVitals" then
-      snapshot = ChromaLink.Gather.BuildSyntheticPlayerVitalsSnapshot()
-      _, symbols = ChromaLink.Protocol.BuildPlayerVitalsFrame(snapshot, state.sequence)
-    elseif frameKind == "playerPosition" then
-      snapshot = ChromaLink.Gather.BuildSyntheticPlayerPositionSnapshot()
-      _, symbols = ChromaLink.Protocol.BuildPlayerPositionFrame(snapshot, state.sequence)
-    elseif frameKind == "playerCast" then
-      snapshot = ChromaLink.Gather.BuildSyntheticPlayerCastSnapshot()
-      _, symbols = ChromaLink.Protocol.BuildPlayerCastFrame(snapshot, state.sequence)
-    else
-      snapshot = ChromaLink.Gather.BuildSyntheticCoreStatusSnapshot()
-      _, symbols = ChromaLink.Protocol.BuildCoreFrame(snapshot, state.sequence)
-      frameKind = "coreStatus"
-    end
+    frameKind, snapshot, symbols = BuildSyntheticFrame(frameKind, state.sequence)
   else
-    if frameKind == "playerVitals" then
-      snapshot = ChromaLink.Gather.BuildPlayerVitalsSnapshot()
-      _, symbols = ChromaLink.Protocol.BuildPlayerVitalsFrame(snapshot, state.sequence)
-    elseif frameKind == "playerPosition" then
-      snapshot = ChromaLink.Gather.BuildPlayerPositionSnapshot()
-      _, symbols = ChromaLink.Protocol.BuildPlayerPositionFrame(snapshot, state.sequence)
-    elseif frameKind == "playerCast" then
-      snapshot = ChromaLink.Gather.BuildPlayerCastSnapshot()
-      _, symbols = ChromaLink.Protocol.BuildPlayerCastFrame(snapshot, state.sequence)
-    else
-      snapshot = ChromaLink.Gather.BuildCoreStatusSnapshot()
-      _, symbols = ChromaLink.Protocol.BuildCoreFrame(snapshot, state.sequence)
-      frameKind = "coreStatus"
-    end
+    frameKind, snapshot, symbols = BuildLiveFrame(frameKind, state.sequence)
   end
   ChromaLink.Render.Update(state.render, symbols)
 
@@ -311,14 +365,23 @@ function ChromaLink.Bootstrap.LogBuildStatus()
 
   ChromaLink.Diagnostics.Log(string.format("%s build: version=%s protocol=%s profile=%s.", identifier, tostring(version), tostring(protocolVersion), tostring(profile.id or "unknown")))
   ChromaLink.Diagnostics.Log(string.format(
-    "Frame types: coreStatus=%s playerVitals=%s playerPosition=%s playerCast=%s.",
+    "Frame types: coreStatus=%s playerVitals=%s playerPosition=%s playerCast=%s playerResources=%s playerCombat=%s targetPosition=%s followUnitStatus=%s.",
     tostring(frameTypes.coreStatus or "n/a"),
     tostring(frameTypes.playerVitals or "n/a"),
     tostring(frameTypes.playerPosition or "n/a"),
-    tostring(frameTypes.playerCast or "n/a")))
+    tostring(frameTypes.playerCast or "n/a"),
+    tostring(frameTypes.playerResources or "n/a"),
+    tostring(frameTypes.playerCombat or "n/a"),
+    tostring(frameTypes.targetPosition or "n/a"),
+    tostring(frameTypes.followUnitStatus or "n/a")))
   ChromaLink.Diagnostics.Log(string.format(
     "Header flags: 0x%02X (%s).",
-    tonumber(headerFlags.multiFrameRotation or 0) + tonumber(headerFlags.playerPosition or 0) + tonumber(headerFlags.playerCast or 0),
+    tonumber(headerFlags.multiFrameRotation or 0)
+      + tonumber(headerFlags.playerPosition or 0)
+      + tonumber(headerFlags.playerCast or 0)
+      + tonumber(headerFlags.expandedStats or 0)
+      + tonumber(headerFlags.targetPosition or 0)
+      + tonumber(headerFlags.followUnitStatus or 0),
     FormatHeaderFlags(headerFlags)))
   ChromaLink.Diagnostics.Log(string.format(
     "Strip profile: %s %dx%d band=%dx%d segments=%d x %d.",
@@ -344,7 +407,7 @@ function ChromaLink.Bootstrap.LogRotationStatus()
   end
 
   ChromaLink.Diagnostics.Log("Rotation sequence: " .. (#parts > 0 and table.concat(parts, " -> ") or "none") .. ".")
-  ChromaLink.Diagnostics.Log("Heartbeat priority: coreStatus is the dominant frame; playerVitals, playerPosition, and playerCast are rotated in for throughput.")
+  ChromaLink.Diagnostics.Log("Heartbeat priority: coreStatus is dominant; secondary telemetry slices are rotated in for throughput without widening the strip.")
 end
 
 function ChromaLink.Bootstrap.SetObserverEnabled(enabled)

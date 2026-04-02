@@ -52,7 +52,10 @@ internal static class TelemetrySnapshotWriter
                 {
                     multiFrameRotation = 1,
                     playerPosition = 2,
-                    playerCast = 4
+                    playerCast = 4,
+                    expandedStats = 8,
+                    targetPosition = 16,
+                    followUnitStatus = 32
                 }
             },
             aggregate = new
@@ -140,12 +143,96 @@ internal static class TelemetrySnapshotWriter
                     channeled = IsFlagSet(aggregate.PlayerCast.Frame.Payload.CastFlags, 0x02),
                     uninterruptible = IsFlagSet(aggregate.PlayerCast.Frame.Payload.CastFlags, 0x04),
                     hasLabel = IsFlagSet(aggregate.PlayerCast.Frame.Payload.CastFlags, 0x08),
+                    hasTarget = IsFlagSet(aggregate.PlayerCast.Frame.Payload.CastFlags, 0x10),
                     progressPctQ8 = aggregate.PlayerCast.Frame.Payload.ProgressPctQ8,
-                    durationQ4 = aggregate.PlayerCast.Frame.Payload.DurationQ4,
-                    remainingQ4 = aggregate.PlayerCast.Frame.Payload.RemainingQ4,
-                    durationSeconds = Q4ToSeconds(aggregate.PlayerCast.Frame.Payload.DurationQ4),
-                    remainingSeconds = Q4ToSeconds(aggregate.PlayerCast.Frame.Payload.RemainingQ4),
+                    durationCenti = aggregate.PlayerCast.Frame.Payload.DurationCenti,
+                    remainingCenti = aggregate.PlayerCast.Frame.Payload.RemainingCenti,
+                    durationSeconds = CentiToSeconds(aggregate.PlayerCast.Frame.Payload.DurationCenti),
+                    remainingSeconds = CentiToSeconds(aggregate.PlayerCast.Frame.Payload.RemainingCenti),
+                    castTargetCode = aggregate.PlayerCast.Frame.Payload.CastTargetCode,
                     spellLabel = aggregate.PlayerCast.Frame.Payload.SpellLabel
+                },
+                playerResources = aggregate.PlayerResources is null ? null : new
+                {
+                    observedAtUtc = aggregate.PlayerResources.ObservedAtUtc,
+                    ageMs = AgeMs(nowUtc, aggregate.PlayerResources.ObservedAtUtc),
+                    fresh = IsFresh(AgeMs(nowUtc, aggregate.PlayerResources.ObservedAtUtc)),
+                    stale = !IsFresh(AgeMs(nowUtc, aggregate.PlayerResources.ObservedAtUtc)),
+                    frameType = aggregate.PlayerResources.Frame.Header.FrameType.ToString(),
+                    schemaId = aggregate.PlayerResources.Frame.Header.SchemaId,
+                    sequence = aggregate.PlayerResources.Frame.Header.Sequence,
+                    reservedFlags = aggregate.PlayerResources.Frame.Header.ReservedFlags,
+                    manaCurrent = aggregate.PlayerResources.Frame.Payload.ManaCurrent,
+                    manaMax = aggregate.PlayerResources.Frame.Payload.ManaMax,
+                    energyCurrent = aggregate.PlayerResources.Frame.Payload.EnergyCurrent,
+                    energyMax = aggregate.PlayerResources.Frame.Payload.EnergyMax,
+                    powerCurrent = aggregate.PlayerResources.Frame.Payload.PowerCurrent,
+                    powerMax = aggregate.PlayerResources.Frame.Payload.PowerMax
+                },
+                playerCombat = aggregate.PlayerCombat is null ? null : new
+                {
+                    observedAtUtc = aggregate.PlayerCombat.ObservedAtUtc,
+                    ageMs = AgeMs(nowUtc, aggregate.PlayerCombat.ObservedAtUtc),
+                    fresh = IsFresh(AgeMs(nowUtc, aggregate.PlayerCombat.ObservedAtUtc)),
+                    stale = !IsFresh(AgeMs(nowUtc, aggregate.PlayerCombat.ObservedAtUtc)),
+                    frameType = aggregate.PlayerCombat.Frame.Header.FrameType.ToString(),
+                    schemaId = aggregate.PlayerCombat.Frame.Header.SchemaId,
+                    sequence = aggregate.PlayerCombat.Frame.Header.Sequence,
+                    reservedFlags = aggregate.PlayerCombat.Frame.Header.ReservedFlags,
+                    combatFlags = aggregate.PlayerCombat.Frame.Payload.CombatFlags,
+                    hasCombo = IsFlagSet(aggregate.PlayerCombat.Frame.Payload.CombatFlags, 0x01),
+                    hasCharge = IsFlagSet(aggregate.PlayerCombat.Frame.Payload.CombatFlags, 0x02),
+                    hasPlanar = IsFlagSet(aggregate.PlayerCombat.Frame.Payload.CombatFlags, 0x04),
+                    hasAbsorb = IsFlagSet(aggregate.PlayerCombat.Frame.Payload.CombatFlags, 0x08),
+                    combo = aggregate.PlayerCombat.Frame.Payload.Combo,
+                    chargeCurrent = aggregate.PlayerCombat.Frame.Payload.ChargeCurrent,
+                    chargeMax = aggregate.PlayerCombat.Frame.Payload.ChargeMax,
+                    planarCurrent = aggregate.PlayerCombat.Frame.Payload.PlanarCurrent,
+                    planarMax = aggregate.PlayerCombat.Frame.Payload.PlanarMax,
+                    absorb = aggregate.PlayerCombat.Frame.Payload.Absorb
+                },
+                targetPosition = aggregate.TargetPosition is null ? null : new
+                {
+                    observedAtUtc = aggregate.TargetPosition.ObservedAtUtc,
+                    ageMs = AgeMs(nowUtc, aggregate.TargetPosition.ObservedAtUtc),
+                    fresh = IsFresh(AgeMs(nowUtc, aggregate.TargetPosition.ObservedAtUtc)),
+                    stale = !IsFresh(AgeMs(nowUtc, aggregate.TargetPosition.ObservedAtUtc)),
+                    frameType = aggregate.TargetPosition.Frame.Header.FrameType.ToString(),
+                    schemaId = aggregate.TargetPosition.Frame.Header.SchemaId,
+                    sequence = aggregate.TargetPosition.Frame.Header.Sequence,
+                    reservedFlags = aggregate.TargetPosition.Frame.Header.ReservedFlags,
+                    x = aggregate.TargetPosition.Frame.Payload.X,
+                    y = aggregate.TargetPosition.Frame.Payload.Y,
+                    z = aggregate.TargetPosition.Frame.Payload.Z
+                },
+                followUnitStatus = aggregate.FollowUnitStatus is null ? null : new
+                {
+                    observedAtUtc = aggregate.FollowUnitStatus.ObservedAtUtc,
+                    ageMs = AgeMs(nowUtc, aggregate.FollowUnitStatus.ObservedAtUtc),
+                    fresh = IsFresh(AgeMs(nowUtc, aggregate.FollowUnitStatus.ObservedAtUtc)),
+                    stale = !IsFresh(AgeMs(nowUtc, aggregate.FollowUnitStatus.ObservedAtUtc)),
+                    frameType = aggregate.FollowUnitStatus.Frame.Header.FrameType.ToString(),
+                    schemaId = aggregate.FollowUnitStatus.Frame.Header.SchemaId,
+                    sequence = aggregate.FollowUnitStatus.Frame.Header.Sequence,
+                    reservedFlags = aggregate.FollowUnitStatus.Frame.Header.ReservedFlags,
+                    slot = aggregate.FollowUnitStatus.Frame.Payload.Slot,
+                    followFlags = aggregate.FollowUnitStatus.Frame.Payload.FollowFlags,
+                    present = IsFlagSet(aggregate.FollowUnitStatus.Frame.Payload.FollowFlags, 0x01),
+                    alive = IsFlagSet(aggregate.FollowUnitStatus.Frame.Payload.FollowFlags, 0x02),
+                    combat = IsFlagSet(aggregate.FollowUnitStatus.Frame.Payload.FollowFlags, 0x04),
+                    afk = IsFlagSet(aggregate.FollowUnitStatus.Frame.Payload.FollowFlags, 0x08),
+                    offline = IsFlagSet(aggregate.FollowUnitStatus.Frame.Payload.FollowFlags, 0x10),
+                    aggro = IsFlagSet(aggregate.FollowUnitStatus.Frame.Payload.FollowFlags, 0x20),
+                    blocked = IsFlagSet(aggregate.FollowUnitStatus.Frame.Payload.FollowFlags, 0x40),
+                    readyFlag = IsFlagSet(aggregate.FollowUnitStatus.Frame.Payload.FollowFlags, 0x80),
+                    x = aggregate.FollowUnitStatus.Frame.Payload.X,
+                    y = aggregate.FollowUnitStatus.Frame.Payload.Y,
+                    z = aggregate.FollowUnitStatus.Frame.Payload.Z,
+                    healthPctQ8 = aggregate.FollowUnitStatus.Frame.Payload.HealthPctQ8,
+                    resourcePctQ8 = aggregate.FollowUnitStatus.Frame.Payload.ResourcePctQ8,
+                    level = aggregate.FollowUnitStatus.Frame.Payload.Level,
+                    calling = aggregate.FollowUnitStatus.Frame.Payload.CallingRolePacked >> 4,
+                    role = aggregate.FollowUnitStatus.Frame.Payload.CallingRolePacked & 0x0F
                 }
             },
             metrics = new
@@ -236,9 +323,9 @@ internal static class TelemetrySnapshotWriter
         return (flags & mask) != 0;
     }
 
-    private static double Q4ToSeconds(byte value)
+    private static double CentiToSeconds(ushort value)
     {
-        return Math.Round(value / 4.0, 2);
+        return Math.Round(value / 100.0, 2);
     }
 
     private sealed record AggregateFreshness(

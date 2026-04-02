@@ -18,6 +18,10 @@ Current project direction:
 - first throughput expansion: `playerVitals`
 - second throughput expansion: `playerPosition`
 - third throughput expansion: `playerCast`
+- expanded stats lane: `playerResources`
+- combat lane: `playerCombat`
+- target coordinate lane: `targetPosition`
+- follow-unit lane: `followUnitStatus`
 
 Working rules:
 - optimize for the fastest proven vertical slice
@@ -68,13 +72,50 @@ Current throughput expansion payload:
 - `playerCast-v1`
   - cast flags (`byte`)
   - progress (`byte`, `Q8`)
-  - duration (`byte`, `Q4`)
-  - remaining (`byte`, `Q4`)
-  - short spell label (`8` transport-safe bytes)
+  - duration (`uint16`, centiseconds)
+  - remaining (`uint16`, centiseconds)
+  - cast target code (`byte`)
+  - short spell label (`5` transport-safe bytes)
+- `playerResources-v1`
+  - mana current/max (`uint16`, `uint16`)
+  - energy current/max (`uint16`, `uint16`)
+  - power current/max (`uint16`, `uint16`)
+- `playerCombat-v1`
+  - combat flags (`byte`)
+  - combo (`byte`)
+  - charge current/max (`uint16`, `uint16`)
+  - planar current/max (`uint16`, `uint16`)
+  - absorb (`uint16`)
+- `targetPosition-v1`
+  - x (`int32`, fixed-point `*100`)
+  - y (`int32`, fixed-point `*100`)
+  - z (`int32`, fixed-point `*100`)
+- `followUnitStatus-v1`
+  - slot (`byte`)
+  - follow flags (`byte`)
+  - x (`int16`, fixed-point `*2`)
+  - y (`int16`, fixed-point `*2`)
+  - z (`int16`, fixed-point `*2`)
+  - health percent (`byte`, `Q8`)
+  - resource percent (`byte`, `Q8`)
+  - level (`byte`)
+  - calling/role packed (`byte`)
 
 Current rotation strategy:
 - keep `coreStatus` as the dominant heartbeat
-- rotate in `playerVitals`, `playerPosition`, and `playerCast` periodically to increase throughput without changing strip geometry
+- rotate in the secondary slices periodically to increase throughput without changing strip geometry
+
+Current live proof:
+- the expanded rotation now decodes live with reserved flags `0x3F`
+- live captures have accepted:
+  - `CoreStatus`
+  - `PlayerVitals`
+  - `PlayerPosition`
+  - `PlayerCast`
+  - `PlayerResources`
+  - `PlayerCombat`
+  - `TargetPosition`
+  - `FollowUnitStatus`
 
 Desktop requirements:
 - `smoke`

@@ -245,6 +245,7 @@ internal sealed class InspectorForm : Form
             {
                 lines.Add($"Ready: {aggregate.GetProperty("ready").GetBoolean()} | AcceptedFrames: {aggregate.GetProperty("acceptedFrames").GetInt32()}");
                 lines.Add($"Frames: {SummarizeSnapshotFrame(aggregate, "coreStatus")} | {SummarizeSnapshotFrame(aggregate, "playerVitals")} | {SummarizeSnapshotFrame(aggregate, "playerPosition")} | {SummarizeSnapshotFrame(aggregate, "playerCast")}");
+                lines.Add($"Expanded: {SummarizeSnapshotFrame(aggregate, "playerResources")} | {SummarizeSnapshotFrame(aggregate, "playerCombat")} | {SummarizeSnapshotFrame(aggregate, "targetPosition")} | {SummarizeSnapshotFrame(aggregate, "followUnitStatus")}");
             }
 
             if (root.TryGetProperty("metrics", out var metrics))
@@ -384,10 +385,43 @@ internal sealed class InspectorForm : Form
                     builder.AppendLine($"  CastActive: {(cast.Payload.CastFlags & 0x01) != 0}");
                     builder.AppendLine($"  CastChanneled: {(cast.Payload.CastFlags & 0x02) != 0}");
                     builder.AppendLine($"  CastUninterruptible: {(cast.Payload.CastFlags & 0x04) != 0}");
+                    builder.AppendLine($"  CastHasTarget: {(cast.Payload.CastFlags & 0x10) != 0}");
                     builder.AppendLine($"  SpellLabel: {FormatSpellLabel(cast.Payload.SpellLabel)}");
                     builder.AppendLine($"  ProgressPctQ8: {cast.Payload.ProgressPctQ8}");
-                    builder.AppendLine($"  DurationSeconds: {cast.Payload.DurationQ4 / 4.0:F2}");
-                    builder.AppendLine($"  RemainingSeconds: {cast.Payload.RemainingQ4 / 4.0:F2}");
+                    builder.AppendLine($"  DurationSeconds: {cast.Payload.DurationCenti / 100.0:F2}");
+                    builder.AppendLine($"  RemainingSeconds: {cast.Payload.RemainingCenti / 100.0:F2}");
+                    builder.AppendLine($"  CastTargetCode: {cast.Payload.CastTargetCode}");
+                    break;
+
+                case PlayerResourcesFrame resources:
+                    builder.AppendLine($"  Mana: {resources.Payload.ManaCurrent}/{resources.Payload.ManaMax}");
+                    builder.AppendLine($"  Energy: {resources.Payload.EnergyCurrent}/{resources.Payload.EnergyMax}");
+                    builder.AppendLine($"  Power: {resources.Payload.PowerCurrent}/{resources.Payload.PowerMax}");
+                    break;
+
+                case PlayerCombatFrame combat:
+                    builder.AppendLine($"  CombatFlags: {combat.Payload.CombatFlags}");
+                    builder.AppendLine($"  Combo: {combat.Payload.Combo}");
+                    builder.AppendLine($"  Charge: {combat.Payload.ChargeCurrent}/{combat.Payload.ChargeMax}");
+                    builder.AppendLine($"  Planar: {combat.Payload.PlanarCurrent}/{combat.Payload.PlanarMax}");
+                    builder.AppendLine($"  Absorb: {combat.Payload.Absorb}");
+                    break;
+
+                case TargetPositionFrame targetPosition:
+                    builder.AppendLine($"  PositionX: {targetPosition.Payload.X:F2}");
+                    builder.AppendLine($"  PositionY: {targetPosition.Payload.Y:F2}");
+                    builder.AppendLine($"  PositionZ: {targetPosition.Payload.Z:F2}");
+                    break;
+
+                case FollowUnitStatusFrame follow:
+                    builder.AppendLine($"  Slot: {follow.Payload.Slot}");
+                    builder.AppendLine($"  FollowFlags: 0x{follow.Payload.FollowFlags:X2}");
+                    builder.AppendLine($"  FollowPosition: {follow.Payload.X:F1},{follow.Payload.Y:F1},{follow.Payload.Z:F1}");
+                    builder.AppendLine($"  HealthPctQ8: {follow.Payload.HealthPctQ8}");
+                    builder.AppendLine($"  ResourcePctQ8: {follow.Payload.ResourcePctQ8}");
+                    builder.AppendLine($"  Level: {follow.Payload.Level}");
+                    builder.AppendLine($"  Calling: {follow.Payload.CallingRolePacked >> 4}");
+                    builder.AppendLine($"  Role: {follow.Payload.CallingRolePacked & 0x0F}");
                     break;
             }
         }
@@ -435,6 +469,10 @@ internal sealed class InspectorForm : Form
                 AppendSnapshotFrame(builder, aggregate, "PlayerVitals", "playerVitals");
                 AppendSnapshotFrame(builder, aggregate, "PlayerPosition", "playerPosition");
                 AppendSnapshotFrame(builder, aggregate, "PlayerCast", "playerCast");
+                AppendSnapshotFrame(builder, aggregate, "PlayerResources", "playerResources");
+                AppendSnapshotFrame(builder, aggregate, "PlayerCombat", "playerCombat");
+                AppendSnapshotFrame(builder, aggregate, "TargetPosition", "targetPosition");
+                AppendSnapshotFrame(builder, aggregate, "FollowUnitStatus", "followUnitStatus");
             }
 
             if (root.TryGetProperty("metrics", out var metrics))

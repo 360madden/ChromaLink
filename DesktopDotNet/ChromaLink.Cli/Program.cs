@@ -361,10 +361,55 @@ internal sealed class CliApp
                 Console.WriteLine($"CastActive: {((cast.Payload.CastFlags & 0x01) != 0).ToString().ToLowerInvariant()}");
                 Console.WriteLine($"CastChanneled: {((cast.Payload.CastFlags & 0x02) != 0).ToString().ToLowerInvariant()}");
                 Console.WriteLine($"CastUninterruptible: {((cast.Payload.CastFlags & 0x04) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"CastHasTarget: {((cast.Payload.CastFlags & 0x10) != 0).ToString().ToLowerInvariant()}");
                 Console.WriteLine($"SpellLabel: {FormatSpellLabel(cast.Payload.SpellLabel)}");
                 Console.WriteLine($"ProgressPctQ8: {cast.Payload.ProgressPctQ8}");
-                Console.WriteLine($"DurationSeconds: {cast.Payload.DurationQ4 / 4.0:F2}");
-                Console.WriteLine($"RemainingSeconds: {cast.Payload.RemainingQ4 / 4.0:F2}");
+                Console.WriteLine($"DurationSeconds: {cast.Payload.DurationCenti / 100.0:F2}");
+                Console.WriteLine($"RemainingSeconds: {cast.Payload.RemainingCenti / 100.0:F2}");
+                Console.WriteLine($"CastTargetCode: {cast.Payload.CastTargetCode}");
+                break;
+
+            case PlayerResourcesFrame resources:
+                Console.WriteLine($"Mana: {resources.Payload.ManaCurrent}/{resources.Payload.ManaMax}");
+                Console.WriteLine($"Energy: {resources.Payload.EnergyCurrent}/{resources.Payload.EnergyMax}");
+                Console.WriteLine($"Power: {resources.Payload.PowerCurrent}/{resources.Payload.PowerMax}");
+                break;
+
+            case PlayerCombatFrame combat:
+                Console.WriteLine($"CombatFlags: {combat.Payload.CombatFlags}");
+                Console.WriteLine($"HasCombo: {((combat.Payload.CombatFlags & 0x01) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"HasCharge: {((combat.Payload.CombatFlags & 0x02) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"HasPlanar: {((combat.Payload.CombatFlags & 0x04) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"HasAbsorb: {((combat.Payload.CombatFlags & 0x08) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"Combo: {combat.Payload.Combo}");
+                Console.WriteLine($"Charge: {combat.Payload.ChargeCurrent}/{combat.Payload.ChargeMax}");
+                Console.WriteLine($"Planar: {combat.Payload.PlanarCurrent}/{combat.Payload.PlanarMax}");
+                Console.WriteLine($"Absorb: {combat.Payload.Absorb}");
+                break;
+
+            case TargetPositionFrame targetPosition:
+                Console.WriteLine($"TargetPositionX: {targetPosition.Payload.X:F2}");
+                Console.WriteLine($"TargetPositionY: {targetPosition.Payload.Y:F2}");
+                Console.WriteLine($"TargetPositionZ: {targetPosition.Payload.Z:F2}");
+                break;
+
+            case FollowUnitStatusFrame follow:
+                Console.WriteLine($"FollowSlot: {follow.Payload.Slot}");
+                Console.WriteLine($"FollowFlags: {follow.Payload.FollowFlags}");
+                Console.WriteLine($"FollowPresent: {((follow.Payload.FollowFlags & 0x01) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"FollowAlive: {((follow.Payload.FollowFlags & 0x02) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"FollowCombat: {((follow.Payload.FollowFlags & 0x04) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"FollowAfk: {((follow.Payload.FollowFlags & 0x08) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"FollowOffline: {((follow.Payload.FollowFlags & 0x10) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"FollowAggro: {((follow.Payload.FollowFlags & 0x20) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"FollowBlocked: {((follow.Payload.FollowFlags & 0x40) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"FollowReady: {((follow.Payload.FollowFlags & 0x80) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"FollowPosition: {follow.Payload.X:F1},{follow.Payload.Y:F1},{follow.Payload.Z:F1}");
+                Console.WriteLine($"FollowHealthPctQ8: {follow.Payload.HealthPctQ8}");
+                Console.WriteLine($"FollowResourcePctQ8: {follow.Payload.ResourcePctQ8}");
+                Console.WriteLine($"FollowLevel: {follow.Payload.Level}");
+                Console.WriteLine($"FollowCalling: {follow.Payload.CallingRolePacked >> 4}");
+                Console.WriteLine($"FollowRole: {follow.Payload.CallingRolePacked & 0x0F}");
                 break;
         }
     }
@@ -403,7 +448,31 @@ internal sealed class CliApp
             snapshot.PlayerCast,
             nowUtc,
             observation =>
-                $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} active={((observation.Frame.Payload.CastFlags & 0x01) != 0).ToString().ToLowerInvariant()} spell={FormatSpellLabel(observation.Frame.Payload.SpellLabel)} progressQ8={observation.Frame.Payload.ProgressPctQ8} remaining={observation.Frame.Payload.RemainingQ4 / 4.0:F2}s");
+                $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} active={((observation.Frame.Payload.CastFlags & 0x01) != 0).ToString().ToLowerInvariant()} spell={FormatSpellLabel(observation.Frame.Payload.SpellLabel)} target={observation.Frame.Payload.CastTargetCode} progressQ8={observation.Frame.Payload.ProgressPctQ8} remaining={observation.Frame.Payload.RemainingCenti / 100.0:F2}s");
+        WriteAggregateObservation(
+            "AggregatePlayerResources",
+            snapshot.PlayerResources,
+            nowUtc,
+            observation =>
+                $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} mana={observation.Frame.Payload.ManaCurrent}/{observation.Frame.Payload.ManaMax} energy={observation.Frame.Payload.EnergyCurrent}/{observation.Frame.Payload.EnergyMax} power={observation.Frame.Payload.PowerCurrent}/{observation.Frame.Payload.PowerMax}");
+        WriteAggregateObservation(
+            "AggregatePlayerCombat",
+            snapshot.PlayerCombat,
+            nowUtc,
+            observation =>
+                $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} combo={observation.Frame.Payload.Combo} charge={observation.Frame.Payload.ChargeCurrent}/{observation.Frame.Payload.ChargeMax} planar={observation.Frame.Payload.PlanarCurrent}/{observation.Frame.Payload.PlanarMax} absorb={observation.Frame.Payload.Absorb}");
+        WriteAggregateObservation(
+            "AggregateTargetPosition",
+            snapshot.TargetPosition,
+            nowUtc,
+            observation =>
+                $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} pos={observation.Frame.Payload.X:F2},{observation.Frame.Payload.Y:F2},{observation.Frame.Payload.Z:F2}");
+        WriteAggregateObservation(
+            "AggregateFollowUnitStatus",
+            snapshot.FollowUnitStatus,
+            nowUtc,
+            observation =>
+                $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} slot={observation.Frame.Payload.Slot} flags=0x{observation.Frame.Payload.FollowFlags:X2} pos={observation.Frame.Payload.X:F1},{observation.Frame.Payload.Y:F1},{observation.Frame.Payload.Z:F1} hpPctQ8={observation.Frame.Payload.HealthPctQ8}");
     }
 
     private static void WriteAggregateObservation<TFrame>(
@@ -459,6 +528,21 @@ internal sealed class CliApp
         if (flags.HasFlag(HeaderCapabilityFlags.PlayerCast))
         {
             labels.Add("player-cast");
+        }
+
+        if (flags.HasFlag(HeaderCapabilityFlags.ExpandedStats))
+        {
+            labels.Add("expanded-stats");
+        }
+
+        if (flags.HasFlag(HeaderCapabilityFlags.TargetPosition))
+        {
+            labels.Add("target-position");
+        }
+
+        if (flags.HasFlag(HeaderCapabilityFlags.FollowUnitStatus))
+        {
+            labels.Add("follow-unit-status");
         }
 
         var unknown = (byte)(flags & ~(TransportConstants.HeaderCapabilities));

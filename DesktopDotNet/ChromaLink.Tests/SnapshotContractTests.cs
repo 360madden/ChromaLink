@@ -34,12 +34,15 @@ public class SnapshotContractTests
         Assert.Equal(1, transport.GetProperty("reservedFlags").GetProperty("multiFrameRotation").GetInt32());
         Assert.Equal(2, transport.GetProperty("reservedFlags").GetProperty("playerPosition").GetInt32());
         Assert.Equal(4, transport.GetProperty("reservedFlags").GetProperty("playerCast").GetInt32());
+        Assert.Equal(8, transport.GetProperty("reservedFlags").GetProperty("expandedStats").GetInt32());
+        Assert.Equal(16, transport.GetProperty("reservedFlags").GetProperty("targetPosition").GetInt32());
+        Assert.Equal(32, transport.GetProperty("reservedFlags").GetProperty("followUnitStatus").GetInt32());
 
         var aggregateJson = root.GetProperty("aggregate");
         Assert.True(aggregateJson.GetProperty("ready").GetBoolean());
         Assert.True(aggregateJson.GetProperty("healthy").GetBoolean());
         Assert.False(aggregateJson.GetProperty("stale").GetBoolean());
-        Assert.Equal(4, aggregateJson.GetProperty("acceptedFrames").GetInt32());
+        Assert.Equal(8, aggregateJson.GetProperty("acceptedFrames").GetInt32());
 
         var freshness = aggregateJson.GetProperty("freshness");
         Assert.Equal(2000.0, freshness.GetProperty("windowMs").GetDouble(), 2);
@@ -50,18 +53,26 @@ public class SnapshotContractTests
         Assert.True(aggregateJson.GetProperty("playerVitals").GetProperty("fresh").GetBoolean());
         Assert.True(aggregateJson.GetProperty("playerPosition").GetProperty("fresh").GetBoolean());
         Assert.True(aggregateJson.GetProperty("playerCast").GetProperty("fresh").GetBoolean());
+        Assert.True(aggregateJson.GetProperty("playerResources").GetProperty("fresh").GetBoolean());
+        Assert.True(aggregateJson.GetProperty("playerCombat").GetProperty("fresh").GetBoolean());
+        Assert.True(aggregateJson.GetProperty("targetPosition").GetProperty("fresh").GetBoolean());
+        Assert.True(aggregateJson.GetProperty("followUnitStatus").GetProperty("fresh").GetBoolean());
 
         var metrics = root.GetProperty("metrics");
-        Assert.Equal(3, metrics.GetProperty("acceptedSamples").GetInt32());
+        Assert.Equal(7, metrics.GetProperty("acceptedSamples").GetInt32());
         Assert.Equal(1, metrics.GetProperty("rejectedSamples").GetInt32());
         Assert.Equal(3, metrics.GetProperty("frameTypeCounts").GetProperty("CoreStatus/schema-1").GetInt32());
         Assert.Equal(2, metrics.GetProperty("frameTypeCounts").GetProperty("PlayerVitals/schema-1").GetInt32());
         Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("PlayerPosition/schema-1").GetInt32());
         Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("PlayerCast/schema-1").GetInt32());
+        Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("PlayerResources/schema-1").GetInt32());
+        Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("PlayerCombat/schema-1").GetInt32());
+        Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("TargetPosition/schema-1").GetInt32());
+        Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("FollowUnitStatus/schema-1").GetInt32());
 
         Assert.Equal("screen", root.GetProperty("lastBackend").GetString());
         Assert.Equal(0, root.GetProperty("lastDetection").GetProperty("originX").GetInt32());
-        Assert.Equal("PlayerCast", root.GetProperty("lastFrame").GetProperty("frameType").GetString());
+        Assert.Equal("FollowUnitStatus", root.GetProperty("lastFrame").GetProperty("frameType").GetString());
     }
 
     [Fact]
@@ -114,7 +125,7 @@ public class SnapshotContractTests
         Assert.True(freshPayload.Fresh);
         Assert.True(freshDocument.Ok);
         Assert.Equal("chromalink-live-telemetry", freshJson.RootElement.GetProperty("contract").GetProperty("name").GetString());
-        Assert.Equal(4, freshJson.RootElement.GetProperty("aggregate").GetProperty("acceptedFrames").GetInt32());
+        Assert.Equal(8, freshJson.RootElement.GetProperty("aggregate").GetProperty("acceptedFrames").GetInt32());
         Assert.True(freshJson.RootElement.GetProperty("aggregate").GetProperty("ready").GetBoolean());
         Assert.True(freshJson.RootElement.GetProperty("aggregate").GetProperty("healthy").GetBoolean());
         Assert.False(freshJson.RootElement.GetProperty("aggregate").GetProperty("stale").GetBoolean());
@@ -305,12 +316,15 @@ public class SnapshotContractTests
                 {
                     multiFrameRotation = 1,
                     playerPosition = 2,
-                    playerCast = 4
+                    playerCast = 4,
+                    expandedStats = 8,
+                    targetPosition = 16,
+                    followUnitStatus = 32
                 }
             },
             aggregate = new
             {
-                acceptedFrames = 4,
+                acceptedFrames = 8,
                 ready = true,
                 lastUpdatedUtc = nowUtc.AddMilliseconds(-20),
                 healthy = true,
@@ -387,23 +401,107 @@ public class SnapshotContractTests
                     frameType = "PlayerCast",
                     schemaId = 1,
                     sequence = 4,
-                    reservedFlags = 7,
-                    castFlags = 9,
+                    reservedFlags = 63,
+                    castFlags = 25,
                     castActive = true,
                     channeled = false,
                     uninterruptible = false,
                     hasLabel = true,
+                    hasTarget = true,
                     progressPctQ8 = 96,
-                    durationQ4 = 10,
-                    remainingQ4 = 6,
+                    durationCenti = 250,
+                    remainingCenti = 150,
                     durationSeconds = 2.5,
                     remainingSeconds = 1.5,
-                    spellLabel = "HEALING"
+                    castTargetCode = 2,
+                    spellLabel = "HEALI"
+                },
+                playerResources = new
+                {
+                    observedAtUtc = nowUtc.AddMilliseconds(-12),
+                    ageMs = 12.0,
+                    fresh = true,
+                    stale = false,
+                    frameType = "PlayerResources",
+                    schemaId = 1,
+                    sequence = 5,
+                    reservedFlags = 63,
+                    manaCurrent = 4200,
+                    manaMax = 5000,
+                    energyCurrent = 85,
+                    energyMax = 100,
+                    powerCurrent = 12,
+                    powerMax = 100
+                },
+                playerCombat = new
+                {
+                    observedAtUtc = nowUtc.AddMilliseconds(-11),
+                    ageMs = 11.0,
+                    fresh = true,
+                    stale = false,
+                    frameType = "PlayerCombat",
+                    schemaId = 1,
+                    sequence = 6,
+                    reservedFlags = 63,
+                    combatFlags = 15,
+                    hasCombo = true,
+                    hasCharge = true,
+                    hasPlanar = true,
+                    hasAbsorb = true,
+                    combo = 4,
+                    chargeCurrent = 80,
+                    chargeMax = 100,
+                    planarCurrent = 3,
+                    planarMax = 6,
+                    absorb = 250
+                },
+                targetPosition = new
+                {
+                    observedAtUtc = nowUtc.AddMilliseconds(-9),
+                    ageMs = 9.0,
+                    fresh = true,
+                    stale = false,
+                    frameType = "TargetPosition",
+                    schemaId = 1,
+                    sequence = 7,
+                    reservedFlags = 63,
+                    x = 128.75,
+                    y = 201.50,
+                    z = -48.25
+                },
+                followUnitStatus = new
+                {
+                    observedAtUtc = nowUtc.AddMilliseconds(-8),
+                    ageMs = 8.0,
+                    fresh = true,
+                    stale = false,
+                    frameType = "FollowUnitStatus",
+                    schemaId = 1,
+                    sequence = 8,
+                    reservedFlags = 63,
+                    slot = 1,
+                    followFlags = 143,
+                    present = true,
+                    alive = true,
+                    combat = true,
+                    afk = true,
+                    offline = false,
+                    aggro = false,
+                    blocked = false,
+                    readyFlag = true,
+                    x = 7123.5,
+                    y = 865.0,
+                    z = 3010.5,
+                    healthPctQ8 = 222,
+                    resourcePctQ8 = 144,
+                    level = 70,
+                    calling = 3,
+                    role = 1
                 }
             },
             metrics = new
             {
-                acceptedSamples = 3,
+                acceptedSamples = 7,
                 rejectedSamples = 1,
                 averageCaptureMs = 12.5,
                 averageDecodeMs = 4.25,
@@ -415,7 +513,11 @@ public class SnapshotContractTests
                     ["CoreStatus/schema-1"] = 3,
                     ["PlayerVitals/schema-1"] = 2,
                     ["PlayerPosition/schema-1"] = 1,
-                    ["PlayerCast/schema-1"] = 1
+                    ["PlayerCast/schema-1"] = 1,
+                    ["PlayerResources/schema-1"] = 1,
+                    ["PlayerCombat/schema-1"] = 1,
+                    ["TargetPosition/schema-1"] = 1,
+                    ["FollowUnitStatus/schema-1"] = 1
                 }
             },
             lastBackend = "screen",
@@ -433,10 +535,10 @@ public class SnapshotContractTests
             },
             lastFrame = new
             {
-                frameType = "PlayerCast",
+                frameType = "FollowUnitStatus",
                 schemaId = 1,
-                sequence = 4,
-                reservedFlags = 7
+                sequence = 8,
+                reservedFlags = 63
             }
         };
 

@@ -24,6 +24,7 @@ ChromaLink is intentionally narrow right now. The active baseline is:
 - fast heartbeat frame: `coreStatus`
 - proven rotating expansions: `playerVitals`, `playerPosition`
 - proven cast expansion: `playerCast`
+- live-proven expanded slices: `playerResources`, `playerCombat`, `targetPosition`, `followUnitStatus`
 
 Current live proof:
 
@@ -34,7 +35,7 @@ Current live proof:
   - `origin 0,0`
   - `pitch 2.8`
   - `scale 0.35`
-- live captures now decode `CoreStatus`, `PlayerVitals`, `PlayerPosition`, and `PlayerCast` on the running client
+- live captures now decode `CoreStatus`, `PlayerVitals`, `PlayerPosition`, `PlayerCast`, `PlayerResources`, `PlayerCombat`, `TargetPosition`, and `FollowUnitStatus` on the running client
 - capture sessions emit raw BMP, annotated BMP, and JSON sidecars under `%LOCALAPPDATA%\ChromaLink\DesktopDotNet\out`
 
 ## How It Works
@@ -125,7 +126,7 @@ dotnet run --project .\DesktopDotNet\ChromaLink.Monitor\ChromaLink.Monitor.cspro
 
 `live` and `watch` now report per-frame-type counts for accepted samples, which makes rotating telemetry easier to verify.
 
-They also emit a compact aggregate summary showing the newest accepted `CoreStatus`, `PlayerVitals`, `PlayerPosition`, and `PlayerCast` observations plus rough age in milliseconds. That makes the rotating strip immediately usable as one reader-side telemetry state instead of separate unrelated frame types.
+They also emit a compact aggregate summary showing the newest accepted observations plus rough age in milliseconds. The proven readiness baseline still centers on `CoreStatus`, `PlayerVitals`, and `PlayerPosition`, while newer optional slices flow through the same aggregate when present.
 
 While `live` or `watch` runs, the CLI also writes a rolling machine-readable snapshot to `%LOCALAPPDATA%\ChromaLink\DesktopDotNet\out\chromalink-live-telemetry.json`.
 
@@ -220,22 +221,49 @@ The current strip carries `24` transport bytes per frame and now supports more t
 - `PlayerCast`
   - cast-state flags
   - progress (`Q8`)
-  - duration / remaining time (`Q4`, quarter-second units)
-  - short transport-safe spell label (`8` bytes)
+  - duration / remaining time (`uint16`, centiseconds)
+  - cast target code
+  - short transport-safe spell label (`5` bytes)
+- `PlayerResources`
+  - mana current/max
+  - energy current/max
+  - power current/max
+- `PlayerCombat`
+  - combo points
+  - charge current/max
+  - planar charges current/max
+  - absorb
+  - compact combat-resource availability flags
+- `TargetPosition`
+  - target x/y/z world coordinates encoded as fixed-point integers
+- `FollowUnitStatus`
+  - follow-slot flags for present/alive/combat/afk/offline/aggro/blocked/ready
+  - follow-unit x/y/z coordinates at half-unit precision
+  - follow-unit health/resource percentages, level, and calling/role
 
-The current addon rotation keeps `coreStatus` as the dominant heartbeat and periodically inserts `playerVitals`, `playerPosition`, and `playerCast` to increase throughput over time instead of widening the strip. A recent live sample after `/reloadui` produced:
+The current addon rotation keeps `coreStatus` as the dominant heartbeat and periodically inserts the secondary slices to increase throughput over time instead of widening the strip. A recent live sample after `/reloadui` for the expanded live build produced:
 
-- `46` accepted `CoreStatus` frames
-- `13` accepted `PlayerVitals` frames
+- `73` accepted `CoreStatus` frames
+- `12` accepted `PlayerVitals` frames
 - `10` accepted `PlayerPosition` frames
 - `10` accepted `PlayerCast` frames
-- `ReservedFlags: 0x07`, confirming the live addon loaded the cast-capable multi-frame build
+- `9` accepted `PlayerResources` frames
+- `11` accepted `PlayerCombat` frames
+- `12` accepted `TargetPosition` frames
+- `8` accepted `FollowUnitStatus` frames
+- `ReservedFlags: 0x3F`, confirming the live addon loaded the expanded multi-frame build
 
-The header `ReservedFlags` byte is now used as a live build-capability marker. Current expected value is `0x07`, which means:
+The header `ReservedFlags` byte is now used as a live build-capability marker. The current live-proven value is `0x3F`, which means:
 
 - `0x01` = multi-frame rotation capable
 - `0x02` = player-position capable
 - `0x04` = player-cast capable
+
+The expanded telemetry build also defines:
+
+- `0x08` = expanded player stats capable
+- `0x10` = target-position capable
+- `0x20` = follow-unit-status capable
 
 That gives live captures a direct way to prove whether the running addon actually loaded a newer telemetry build.
 

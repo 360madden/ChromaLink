@@ -46,18 +46,30 @@ ChromaLink.Config = {
     maxScaleY = 4.0,
     allowShrink = false
   },
+  followUnit = {
+    enabled = true,
+    slot = 1,
+    specifier = "group01"
+  },
   preferHighestAvailableStrata = true,
   protocolVersion = 1,
   headerFlags = {
     multiFrameRotation = 1,
     playerPosition = 2,
-    playerCast = 4
+    playerCast = 4,
+    expandedStats = 8,
+    targetPosition = 16,
+    followUnitStatus = 32
   },
   frameTypes = {
     coreStatus = 1,
     playerVitals = 2,
     playerPosition = 3,
-    playerCast = 4
+    playerCast = 4,
+    playerResources = 5,
+    playerCombat = 6,
+    targetPosition = 7,
+    followUnitStatus = 8
   },
   frameRotation = {
     "coreStatus",
@@ -66,7 +78,15 @@ ChromaLink.Config = {
     "coreStatus",
     "playerPosition",
     "coreStatus",
-    "playerCast"
+    "playerCast",
+    "coreStatus",
+    "playerResources",
+    "coreStatus",
+    "playerCombat",
+    "coreStatus",
+    "targetPosition",
+    "coreStatus",
+    "followUnitStatus"
   },
   syntheticMode = {
     enabled = false
@@ -126,6 +146,17 @@ ChromaLink.Config = {
     hostile = 2,
     neutral = 3,
     self = 4
+  },
+  castTargetCodes = {
+    none = 0,
+    self = 1,
+    currentTarget = 2,
+    focus = 3,
+    groupBase = 4,
+    groupMax = 23,
+    friendlyOther = 24,
+    hostileOther = 25,
+    other = 26
   }
 }
 

@@ -8,12 +8,27 @@ public sealed record TelemetryAggregateSnapshot(
     FrameObservation<PlayerVitalsFrame>? PlayerVitals,
     FrameObservation<PlayerPositionFrame>? PlayerPosition,
     FrameObservation<PlayerCastFrame>? PlayerCast,
+    FrameObservation<PlayerResourcesFrame>? PlayerResources,
+    FrameObservation<PlayerCombatFrame>? PlayerCombat,
+    FrameObservation<TargetPositionFrame>? TargetPosition,
+    FrameObservation<FollowUnitStatusFrame>? FollowUnitStatus,
     DateTimeOffset? LastUpdatedUtc,
     int AcceptedFrames)
 {
-    public bool HasAny => CoreStatus is not null || PlayerVitals is not null || PlayerPosition is not null || PlayerCast is not null;
+    public bool HasAny =>
+        CoreStatus is not null ||
+        PlayerVitals is not null ||
+        PlayerPosition is not null ||
+        PlayerCast is not null ||
+        PlayerResources is not null ||
+        PlayerCombat is not null ||
+        TargetPosition is not null ||
+        FollowUnitStatus is not null;
 
-    public bool HasCompleteState => CoreStatus is not null && PlayerVitals is not null && PlayerPosition is not null;
+    public bool HasCompleteState =>
+        CoreStatus is not null &&
+        PlayerVitals is not null &&
+        PlayerPosition is not null;
 }
 
 public sealed class TelemetryAggregate
@@ -22,6 +37,10 @@ public sealed class TelemetryAggregate
     private FrameObservation<PlayerVitalsFrame>? _playerVitals;
     private FrameObservation<PlayerPositionFrame>? _playerPosition;
     private FrameObservation<PlayerCastFrame>? _playerCast;
+    private FrameObservation<PlayerResourcesFrame>? _playerResources;
+    private FrameObservation<PlayerCombatFrame>? _playerCombat;
+    private FrameObservation<TargetPositionFrame>? _targetPosition;
+    private FrameObservation<FollowUnitStatusFrame>? _followUnitStatus;
 
     public int AcceptedFrames { get; private set; }
 
@@ -50,6 +69,22 @@ public sealed class TelemetryAggregate
                 _playerCast = new FrameObservation<PlayerCastFrame>(playerCast, observed);
                 break;
 
+            case PlayerResourcesFrame playerResources:
+                _playerResources = new FrameObservation<PlayerResourcesFrame>(playerResources, observed);
+                break;
+
+            case PlayerCombatFrame playerCombat:
+                _playerCombat = new FrameObservation<PlayerCombatFrame>(playerCombat, observed);
+                break;
+
+            case TargetPositionFrame targetPosition:
+                _targetPosition = new FrameObservation<TargetPositionFrame>(targetPosition, observed);
+                break;
+
+            case FollowUnitStatusFrame followUnitStatus:
+                _followUnitStatus = new FrameObservation<FollowUnitStatusFrame>(followUnitStatus, observed);
+                break;
+
             default:
                 throw new InvalidOperationException($"Unsupported telemetry frame type: {frame.GetType().Name}.");
         }
@@ -65,6 +100,10 @@ public sealed class TelemetryAggregate
             _playerVitals,
             _playerPosition,
             _playerCast,
+            _playerResources,
+            _playerCombat,
+            _targetPosition,
+            _followUnitStatus,
             LastUpdatedUtc,
             AcceptedFrames);
     }
