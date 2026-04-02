@@ -12,6 +12,13 @@ public sealed record TelemetryAggregateSnapshot(
     FrameObservation<PlayerCombatFrame>? PlayerCombat,
     FrameObservation<TargetPositionFrame>? TargetPosition,
     FrameObservation<FollowUnitStatusFrame>? FollowUnitStatus,
+    IReadOnlyDictionary<byte, FrameObservation<FollowUnitStatusFrame>> FollowUnitStatusesBySlot,
+    FrameObservation<TargetVitalsFrame>? TargetVitals,
+    FrameObservation<TargetResourcesFrame>? TargetResources,
+    FrameObservation<AuxUnitCastFrame>? AuxUnitCast,
+    FrameObservation<AuraPageFrame>? AuraPage,
+    FrameObservation<TextPageFrame>? TextPage,
+    FrameObservation<AbilityWatchFrame>? AbilityWatch,
     DateTimeOffset? LastUpdatedUtc,
     int AcceptedFrames)
 {
@@ -23,7 +30,14 @@ public sealed record TelemetryAggregateSnapshot(
         PlayerResources is not null ||
         PlayerCombat is not null ||
         TargetPosition is not null ||
-        FollowUnitStatus is not null;
+        FollowUnitStatus is not null ||
+        FollowUnitStatusesBySlot.Count > 0 ||
+        TargetVitals is not null ||
+        TargetResources is not null ||
+        AuxUnitCast is not null ||
+        AuraPage is not null ||
+        TextPage is not null ||
+        AbilityWatch is not null;
 
     public bool HasCompleteState =>
         CoreStatus is not null &&
@@ -41,6 +55,13 @@ public sealed class TelemetryAggregate
     private FrameObservation<PlayerCombatFrame>? _playerCombat;
     private FrameObservation<TargetPositionFrame>? _targetPosition;
     private FrameObservation<FollowUnitStatusFrame>? _followUnitStatus;
+    private readonly SortedDictionary<byte, FrameObservation<FollowUnitStatusFrame>> _followUnitStatusesBySlot = new();
+    private FrameObservation<TargetVitalsFrame>? _targetVitals;
+    private FrameObservation<TargetResourcesFrame>? _targetResources;
+    private FrameObservation<AuxUnitCastFrame>? _auxUnitCast;
+    private FrameObservation<AuraPageFrame>? _auraPage;
+    private FrameObservation<TextPageFrame>? _textPage;
+    private FrameObservation<AbilityWatchFrame>? _abilityWatch;
 
     public int AcceptedFrames { get; private set; }
 
@@ -83,6 +104,31 @@ public sealed class TelemetryAggregate
 
             case FollowUnitStatusFrame followUnitStatus:
                 _followUnitStatus = new FrameObservation<FollowUnitStatusFrame>(followUnitStatus, observed);
+                _followUnitStatusesBySlot[followUnitStatus.Payload.Slot] = _followUnitStatus;
+                break;
+
+            case TargetVitalsFrame targetVitals:
+                _targetVitals = new FrameObservation<TargetVitalsFrame>(targetVitals, observed);
+                break;
+
+            case TargetResourcesFrame targetResources:
+                _targetResources = new FrameObservation<TargetResourcesFrame>(targetResources, observed);
+                break;
+
+            case AuxUnitCastFrame auxUnitCast:
+                _auxUnitCast = new FrameObservation<AuxUnitCastFrame>(auxUnitCast, observed);
+                break;
+
+            case AuraPageFrame auraPage:
+                _auraPage = new FrameObservation<AuraPageFrame>(auraPage, observed);
+                break;
+
+            case TextPageFrame textPage:
+                _textPage = new FrameObservation<TextPageFrame>(textPage, observed);
+                break;
+
+            case AbilityWatchFrame abilityWatch:
+                _abilityWatch = new FrameObservation<AbilityWatchFrame>(abilityWatch, observed);
                 break;
 
             default:
@@ -104,6 +150,13 @@ public sealed class TelemetryAggregate
             _playerCombat,
             _targetPosition,
             _followUnitStatus,
+            _followUnitStatusesBySlot.ToDictionary(static entry => entry.Key, static entry => entry.Value),
+            _targetVitals,
+            _targetResources,
+            _auxUnitCast,
+            _auraPage,
+            _textPage,
+            _abilityWatch,
             LastUpdatedUtc,
             AcceptedFrames);
     }

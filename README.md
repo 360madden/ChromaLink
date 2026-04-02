@@ -25,6 +25,7 @@ ChromaLink is intentionally narrow right now. The active baseline is:
 - proven rotating expansions: `playerVitals`, `playerPosition`
 - proven cast expansion: `playerCast`
 - live-proven expanded slices: `playerResources`, `playerCombat`, `targetPosition`, `followUnitStatus`
+- expanded generic telemetry pages: `targetVitals`, `targetResources`, `auxUnitCast`, `auraPage`, `textPage`, `abilityWatch`
 
 Current live proof:
 
@@ -36,6 +37,10 @@ Current live proof:
   - `pitch 2.8`
   - `scale 0.35`
 - live captures now decode `CoreStatus`, `PlayerVitals`, `PlayerPosition`, `PlayerCast`, `PlayerResources`, `PlayerCombat`, `TargetPosition`, and `FollowUnitStatus` on the running client
+- the current expanded build has also been live-proven with reserved flags `0xFF`, confirming:
+  - additional telemetry pages are loaded
+  - text and aura pages are loaded
+  - live captures now also decode `TargetVitals`, `AuxUnitCast`, `AuraPage`, `TextPage`, and `AbilityWatch`
 - capture sessions emit raw BMP, annotated BMP, and JSON sidecars under `%LOCALAPPDATA%\ChromaLink\DesktopDotNet\out`
 
 ## How It Works
@@ -234,12 +239,37 @@ The current strip carries `24` transport bytes per frame and now supports more t
   - planar charges current/max
   - absorb
   - compact combat-resource availability flags
+  - `pvp`, `mentoring`, `ready`, and `afk` capability flags
 - `TargetPosition`
   - target x/y/z world coordinates encoded as fixed-point integers
 - `FollowUnitStatus`
   - follow-slot flags for present/alive/combat/afk/offline/aggro/blocked/ready
   - follow-unit x/y/z coordinates at half-unit precision
   - follow-unit health/resource percentages, level, and calling/role
+- `TargetVitals`
+  - target health current/max
+  - target absorb
+  - target state flags and level
+- `TargetResources`
+  - target mana current/max
+  - target energy current/max
+  - target power current/max
+- `AuxUnitCast`
+  - compact cast telemetry for target or rotated group slots
+  - unit selector code
+  - cast flags, progress, duration, remaining, cast target code, short label
+- `AuraPage`
+  - compact player/target buff or debuff summary pages
+  - total aura count plus two compact entries
+- `TextPage`
+  - player name
+  - target name
+  - zone name
+  - shard name
+- `AbilityWatch`
+  - tracked ability ids
+  - compact cooldown/readiness state
+  - per-page ready/cooling counts
 
 The current addon rotation keeps `coreStatus` as the dominant heartbeat and periodically inserts the secondary slices to increase throughput over time instead of widening the strip. A recent live sample after `/reloadui` for the expanded live build produced:
 
@@ -253,11 +283,34 @@ The current addon rotation keeps `coreStatus` as the dominant heartbeat and peri
 - `8` accepted `FollowUnitStatus` frames
 - `ReservedFlags: 0x3F`, confirming the live addon loaded the expanded multi-frame build
 
+The next remaining-capabilities pass widened the live capability marker to `0xFF` and produced accepted samples for:
+
+- `AbilityWatch`
+- `AuraPage`
+- `AuxUnitCast`
+- `CoreStatus`
+- `FollowUnitStatus`
+- `PlayerCast`
+- `PlayerPosition`
+- `PlayerResources`
+- `PlayerVitals`
+- `TargetPosition`
+- `TargetVitals`
+- `TextPage`
+
 The header `ReservedFlags` byte is now used as a live build-capability marker. The current live-proven value is `0x3F`, which means:
 
 - `0x01` = multi-frame rotation capable
 - `0x02` = player-position capable
 - `0x04` = player-cast capable
+- `0x08` = expanded stats capable
+- `0x10` = target-position capable
+- `0x20` = follow-unit capable
+
+The current expanded build also uses:
+
+- `0x40` = additional telemetry capable
+- `0x80` = text and aura pages capable
 
 The expanded telemetry build also defines:
 

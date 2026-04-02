@@ -2,6 +2,8 @@ ChromaLink = ChromaLink or {}
 ChromaLink.Gather = {}
 
 local config = ChromaLink.Config
+local cachedAbilityNameIndex = nil
+local cachedAbilityNameIndexStamp = 0
 
 local function ClampByte(value)
   local number = tonumber(value) or 0
@@ -95,6 +97,71 @@ local function SafeAbilityDetail(ability)
   return nil
 end
 
+local function SafeAbilityList()
+  if Inspect == nil or Inspect.Ability == nil or Inspect.Ability.New == nil or Inspect.Ability.New.List == nil then
+    return nil
+  end
+
+  local ok, result = pcall(Inspect.Ability.New.List)
+  if ok then
+    return result
+  end
+
+  return nil
+end
+
+local function SafeBuffList(unit)
+  if unit == nil or Inspect == nil or Inspect.Buff == nil or Inspect.Buff.List == nil then
+    return nil
+  end
+
+  local ok, result = pcall(Inspect.Buff.List, unit)
+  if ok then
+    return result
+  end
+
+  return nil
+end
+
+local function SafeBuffDetail(unit, buffs)
+  if unit == nil or buffs == nil or Inspect == nil or Inspect.Buff == nil or Inspect.Buff.Detail == nil then
+    return nil
+  end
+
+  local ok, result = pcall(Inspect.Buff.Detail, unit, buffs)
+  if ok then
+    return result
+  end
+
+  return nil
+end
+
+local function SafeZoneDetail(zone)
+  if zone == nil or Inspect == nil or Inspect.Zone == nil or Inspect.Zone.Detail == nil then
+    return nil
+  end
+
+  local ok, result = pcall(Inspect.Zone.Detail, zone)
+  if ok then
+    return result
+  end
+
+  return nil
+end
+
+local function SafeShardDetail()
+  if Inspect == nil or Inspect.Shard == nil then
+    return nil
+  end
+
+  local ok, result = pcall(Inspect.Shard)
+  if ok then
+    return result
+  end
+
+  return nil
+end
+
 local function QuantizePercent(current, maximum)
   local currentNumber = tonumber(current) or 0
   local maxNumber = tonumber(maximum) or 0
@@ -124,12 +191,12 @@ local function QuantizeSecondsCenti(seconds)
   return ClampUInt16(value * 100)
 end
 
-local function BuildSpellLabelBytes(value)
+local function BuildAsciiBytes(value, length)
   local source = string.upper(tostring(value or ""))
   local bytes = {}
   local index
 
-  for index = 1, 5 do
+  for index = 1, length do
     local byteValue = string.byte(source, index) or 32
     if byteValue < 32 or byteValue > 126 then
       byteValue = 63
@@ -139,6 +206,39 @@ local function BuildSpellLabelBytes(value)
   end
 
   return bytes
+end
+
+local function BuildSpellLabelBytes(value)
+  return BuildAsciiBytes(value, 5)
+end
+
+local function BuildAuxSpellLabelBytes(value)
+  return BuildAsciiBytes(value, 4)
+end
+
+local function BuildTextLabelBytes(value)
+  return BuildAsciiBytes(value, 9)
+end
+
+local function StableHash16(value)
+  local source = string.upper(tostring(value or ""))
+  local hash = 5381
+  local index
+
+  for index = 1, #source do
+    hash = math.fmod((hash * 33) + (string.byte(source, index) or 0), 65536)
+  end
+
+  return ClampUInt16(hash)
+end
+
+local function StableId16(value)
+  local numeric = tonumber(value)
+  if numeric ~= nil then
+    return ClampUInt16(math.fmod(math.floor(math.abs(numeric) + 0.5), 65536))
+  end
+
+  return StableHash16(value)
 end
 
 local function HasVisibleLabel(labelBytes)
@@ -151,6 +251,183 @@ local function HasVisibleLabel(labelBytes)
   end
 
   return false
+end
+
+local function SafeRealtimeNow()
+  if Inspect ~= nil and Inspect.Time ~= nil and Inspect.Time.Real ~= nil then
+    local ok, result = pcall(Inspect.Time.Real)
+    if ok then
+      return tonumber(result) or 0
+    end
+  end
+
+  return 0
+end
+
+local function BuildAbilityNameIndex()
+  local abilities = SafeAbilityList()
+  local details
+  local index = {}
+  local abilityId
+  local detail
+  local name
+  local normalized
+
+  if abilities == nil then
+    return index
+  end
+
+  details = SafeAbilityDetail(abilities) or {}
+
+  for abilityId, detail in pairs(details) do
+    name = detail and detail.name
+    normalized = string.upper(tostring(name or ""))
+    if normalized ~= "" and index[normalized] == nil then
+      index[normalized] = abilityId
+    end
+  end
+
+  return index
+end
+
+local function ResolveTrackedAbilityId(entry)
+  local numeric = tonumber(entry)
+  local normalized
+  local now
+
+  if numeric ~= nil then
+    return numeric
+  end
+
+  normalized = string.upper(tostring(entry or ""))
+  if normalized == "" then
+    return nil
+  end
+
+  now = SafeRealtimeNow()
+  if cachedAbilityNameIndex == nil or now <= 0 or (now - cachedAbilityNameIndexStamp) > 5 then
+    cachedAbilityNameIndex = BuildAbilityNameIndex()
+    cachedAbilityNameIndexStamp = now
+  end
+
+  return cachedAbilityNameIndex ~= nil and cachedAbilityNameIndex[normalized] or nil
+end
+
+local function NormalizeText(value, fallback)
+  local text = tostring(value or fallback or "")
+  if text == "" and fallback ~= nil then
+    return tostring(fallback)
+  end
+
+  return text
+end
+
+local function ResolvePrimaryZoneName(player)
+  local zoneDetail = SafeZoneDetail(player and player.zone)
+
+  if zoneDetail ~= nil and zoneDetail.name ~= nil and tostring(zoneDetail.name) ~= "" then
+    return tostring(zoneDetail.name)
+  end
+
+  return NormalizeText(player and player.locationName, "")
+end
+
+local function BuildTextSnapshot(kindCode, value)
+  local text = NormalizeText(value, "")
+
+  return {
+    textKindCode = ClampByte(kindCode),
+    textHash16 = StableHash16(text),
+    textBytes = BuildTextLabelBytes(text)
+  }
+end
+
+local function BuildAuraEntry(detail, wantDebuff, playerUnitId)
+  local isDebuff = detail ~= nil and detail.debuff and true or false
+  local infinite = detail == nil or tonumber(detail.duration) == nil or tonumber(detail.duration) <= 0
+  local fromPlayer = detail ~= nil and playerUnitId ~= nil and detail.caster == playerUnitId
+  local dispellable = detail ~= nil and (detail.curse or detail.disease or detail.poison)
+  local flags = 0
+
+  if detail ~= nil then
+    flags = flags + 1
+  end
+  if wantDebuff and isDebuff then
+    flags = flags + 2
+  end
+  if fromPlayer then
+    flags = flags + 4
+  end
+  if dispellable then
+    flags = flags + 8
+  end
+  if infinite then
+    flags = flags + 16
+  end
+
+  return {
+    id16 = StableId16((detail and detail.type) or (detail and detail.ability) or (detail and detail.name) or 0),
+    remainingQ4 = infinite and 0 or QuantizeSecondsQ4(detail and detail.remaining),
+    stack = ClampByte(detail and detail.stack),
+    flags = ClampByte(flags),
+    sortRemaining = infinite and 999999 or (tonumber(detail and detail.remaining) or 0),
+    sortStack = ClampByte(detail and detail.stack)
+  }
+end
+
+local function CompareAuraEntries(left, right)
+  local leftFromPlayer = math.fmod(math.floor((left.flags or 0) / 4), 2)
+  local rightFromPlayer = math.fmod(math.floor((right.flags or 0) / 4), 2)
+
+  if leftFromPlayer ~= rightFromPlayer then
+    return leftFromPlayer > rightFromPlayer
+  end
+  if left.sortRemaining ~= right.sortRemaining then
+    return left.sortRemaining < right.sortRemaining
+  end
+  if left.sortStack ~= right.sortStack then
+    return left.sortStack > right.sortStack
+  end
+
+  return left.id16 < right.id16
+end
+
+local function BuildAuraPageSnapshotForUnit(unit, pageKindCode, wantDebuff)
+  local buffIds = SafeBuffList(unit)
+  local details = SafeBuffDetail(unit, buffIds)
+  local entries = {}
+  local playerUnitId = SafeUnitLookup("player")
+  local _, detail
+  local totalCount = 0
+  local first
+  local second
+
+  if type(details) == "table" then
+    for _, detail in pairs(details) do
+      local isDebuff = detail ~= nil and detail.debuff and true or false
+      if isDebuff == wantDebuff then
+        totalCount = totalCount + 1
+        table.insert(entries, BuildAuraEntry(detail, wantDebuff, playerUnitId))
+      end
+    end
+  end
+
+  table.sort(entries, CompareAuraEntries)
+  first = entries[1]
+  second = entries[2]
+
+  return {
+    pageKindCode = ClampByte(pageKindCode),
+    totalAuraCount = ClampByte(totalCount),
+    entry1Id = first and first.id16 or 0,
+    entry1RemainingQ4 = first and first.remainingQ4 or 0,
+    entry1Stack = first and first.stack or 0,
+    entry1Flags = first and first.flags or 0,
+    entry2Id = second and second.id16 or 0,
+    entry2RemainingQ4 = second and second.remainingQ4 or 0,
+    entry2Stack = second and second.stack or 0,
+    entry2Flags = second and second.flags or 0
+  }
 end
 
 local function BuildPackedFollowFlags(detail)
@@ -414,6 +691,33 @@ function ChromaLink.Gather.BuildTargetPositionSnapshot()
   }
 end
 
+function ChromaLink.Gather.BuildTargetVitalsSnapshot()
+  local targetUnitId = SafeUnitLookup("player.target")
+  local target = SafeUnitDetail(targetUnitId)
+
+  return {
+    healthCurrent = ClampUInt32(target and target.health),
+    healthMax = ClampUInt32(target and target.healthMax),
+    absorb = ClampUInt16(target and target.absorb),
+    targetFlags = ClampByte(BuildTargetStateFlags(target)),
+    targetLevel = ClampByte(target and target.level)
+  }
+end
+
+function ChromaLink.Gather.BuildTargetResourcesSnapshot()
+  local targetUnitId = SafeUnitLookup("player.target")
+  local target = SafeUnitDetail(targetUnitId)
+
+  return {
+    manaCurrent = ClampUInt16(target and target.mana),
+    manaMax = ClampUInt16(target and target.manaMax),
+    energyCurrent = ClampUInt16(target and target.energy),
+    energyMax = ClampUInt16(target and target.energyMax),
+    powerCurrent = ClampUInt16(target and target.power),
+    powerMax = ClampUInt16(target and target.powerMax)
+  }
+end
+
 function ChromaLink.Gather.BuildPlayerCastSnapshot()
   local castbar = SafeUnitCastbar("player")
   local abilityDetail = SafeAbilityDetail(castbar and castbar.ability)
@@ -458,6 +762,51 @@ function ChromaLink.Gather.BuildPlayerCastSnapshot()
   }
 end
 
+function ChromaLink.Gather.BuildAuxUnitCastSnapshot(unitSelectorCode, unitSpecifier)
+  local castbar = SafeUnitCastbar(unitSpecifier)
+  local abilityDetail = SafeAbilityDetail(castbar and castbar.ability)
+  local durationSeconds = math.max(0, tonumber(castbar and castbar.duration) or 0)
+  local remainingSeconds = math.max(0, tonumber(castbar and castbar.remaining) or 0)
+  local progress = 0
+  local spellLabelBytes = BuildAuxSpellLabelBytes(castbar and (castbar.abilityName or castbar.ability))
+  local flags = 0
+
+  if durationSeconds > 0 then
+    local completedSeconds = durationSeconds - remainingSeconds
+    if completedSeconds < 0 then
+      completedSeconds = 0
+    end
+
+    progress = ClampByte((completedSeconds / durationSeconds) * 255)
+  end
+
+  if castbar ~= nil and (durationSeconds > 0 or remainingSeconds > 0 or HasVisibleLabel(spellLabelBytes)) then
+    flags = flags + 1
+  end
+  if castbar ~= nil and castbar.channeled then
+    flags = flags + 2
+  end
+  if castbar ~= nil and castbar.uninterruptible then
+    flags = flags + 4
+  end
+  if HasVisibleLabel(spellLabelBytes) then
+    flags = flags + 8
+  end
+  if abilityDetail ~= nil and abilityDetail.target ~= nil and abilityDetail.target ~= "" then
+    flags = flags + 16
+  end
+
+  return {
+    unitSelectorCode = ClampByte(unitSelectorCode),
+    castFlags = ClampByte(flags),
+    progressPctQ8 = ClampByte(progress),
+    durationCenti = QuantizeSecondsCenti(durationSeconds),
+    remainingCenti = QuantizeSecondsCenti(remainingSeconds),
+    castTargetCode = EncodeCastTargetCode(abilityDetail and abilityDetail.target),
+    spellLabelBytes = spellLabelBytes
+  }
+end
+
 function ChromaLink.Gather.BuildPlayerResourcesSnapshot()
   local player = SafeUnitDetail("player")
 
@@ -487,6 +836,18 @@ function ChromaLink.Gather.BuildPlayerCombatSnapshot()
   if player ~= nil and tonumber(player.absorb) ~= nil and tonumber(player.absorb) > 0 then
     flags = flags + 8
   end
+  if player ~= nil and player.pvp then
+    flags = flags + 16
+  end
+  if player ~= nil and player.mentoring then
+    flags = flags + 32
+  end
+  if player ~= nil and player.ready then
+    flags = flags + 64
+  end
+  if player ~= nil and player.afk then
+    flags = flags + 128
+  end
 
   return {
     combatFlags = ClampByte(flags),
@@ -499,14 +860,18 @@ function ChromaLink.Gather.BuildPlayerCombatSnapshot()
   }
 end
 
-function ChromaLink.Gather.BuildFollowUnitStatusSnapshot()
+function ChromaLink.Gather.BuildFollowUnitStatusSnapshot(slotOverride)
   local followConfig = config.followUnit or {}
-  local slot = tonumber(followConfig.slot) or 1
+  local slot = tonumber(slotOverride) or tonumber(followConfig.slot) or 1
   local specifier = followConfig.specifier or string.format("group%02d", slot)
   local detail
   local callingCode
   local roleCode
   local _, _, _, resourcePct
+
+  if followConfig.slots ~= nil and tonumber(slotOverride) ~= nil then
+    specifier = string.format("group%02d", slot)
+  end
 
   if not followConfig.enabled then
     return {
@@ -537,6 +902,108 @@ function ChromaLink.Gather.BuildFollowUnitStatusSnapshot()
     resourcePctQ8 = ClampByte(resourcePct),
     level = ClampByte(detail and detail.level),
     callingRolePacked = ClampByte((callingCode * 16) + roleCode)
+  }
+end
+
+function ChromaLink.Gather.BuildAuraPageSnapshot(pageKindCode)
+  local auraKinds = config.auraPageKinds or {}
+  local targetUnitId = SafeUnitLookup("player.target")
+
+  if pageKindCode == auraKinds.playerDebuffs then
+    return BuildAuraPageSnapshotForUnit("player", pageKindCode, true)
+  end
+  if pageKindCode == auraKinds.targetBuffs then
+    return BuildAuraPageSnapshotForUnit(targetUnitId, pageKindCode, false)
+  end
+  if pageKindCode == auraKinds.targetDebuffs then
+    return BuildAuraPageSnapshotForUnit(targetUnitId, pageKindCode, true)
+  end
+
+  return BuildAuraPageSnapshotForUnit("player", auraKinds.playerBuffs or 1, false)
+end
+
+function ChromaLink.Gather.BuildTextPageSnapshot(textKindCode)
+  local textKinds = config.textKindCodes or {}
+  local player = SafeUnitDetail("player")
+  local target = SafeUnitDetail(SafeUnitLookup("player.target"))
+  local shard = SafeShardDetail()
+
+  if textKindCode == textKinds.targetName then
+    return BuildTextSnapshot(textKindCode, target and target.name)
+  end
+  if textKindCode == textKinds.zoneName then
+    return BuildTextSnapshot(textKindCode, ResolvePrimaryZoneName(player))
+  end
+  if textKindCode == textKinds.shardName then
+    return BuildTextSnapshot(textKindCode, shard and shard.name)
+  end
+
+  return BuildTextSnapshot(textKinds.playerName or 1, player and player.name)
+end
+
+function ChromaLink.Gather.BuildAbilityWatchSnapshot(pageIndex)
+  local watchConfig = config.abilityWatch or {}
+  local tracked = watchConfig.trackedAbilities or {}
+  local totalTracked = #tracked
+  local totalPages = math.max(1, math.ceil(totalTracked / 2))
+  local page = math.max(1, math.min(totalPages, tonumber(pageIndex) or 1))
+  local startIndex = ((page - 1) * 2) + 1
+  local shortestCooldownQ4 = 0
+  local readyCount = 0
+  local coolingCount = 0
+
+  local function BuildAbilityEntry(trackedEntry)
+    local abilityId = ResolveTrackedAbilityId(trackedEntry)
+    local detail = SafeAbilityDetail(abilityId)
+    local cooldownRemaining = tonumber(detail and detail.currentCooldownRemaining) or 0
+    local flags = 0
+
+    if trackedEntry ~= nil then
+      flags = flags + 1
+    end
+    if detail ~= nil and not detail.unusable then
+      flags = flags + 2
+      readyCount = readyCount + 1
+    end
+    if detail ~= nil and detail.outOfRange then
+      flags = flags + 4
+    end
+    if detail ~= nil and cooldownRemaining > 0 then
+      flags = flags + 8
+      coolingCount = coolingCount + 1
+      local cooldownQ4 = QuantizeSecondsQ4(cooldownRemaining)
+      if shortestCooldownQ4 == 0 or cooldownQ4 < shortestCooldownQ4 then
+        shortestCooldownQ4 = cooldownQ4
+      end
+    end
+    if detail ~= nil and detail.currentCooldownPaused then
+      flags = flags + 16
+    end
+    if detail ~= nil and detail.passive then
+      flags = flags + 32
+    end
+
+    return {
+      id16 = StableId16((detail and detail.idNew) or (detail and detail.id) or trackedEntry or 0),
+      cooldownQ4 = QuantizeSecondsQ4(cooldownRemaining),
+      flags = ClampByte(flags)
+    }
+  end
+
+  local first = BuildAbilityEntry(tracked[startIndex])
+  local second = BuildAbilityEntry(tracked[startIndex + 1])
+
+  return {
+    pageIndex = ClampByte(page),
+    entry1Id = first.id16,
+    entry1CooldownQ4 = first.cooldownQ4,
+    entry1Flags = first.flags,
+    entry2Id = second.id16,
+    entry2CooldownQ4 = second.cooldownQ4,
+    entry2Flags = second.flags,
+    shortestCooldownQ4 = ClampByte(shortestCooldownQ4),
+    readyCount = ClampByte(readyCount),
+    coolingCount = ClampByte(coolingCount)
   }
 end
 
@@ -599,7 +1066,7 @@ end
 
 function ChromaLink.Gather.BuildSyntheticPlayerCombatSnapshot()
   return {
-    combatFlags = 15,
+    combatFlags = 0xFF,
     combo = 4,
     chargeCurrent = 80,
     chargeMax = 100,
@@ -617,9 +1084,90 @@ function ChromaLink.Gather.BuildSyntheticTargetPositionSnapshot()
   }
 end
 
-function ChromaLink.Gather.BuildSyntheticFollowUnitStatusSnapshot()
+function ChromaLink.Gather.BuildSyntheticTargetVitalsSnapshot()
   return {
-    slot = 1,
+    healthCurrent = 18250,
+    healthMax = 20000,
+    absorb = 640,
+    targetFlags = 15,
+    targetLevel = 72
+  }
+end
+
+function ChromaLink.Gather.BuildSyntheticTargetResourcesSnapshot()
+  return {
+    manaCurrent = 1200,
+    manaMax = 2000,
+    energyCurrent = 0,
+    energyMax = 0,
+    powerCurrent = 35,
+    powerMax = 100
+  }
+end
+
+function ChromaLink.Gather.BuildSyntheticAuxUnitCastSnapshot(unitSelectorCode)
+  return {
+    unitSelectorCode = ClampByte(unitSelectorCode or config.unitSelectorCodes.target),
+    castFlags = 25,
+    progressPctQ8 = 112,
+    durationCenti = 320,
+    remainingCenti = 140,
+    castTargetCode = config.castTargetCodes.currentTarget,
+    spellLabelBytes = BuildAuxSpellLabelBytes("BOLT")
+  }
+end
+
+function ChromaLink.Gather.BuildSyntheticAuraPageSnapshot(pageKindCode)
+  return {
+    pageKindCode = ClampByte(pageKindCode or (config.auraPageKinds.playerBuffs)),
+    totalAuraCount = 4,
+    entry1Id = StableId16("SYNTH-AURA-1"),
+    entry1RemainingQ4 = 24,
+    entry1Stack = 3,
+    entry1Flags = 1 + 4,
+    entry2Id = StableId16("SYNTH-AURA-2"),
+    entry2RemainingQ4 = 12,
+    entry2Stack = 1,
+    entry2Flags = 1
+  }
+end
+
+function ChromaLink.Gather.BuildSyntheticTextPageSnapshot(textKindCode)
+  local textKinds = config.textKindCodes or {}
+
+  if textKindCode == textKinds.targetName then
+    return BuildTextSnapshot(textKindCode, "TARGETORC")
+  end
+  if textKindCode == textKinds.zoneName then
+    return BuildTextSnapshot(textKindCode, "SILVERWD")
+  end
+  if textKindCode == textKinds.shardName then
+    return BuildTextSnapshot(textKindCode, "GREYBRIA")
+  end
+
+  return BuildTextSnapshot(textKinds.playerName or 1, "RIFTLEAD")
+end
+
+function ChromaLink.Gather.BuildSyntheticAbilityWatchSnapshot(pageIndex)
+  return {
+    pageIndex = ClampByte(pageIndex or 1),
+    entry1Id = StableId16("HEAL"),
+    entry1CooldownQ4 = 6,
+    entry1Flags = 1 + 2 + 8,
+    entry2Id = StableId16("SHLD"),
+    entry2CooldownQ4 = 0,
+    entry2Flags = 1 + 2,
+    shortestCooldownQ4 = 6,
+    readyCount = 1,
+    coolingCount = 1
+  }
+end
+
+function ChromaLink.Gather.BuildSyntheticFollowUnitStatusSnapshot(slotOverride)
+  local slot = ClampByte(slotOverride or 1)
+
+  return {
+    slot = slot,
     followFlags = 143,
     xQ2 = 7123.5,
     yQ2 = 865.0,

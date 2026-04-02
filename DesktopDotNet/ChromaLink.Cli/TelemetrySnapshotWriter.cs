@@ -55,7 +55,9 @@ internal static class TelemetrySnapshotWriter
                     playerCast = 4,
                     expandedStats = 8,
                     targetPosition = 16,
-                    followUnitStatus = 32
+                    followUnitStatus = 32,
+                    additionalTelemetry = 64,
+                    textAndAuras = 128
                 }
             },
             aggregate = new
@@ -184,6 +186,10 @@ internal static class TelemetrySnapshotWriter
                     hasCharge = IsFlagSet(aggregate.PlayerCombat.Frame.Payload.CombatFlags, 0x02),
                     hasPlanar = IsFlagSet(aggregate.PlayerCombat.Frame.Payload.CombatFlags, 0x04),
                     hasAbsorb = IsFlagSet(aggregate.PlayerCombat.Frame.Payload.CombatFlags, 0x08),
+                    pvp = IsFlagSet(aggregate.PlayerCombat.Frame.Payload.CombatFlags, 0x10),
+                    mentoring = IsFlagSet(aggregate.PlayerCombat.Frame.Payload.CombatFlags, 0x20),
+                    ready = IsFlagSet(aggregate.PlayerCombat.Frame.Payload.CombatFlags, 0x40),
+                    afk = IsFlagSet(aggregate.PlayerCombat.Frame.Payload.CombatFlags, 0x80),
                     combo = aggregate.PlayerCombat.Frame.Payload.Combo,
                     chargeCurrent = aggregate.PlayerCombat.Frame.Payload.ChargeCurrent,
                     chargeMax = aggregate.PlayerCombat.Frame.Payload.ChargeMax,
@@ -204,6 +210,107 @@ internal static class TelemetrySnapshotWriter
                     x = aggregate.TargetPosition.Frame.Payload.X,
                     y = aggregate.TargetPosition.Frame.Payload.Y,
                     z = aggregate.TargetPosition.Frame.Payload.Z
+                },
+                targetVitals = aggregate.TargetVitals is null ? null : new
+                {
+                    observedAtUtc = aggregate.TargetVitals.ObservedAtUtc,
+                    ageMs = AgeMs(nowUtc, aggregate.TargetVitals.ObservedAtUtc),
+                    fresh = IsFresh(AgeMs(nowUtc, aggregate.TargetVitals.ObservedAtUtc)),
+                    stale = !IsFresh(AgeMs(nowUtc, aggregate.TargetVitals.ObservedAtUtc)),
+                    frameType = aggregate.TargetVitals.Frame.Header.FrameType.ToString(),
+                    schemaId = aggregate.TargetVitals.Frame.Header.SchemaId,
+                    sequence = aggregate.TargetVitals.Frame.Header.Sequence,
+                    reservedFlags = aggregate.TargetVitals.Frame.Header.ReservedFlags,
+                    healthCurrent = aggregate.TargetVitals.Frame.Payload.HealthCurrent,
+                    healthMax = aggregate.TargetVitals.Frame.Payload.HealthMax,
+                    absorb = aggregate.TargetVitals.Frame.Payload.Absorb,
+                    targetFlags = aggregate.TargetVitals.Frame.Payload.TargetFlags,
+                    present = IsFlagSet(aggregate.TargetVitals.Frame.Payload.TargetFlags, 0x01),
+                    alive = IsFlagSet(aggregate.TargetVitals.Frame.Payload.TargetFlags, 0x02),
+                    combat = IsFlagSet(aggregate.TargetVitals.Frame.Payload.TargetFlags, 0x04),
+                    tagged = IsFlagSet(aggregate.TargetVitals.Frame.Payload.TargetFlags, 0x08),
+                    targetLevel = aggregate.TargetVitals.Frame.Payload.TargetLevel
+                },
+                targetResources = aggregate.TargetResources is null ? null : new
+                {
+                    observedAtUtc = aggregate.TargetResources.ObservedAtUtc,
+                    ageMs = AgeMs(nowUtc, aggregate.TargetResources.ObservedAtUtc),
+                    fresh = IsFresh(AgeMs(nowUtc, aggregate.TargetResources.ObservedAtUtc)),
+                    stale = !IsFresh(AgeMs(nowUtc, aggregate.TargetResources.ObservedAtUtc)),
+                    frameType = aggregate.TargetResources.Frame.Header.FrameType.ToString(),
+                    schemaId = aggregate.TargetResources.Frame.Header.SchemaId,
+                    sequence = aggregate.TargetResources.Frame.Header.Sequence,
+                    reservedFlags = aggregate.TargetResources.Frame.Header.ReservedFlags,
+                    manaCurrent = aggregate.TargetResources.Frame.Payload.ManaCurrent,
+                    manaMax = aggregate.TargetResources.Frame.Payload.ManaMax,
+                    energyCurrent = aggregate.TargetResources.Frame.Payload.EnergyCurrent,
+                    energyMax = aggregate.TargetResources.Frame.Payload.EnergyMax,
+                    powerCurrent = aggregate.TargetResources.Frame.Payload.PowerCurrent,
+                    powerMax = aggregate.TargetResources.Frame.Payload.PowerMax
+                },
+                auxUnitCast = aggregate.AuxUnitCast is null ? null : new
+                {
+                    observedAtUtc = aggregate.AuxUnitCast.ObservedAtUtc,
+                    ageMs = AgeMs(nowUtc, aggregate.AuxUnitCast.ObservedAtUtc),
+                    fresh = IsFresh(AgeMs(nowUtc, aggregate.AuxUnitCast.ObservedAtUtc)),
+                    stale = !IsFresh(AgeMs(nowUtc, aggregate.AuxUnitCast.ObservedAtUtc)),
+                    frameType = aggregate.AuxUnitCast.Frame.Header.FrameType.ToString(),
+                    schemaId = aggregate.AuxUnitCast.Frame.Header.SchemaId,
+                    sequence = aggregate.AuxUnitCast.Frame.Header.Sequence,
+                    reservedFlags = aggregate.AuxUnitCast.Frame.Header.ReservedFlags,
+                    unitSelectorCode = aggregate.AuxUnitCast.Frame.Payload.UnitSelectorCode,
+                    castFlags = aggregate.AuxUnitCast.Frame.Payload.CastFlags,
+                    progressPctQ8 = aggregate.AuxUnitCast.Frame.Payload.ProgressPctQ8,
+                    durationCenti = aggregate.AuxUnitCast.Frame.Payload.DurationCenti,
+                    remainingCenti = aggregate.AuxUnitCast.Frame.Payload.RemainingCenti,
+                    castTargetCode = aggregate.AuxUnitCast.Frame.Payload.CastTargetCode,
+                    label = aggregate.AuxUnitCast.Frame.Payload.Label
+                },
+                auraPage = aggregate.AuraPage is null ? null : new
+                {
+                    observedAtUtc = aggregate.AuraPage.ObservedAtUtc,
+                    ageMs = AgeMs(nowUtc, aggregate.AuraPage.ObservedAtUtc),
+                    fresh = IsFresh(AgeMs(nowUtc, aggregate.AuraPage.ObservedAtUtc)),
+                    stale = !IsFresh(AgeMs(nowUtc, aggregate.AuraPage.ObservedAtUtc)),
+                    frameType = aggregate.AuraPage.Frame.Header.FrameType.ToString(),
+                    schemaId = aggregate.AuraPage.Frame.Header.SchemaId,
+                    sequence = aggregate.AuraPage.Frame.Header.Sequence,
+                    reservedFlags = aggregate.AuraPage.Frame.Header.ReservedFlags,
+                    pageKindCode = aggregate.AuraPage.Frame.Payload.PageKindCode,
+                    totalAuraCount = aggregate.AuraPage.Frame.Payload.TotalAuraCount,
+                    entry1 = BuildAuraEntrySnapshot(aggregate.AuraPage.Frame.Payload.Entry1),
+                    entry2 = BuildAuraEntrySnapshot(aggregate.AuraPage.Frame.Payload.Entry2)
+                },
+                textPage = aggregate.TextPage is null ? null : new
+                {
+                    observedAtUtc = aggregate.TextPage.ObservedAtUtc,
+                    ageMs = AgeMs(nowUtc, aggregate.TextPage.ObservedAtUtc),
+                    fresh = IsFresh(AgeMs(nowUtc, aggregate.TextPage.ObservedAtUtc)),
+                    stale = !IsFresh(AgeMs(nowUtc, aggregate.TextPage.ObservedAtUtc)),
+                    frameType = aggregate.TextPage.Frame.Header.FrameType.ToString(),
+                    schemaId = aggregate.TextPage.Frame.Header.SchemaId,
+                    sequence = aggregate.TextPage.Frame.Header.Sequence,
+                    reservedFlags = aggregate.TextPage.Frame.Header.ReservedFlags,
+                    textKindCode = aggregate.TextPage.Frame.Payload.TextKindCode,
+                    textHash16 = aggregate.TextPage.Frame.Payload.TextHash16,
+                    label = aggregate.TextPage.Frame.Payload.Label
+                },
+                abilityWatch = aggregate.AbilityWatch is null ? null : new
+                {
+                    observedAtUtc = aggregate.AbilityWatch.ObservedAtUtc,
+                    ageMs = AgeMs(nowUtc, aggregate.AbilityWatch.ObservedAtUtc),
+                    fresh = IsFresh(AgeMs(nowUtc, aggregate.AbilityWatch.ObservedAtUtc)),
+                    stale = !IsFresh(AgeMs(nowUtc, aggregate.AbilityWatch.ObservedAtUtc)),
+                    frameType = aggregate.AbilityWatch.Frame.Header.FrameType.ToString(),
+                    schemaId = aggregate.AbilityWatch.Frame.Header.SchemaId,
+                    sequence = aggregate.AbilityWatch.Frame.Header.Sequence,
+                    reservedFlags = aggregate.AbilityWatch.Frame.Header.ReservedFlags,
+                    pageIndex = aggregate.AbilityWatch.Frame.Payload.PageIndex,
+                    entry1 = BuildAbilityEntrySnapshot(aggregate.AbilityWatch.Frame.Payload.Entry1),
+                    entry2 = BuildAbilityEntrySnapshot(aggregate.AbilityWatch.Frame.Payload.Entry2),
+                    shortestCooldownQ4 = aggregate.AbilityWatch.Frame.Payload.ShortestCooldownQ4,
+                    readyCount = aggregate.AbilityWatch.Frame.Payload.ReadyCount,
+                    coolingCount = aggregate.AbilityWatch.Frame.Payload.CoolingCount
                 },
                 followUnitStatus = aggregate.FollowUnitStatus is null ? null : new
                 {
@@ -233,7 +340,39 @@ internal static class TelemetrySnapshotWriter
                     level = aggregate.FollowUnitStatus.Frame.Payload.Level,
                     calling = aggregate.FollowUnitStatus.Frame.Payload.CallingRolePacked >> 4,
                     role = aggregate.FollowUnitStatus.Frame.Payload.CallingRolePacked & 0x0F
-                }
+                },
+                followUnitStatuses = aggregate.FollowUnitStatusesBySlot
+                    .OrderBy(static entry => entry.Key)
+                    .Select(entry => new
+                    {
+                        slot = entry.Key,
+                        observedAtUtc = entry.Value.ObservedAtUtc,
+                        ageMs = AgeMs(nowUtc, entry.Value.ObservedAtUtc),
+                        fresh = IsFresh(AgeMs(nowUtc, entry.Value.ObservedAtUtc)),
+                        stale = !IsFresh(AgeMs(nowUtc, entry.Value.ObservedAtUtc)),
+                        frameType = entry.Value.Frame.Header.FrameType.ToString(),
+                        schemaId = entry.Value.Frame.Header.SchemaId,
+                        sequence = entry.Value.Frame.Header.Sequence,
+                        reservedFlags = entry.Value.Frame.Header.ReservedFlags,
+                        followFlags = entry.Value.Frame.Payload.FollowFlags,
+                        present = IsFlagSet(entry.Value.Frame.Payload.FollowFlags, 0x01),
+                        alive = IsFlagSet(entry.Value.Frame.Payload.FollowFlags, 0x02),
+                        combat = IsFlagSet(entry.Value.Frame.Payload.FollowFlags, 0x04),
+                        afk = IsFlagSet(entry.Value.Frame.Payload.FollowFlags, 0x08),
+                        offline = IsFlagSet(entry.Value.Frame.Payload.FollowFlags, 0x10),
+                        aggro = IsFlagSet(entry.Value.Frame.Payload.FollowFlags, 0x20),
+                        blocked = IsFlagSet(entry.Value.Frame.Payload.FollowFlags, 0x40),
+                        readyFlag = IsFlagSet(entry.Value.Frame.Payload.FollowFlags, 0x80),
+                        x = entry.Value.Frame.Payload.X,
+                        y = entry.Value.Frame.Payload.Y,
+                        z = entry.Value.Frame.Payload.Z,
+                        healthPctQ8 = entry.Value.Frame.Payload.HealthPctQ8,
+                        resourcePctQ8 = entry.Value.Frame.Payload.ResourcePctQ8,
+                        level = entry.Value.Frame.Payload.Level,
+                        calling = entry.Value.Frame.Payload.CallingRolePacked >> 4,
+                        role = entry.Value.Frame.Payload.CallingRolePacked & 0x0F
+                    })
+                    .ToArray()
             },
             metrics = new
             {
@@ -321,6 +460,27 @@ internal static class TelemetrySnapshotWriter
     private static bool IsFlagSet(byte flags, byte mask)
     {
         return (flags & mask) != 0;
+    }
+
+    private static object BuildAuraEntrySnapshot(AuraPageEntrySnapshot entry)
+    {
+        return new
+        {
+            id = entry.Id,
+            remainingQ4 = entry.RemainingQ4,
+            stack = entry.Stack,
+            flags = entry.Flags
+        };
+    }
+
+    private static object BuildAbilityEntrySnapshot(AbilityWatchEntrySnapshot entry)
+    {
+        return new
+        {
+            id = entry.Id,
+            cooldownQ4 = entry.CooldownQ4,
+            flags = entry.Flags
+        };
     }
 
     private static double CentiToSeconds(ushort value)

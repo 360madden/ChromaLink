@@ -100,9 +100,118 @@ public class ProtocolAndReplayTests
         var frame = Assert.IsType<PlayerCombatFrame>(validation.Frame);
         Assert.Equal(FrameType.PlayerCombat, frame.Header.FrameType);
         Assert.Equal(TransportConstants.HeaderCapabilities, (HeaderCapabilityFlags)frame.Header.ReservedFlags);
-        Assert.Equal((byte)15, frame.Payload.CombatFlags);
+        Assert.Equal((byte)255, frame.Payload.CombatFlags);
         Assert.Equal((byte)4, frame.Payload.Combo);
         Assert.Equal((ushort)250, frame.Payload.Absorb);
+    }
+
+    [Fact]
+    public void TargetVitalsFrame_RoundTripsThroughRendererAndAnalyzer()
+    {
+        var bytes = FrameProtocol.BuildTargetVitalsFrameBytes(_profile.NumericId, 25, TargetVitalsSnapshot.CreateSynthetic());
+        var image = ColorStripRenderer.Render(_profile, bytes);
+        var validation = ColorStripAnalyzer.Analyze(image, _profile);
+
+        Assert.True(validation.IsAccepted, validation.Reason);
+        var frame = Assert.IsType<TargetVitalsFrame>(validation.Frame);
+        Assert.Equal(FrameType.TargetVitals, frame.Header.FrameType);
+        Assert.Equal(TransportConstants.HeaderCapabilities, (HeaderCapabilityFlags)frame.Header.ReservedFlags);
+        Assert.Equal((uint)31200, frame.Payload.HealthCurrent);
+        Assert.Equal((uint)35000, frame.Payload.HealthMax);
+        Assert.Equal((ushort)120, frame.Payload.Absorb);
+        Assert.Equal((byte)0b0000_1111, frame.Payload.TargetFlags);
+        Assert.Equal((byte)72, frame.Payload.TargetLevel);
+    }
+
+    [Fact]
+    public void TargetResourcesFrame_RoundTripsThroughRendererAndAnalyzer()
+    {
+        var bytes = FrameProtocol.BuildTargetResourcesFrameBytes(_profile.NumericId, 27, TargetResourcesSnapshot.CreateSynthetic());
+        var image = ColorStripRenderer.Render(_profile, bytes);
+        var validation = ColorStripAnalyzer.Analyze(image, _profile);
+
+        Assert.True(validation.IsAccepted, validation.Reason);
+        var frame = Assert.IsType<TargetResourcesFrame>(validation.Frame);
+        Assert.Equal(FrameType.TargetResources, frame.Header.FrameType);
+        Assert.Equal(TransportConstants.HeaderCapabilities, (HeaderCapabilityFlags)frame.Header.ReservedFlags);
+        Assert.Equal((ushort)2200, frame.Payload.ManaCurrent);
+        Assert.Equal((ushort)3000, frame.Payload.ManaMax);
+        Assert.Equal((ushort)80, frame.Payload.EnergyCurrent);
+        Assert.Equal((ushort)100, frame.Payload.EnergyMax);
+        Assert.Equal((ushort)18, frame.Payload.PowerCurrent);
+        Assert.Equal((ushort)100, frame.Payload.PowerMax);
+    }
+
+    [Fact]
+    public void AuxUnitCastFrame_RoundTripsThroughRendererAndAnalyzer()
+    {
+        var bytes = FrameProtocol.BuildAuxUnitCastFrameBytes(_profile.NumericId, 29, AuxUnitCastSnapshot.CreateSynthetic());
+        var image = ColorStripRenderer.Render(_profile, bytes);
+        var validation = ColorStripAnalyzer.Analyze(image, _profile);
+
+        Assert.True(validation.IsAccepted, validation.Reason);
+        var frame = Assert.IsType<AuxUnitCastFrame>(validation.Frame);
+        Assert.Equal(FrameType.AuxUnitCast, frame.Header.FrameType);
+        Assert.Equal(TransportConstants.HeaderCapabilities, (HeaderCapabilityFlags)frame.Header.ReservedFlags);
+        Assert.Equal((byte)2, frame.Payload.UnitSelectorCode);
+        Assert.Equal((byte)0b0001_0011, frame.Payload.CastFlags);
+        Assert.Equal((byte)88, frame.Payload.ProgressPctQ8);
+        Assert.Equal((ushort)180, frame.Payload.DurationCenti);
+        Assert.Equal((ushort)60, frame.Payload.RemainingCenti);
+        Assert.Equal((byte)1, frame.Payload.CastTargetCode);
+        Assert.Equal("SHLD", frame.Payload.Label);
+    }
+
+    [Fact]
+    public void AuraPageFrame_RoundTripsThroughRendererAndAnalyzer()
+    {
+        var bytes = FrameProtocol.BuildAuraPageFrameBytes(_profile.NumericId, 31, AuraPageSnapshot.CreateSynthetic());
+        var image = ColorStripRenderer.Render(_profile, bytes);
+        var validation = ColorStripAnalyzer.Analyze(image, _profile);
+
+        Assert.True(validation.IsAccepted, validation.Reason);
+        var frame = Assert.IsType<AuraPageFrame>(validation.Frame);
+        Assert.Equal(FrameType.AuraPage, frame.Header.FrameType);
+        Assert.Equal(TransportConstants.HeaderCapabilities, (HeaderCapabilityFlags)frame.Header.ReservedFlags);
+        Assert.Equal((byte)1, frame.Payload.PageKindCode);
+        Assert.Equal((byte)8, frame.Payload.TotalAuraCount);
+        Assert.Equal((ushort)1001, frame.Payload.Entry1.Id);
+        Assert.Equal((ushort)1002, frame.Payload.Entry2.Id);
+    }
+
+    [Fact]
+    public void TextPageFrame_RoundTripsThroughRendererAndAnalyzer()
+    {
+        var bytes = FrameProtocol.BuildTextPageFrameBytes(_profile.NumericId, 33, TextPageSnapshot.CreateSynthetic());
+        var image = ColorStripRenderer.Render(_profile, bytes);
+        var validation = ColorStripAnalyzer.Analyze(image, _profile);
+
+        Assert.True(validation.IsAccepted, validation.Reason);
+        var frame = Assert.IsType<TextPageFrame>(validation.Frame);
+        Assert.Equal(FrameType.TextPage, frame.Header.FrameType);
+        Assert.Equal(TransportConstants.HeaderCapabilities, (HeaderCapabilityFlags)frame.Header.ReservedFlags);
+        Assert.Equal((byte)3, frame.Payload.TextKindCode);
+        Assert.Equal((ushort)0xBEEF, frame.Payload.TextHash16);
+        Assert.Equal("AURA TEXT", frame.Payload.Label);
+    }
+
+    [Fact]
+    public void AbilityWatchFrame_RoundTripsThroughRendererAndAnalyzer()
+    {
+        var bytes = FrameProtocol.BuildAbilityWatchFrameBytes(_profile.NumericId, 35, AbilityWatchSnapshot.CreateSynthetic());
+        var image = ColorStripRenderer.Render(_profile, bytes);
+        var validation = ColorStripAnalyzer.Analyze(image, _profile);
+
+        Assert.True(validation.IsAccepted, validation.Reason);
+        var frame = Assert.IsType<AbilityWatchFrame>(validation.Frame);
+        Assert.Equal(FrameType.AbilityWatch, frame.Header.FrameType);
+        Assert.Equal(TransportConstants.HeaderCapabilities, (HeaderCapabilityFlags)frame.Header.ReservedFlags);
+        Assert.Equal((byte)4, frame.Payload.PageIndex);
+        Assert.Equal((ushort)2001, frame.Payload.Entry1.Id);
+        Assert.Equal((ushort)2002, frame.Payload.Entry2.Id);
+        Assert.Equal((byte)8, frame.Payload.ShortestCooldownQ4);
+        Assert.Equal((byte)3, frame.Payload.ReadyCount);
+        Assert.Equal((byte)2, frame.Payload.CoolingCount);
     }
 
     [Fact]
@@ -405,5 +514,31 @@ public class ProtocolAndReplayTests
         Assert.Equal((byte)14, snapshot.PlayerPosition!.Frame.Header.Sequence);
         Assert.Equal(9.87f, snapshot.PlayerPosition.Frame.Payload.X, 2);
         Assert.Equal(baseTime.AddMilliseconds(150), snapshot.PlayerPosition.ObservedAtUtc);
+    }
+
+    [Fact]
+    public void TelemetryAggregate_KeepsMultipleFollowSlots()
+    {
+        var aggregate = new TelemetryAggregate();
+        var baseTime = new DateTimeOffset(2026, 4, 2, 12, 0, 0, TimeSpan.Zero);
+
+        var slotOne = Assert.IsType<FollowUnitStatusFrame>(
+            FrameProtocol.AnalyzeFrameBytes(
+                FrameProtocol.BuildFollowUnitStatusFrameBytes(_profile.NumericId, 41, new FollowUnitStatusSnapshot(1, 0x81, 1.0f, 2.0f, 3.0f, 100, 50, 60, 0x31))).Frame);
+        var slotTwo = Assert.IsType<FollowUnitStatusFrame>(
+            FrameProtocol.AnalyzeFrameBytes(
+                FrameProtocol.BuildFollowUnitStatusFrameBytes(_profile.NumericId, 42, new FollowUnitStatusSnapshot(2, 0x83, 4.0f, 5.0f, 6.0f, 90, 40, 61, 0x32))).Frame);
+
+        aggregate.Update(slotOne, baseTime);
+        aggregate.Update(slotTwo, baseTime.AddMilliseconds(50));
+
+        var snapshot = aggregate.Snapshot();
+        Assert.NotNull(snapshot.FollowUnitStatus);
+        Assert.Equal((byte)2, snapshot.FollowUnitStatus!.Frame.Payload.Slot);
+        Assert.Equal(2, snapshot.FollowUnitStatusesBySlot.Count);
+        Assert.True(snapshot.FollowUnitStatusesBySlot.ContainsKey(1));
+        Assert.True(snapshot.FollowUnitStatusesBySlot.ContainsKey(2));
+        Assert.Equal((byte)1, snapshot.FollowUnitStatusesBySlot[1].Frame.Payload.Slot);
+        Assert.Equal((byte)2, snapshot.FollowUnitStatusesBySlot[2].Frame.Payload.Slot);
     }
 }

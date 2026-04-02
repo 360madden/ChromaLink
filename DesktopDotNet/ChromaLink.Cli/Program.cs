@@ -381,6 +381,10 @@ internal sealed class CliApp
                 Console.WriteLine($"HasCharge: {((combat.Payload.CombatFlags & 0x02) != 0).ToString().ToLowerInvariant()}");
                 Console.WriteLine($"HasPlanar: {((combat.Payload.CombatFlags & 0x04) != 0).ToString().ToLowerInvariant()}");
                 Console.WriteLine($"HasAbsorb: {((combat.Payload.CombatFlags & 0x08) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"PvP: {((combat.Payload.CombatFlags & 0x10) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"Mentoring: {((combat.Payload.CombatFlags & 0x20) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"Ready: {((combat.Payload.CombatFlags & 0x40) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"Afk: {((combat.Payload.CombatFlags & 0x80) != 0).ToString().ToLowerInvariant()}");
                 Console.WriteLine($"Combo: {combat.Payload.Combo}");
                 Console.WriteLine($"Charge: {combat.Payload.ChargeCurrent}/{combat.Payload.ChargeMax}");
                 Console.WriteLine($"Planar: {combat.Payload.PlanarCurrent}/{combat.Payload.PlanarMax}");
@@ -410,6 +414,55 @@ internal sealed class CliApp
                 Console.WriteLine($"FollowLevel: {follow.Payload.Level}");
                 Console.WriteLine($"FollowCalling: {follow.Payload.CallingRolePacked >> 4}");
                 Console.WriteLine($"FollowRole: {follow.Payload.CallingRolePacked & 0x0F}");
+                break;
+
+            case TargetVitalsFrame targetVitals:
+                Console.WriteLine($"TargetHealthCurrent: {targetVitals.Payload.HealthCurrent}");
+                Console.WriteLine($"TargetHealthMax: {targetVitals.Payload.HealthMax}");
+                Console.WriteLine($"TargetAbsorb: {targetVitals.Payload.Absorb}");
+                Console.WriteLine($"TargetPresent: {((targetVitals.Payload.TargetFlags & 0x01) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"TargetAlive: {((targetVitals.Payload.TargetFlags & 0x02) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"TargetCombat: {((targetVitals.Payload.TargetFlags & 0x04) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"TargetTagged: {((targetVitals.Payload.TargetFlags & 0x08) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"TargetLevel: {targetVitals.Payload.TargetLevel}");
+                break;
+
+            case TargetResourcesFrame targetResources:
+                Console.WriteLine($"TargetMana: {targetResources.Payload.ManaCurrent}/{targetResources.Payload.ManaMax}");
+                Console.WriteLine($"TargetEnergy: {targetResources.Payload.EnergyCurrent}/{targetResources.Payload.EnergyMax}");
+                Console.WriteLine($"TargetPower: {targetResources.Payload.PowerCurrent}/{targetResources.Payload.PowerMax}");
+                break;
+
+            case AuxUnitCastFrame auxUnitCast:
+                Console.WriteLine($"UnitSelectorCode: {auxUnitCast.Payload.UnitSelectorCode}");
+                Console.WriteLine($"CastFlags: {auxUnitCast.Payload.CastFlags}");
+                Console.WriteLine($"ProgressPctQ8: {auxUnitCast.Payload.ProgressPctQ8}");
+                Console.WriteLine($"DurationSeconds: {auxUnitCast.Payload.DurationCenti / 100.0:F2}");
+                Console.WriteLine($"RemainingSeconds: {auxUnitCast.Payload.RemainingCenti / 100.0:F2}");
+                Console.WriteLine($"CastTargetCode: {auxUnitCast.Payload.CastTargetCode}");
+                Console.WriteLine($"Label: {FormatSpellLabel(auxUnitCast.Payload.Label)}");
+                break;
+
+            case AuraPageFrame auraPage:
+                Console.WriteLine($"PageKindCode: {auraPage.Payload.PageKindCode}");
+                Console.WriteLine($"TotalAuraCount: {auraPage.Payload.TotalAuraCount}");
+                WriteAuraEntrySummary("Entry1", auraPage.Payload.Entry1);
+                WriteAuraEntrySummary("Entry2", auraPage.Payload.Entry2);
+                break;
+
+            case TextPageFrame textPage:
+                Console.WriteLine($"TextKindCode: {textPage.Payload.TextKindCode}");
+                Console.WriteLine($"TextHash16: 0x{textPage.Payload.TextHash16:X4}");
+                Console.WriteLine($"Label: {FormatSpellLabel(textPage.Payload.Label)}");
+                break;
+
+            case AbilityWatchFrame abilityWatch:
+                Console.WriteLine($"PageIndex: {abilityWatch.Payload.PageIndex}");
+                WriteAbilityEntrySummary("Entry1", abilityWatch.Payload.Entry1);
+                WriteAbilityEntrySummary("Entry2", abilityWatch.Payload.Entry2);
+                Console.WriteLine($"ShortestCooldownQ4: {abilityWatch.Payload.ShortestCooldownQ4}");
+                Console.WriteLine($"ReadyCount: {abilityWatch.Payload.ReadyCount}");
+                Console.WriteLine($"CoolingCount: {abilityWatch.Payload.CoolingCount}");
                 break;
         }
     }
@@ -473,6 +526,48 @@ internal sealed class CliApp
             nowUtc,
             observation =>
                 $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} slot={observation.Frame.Payload.Slot} flags=0x{observation.Frame.Payload.FollowFlags:X2} pos={observation.Frame.Payload.X:F1},{observation.Frame.Payload.Y:F1},{observation.Frame.Payload.Z:F1} hpPctQ8={observation.Frame.Payload.HealthPctQ8}");
+        foreach (var entry in snapshot.FollowUnitStatusesBySlot.OrderBy(static entry => entry.Key))
+        {
+            var observation = entry.Value;
+            Console.WriteLine(
+                $"AggregateFollowUnitStatus[{entry.Key}]: seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} flags=0x{observation.Frame.Payload.FollowFlags:X2} pos={observation.Frame.Payload.X:F1},{observation.Frame.Payload.Y:F1},{observation.Frame.Payload.Z:F1}");
+        }
+        WriteAggregateObservation(
+            "AggregateTargetVitals",
+            snapshot.TargetVitals,
+            nowUtc,
+            observation =>
+                $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} hp={observation.Frame.Payload.HealthCurrent}/{observation.Frame.Payload.HealthMax} absorb={observation.Frame.Payload.Absorb} targetFlags=0x{observation.Frame.Payload.TargetFlags:X2} level={observation.Frame.Payload.TargetLevel}");
+        WriteAggregateObservation(
+            "AggregateTargetResources",
+            snapshot.TargetResources,
+            nowUtc,
+            observation =>
+                $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} mana={observation.Frame.Payload.ManaCurrent}/{observation.Frame.Payload.ManaMax} energy={observation.Frame.Payload.EnergyCurrent}/{observation.Frame.Payload.EnergyMax} power={observation.Frame.Payload.PowerCurrent}/{observation.Frame.Payload.PowerMax}");
+        WriteAggregateObservation(
+            "AggregateAuxUnitCast",
+            snapshot.AuxUnitCast,
+            nowUtc,
+            observation =>
+                $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} unit={observation.Frame.Payload.UnitSelectorCode} flags=0x{observation.Frame.Payload.CastFlags:X2} progressQ8={observation.Frame.Payload.ProgressPctQ8} remaining={observation.Frame.Payload.RemainingCenti / 100.0:F2}s label={FormatSpellLabel(observation.Frame.Payload.Label)}");
+        WriteAggregateObservation(
+            "AggregateAuraPage",
+            snapshot.AuraPage,
+            nowUtc,
+            observation =>
+                $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} kind={observation.Frame.Payload.PageKindCode} total={observation.Frame.Payload.TotalAuraCount} entry1={FormatAuraEntry(observation.Frame.Payload.Entry1)} entry2={FormatAuraEntry(observation.Frame.Payload.Entry2)}");
+        WriteAggregateObservation(
+            "AggregateTextPage",
+            snapshot.TextPage,
+            nowUtc,
+            observation =>
+                $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} kind={observation.Frame.Payload.TextKindCode} hash=0x{observation.Frame.Payload.TextHash16:X4} label={FormatSpellLabel(observation.Frame.Payload.Label)}");
+        WriteAggregateObservation(
+            "AggregateAbilityWatch",
+            snapshot.AbilityWatch,
+            nowUtc,
+            observation =>
+                $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} page={observation.Frame.Payload.PageIndex} ready={observation.Frame.Payload.ReadyCount} cooling={observation.Frame.Payload.CoolingCount} entry1={FormatAbilityEntry(observation.Frame.Payload.Entry1)} entry2={FormatAbilityEntry(observation.Frame.Payload.Entry2)} shortestQ4={observation.Frame.Payload.ShortestCooldownQ4}");
     }
 
     private static void WriteAggregateObservation<TFrame>(
@@ -505,6 +600,26 @@ internal sealed class CliApp
     private static string FormatSpellLabel(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
+    }
+
+    private static string FormatAuraEntry(AuraPageEntrySnapshot entry)
+    {
+        return $"id={entry.Id} remQ4={entry.RemainingQ4} stack={entry.Stack} flags=0x{entry.Flags:X2}";
+    }
+
+    private static string FormatAbilityEntry(AbilityWatchEntrySnapshot entry)
+    {
+        return $"id={entry.Id} cdQ4={entry.CooldownQ4} flags=0x{entry.Flags:X2}";
+    }
+
+    private static void WriteAuraEntrySummary(string label, AuraPageEntrySnapshot entry)
+    {
+        Console.WriteLine($"{label}: {FormatAuraEntry(entry)}");
+    }
+
+    private static void WriteAbilityEntrySummary(string label, AbilityWatchEntrySnapshot entry)
+    {
+        Console.WriteLine($"{label}: {FormatAbilityEntry(entry)}");
     }
 
     private static string DescribeHeaderFlags(HeaderCapabilityFlags flags)
@@ -543,6 +658,16 @@ internal sealed class CliApp
         if (flags.HasFlag(HeaderCapabilityFlags.FollowUnitStatus))
         {
             labels.Add("follow-unit-status");
+        }
+
+        if (flags.HasFlag(HeaderCapabilityFlags.AdditionalTelemetry))
+        {
+            labels.Add("additional-telemetry");
+        }
+
+        if (flags.HasFlag(HeaderCapabilityFlags.TextAndAuras))
+        {
+            labels.Add("text-and-auras");
         }
 
         var unknown = (byte)(flags & ~(TransportConstants.HeaderCapabilities));

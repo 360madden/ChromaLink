@@ -91,6 +91,79 @@ Keep.
 
 ---
 
+## 2026-04-02 - Session AD - remaining telemetry capability expansion
+
+### Goal
+
+Cover the remaining practical telemetry asks without widening the strip or breaking the proven `640x360` bridge.
+
+### Change
+
+- add six new generic frame families:
+  - `TargetVitals`
+  - `TargetResources`
+  - `AuxUnitCast`
+  - `AuraPage`
+  - `TextPage`
+  - `AbilityWatch`
+- expand `PlayerCombat` flags with `pvp`, `mentoring`, `ready`, and `afk`
+- rotate `FollowUnitStatus` by slot so the bridge can carry more than one follow target over time
+- extend the desktop reader, aggregate, CLI, snapshot contract, inspector, and tests for the expanded frame set
+- add new header capability bits:
+  - `0x40` = additional telemetry
+  - `0x80` = text and auras
+
+### Why
+
+The project had already proven the strip and the bridge. The next high-value step was to use the remaining frame-type budget for compact reusable telemetry pages instead of widening the strip or inventing unsupported API surfaces.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+dotnet build .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj
+```
+
+```powershell
+dotnet build .\DesktopDotNet\ChromaLink.Inspector\ChromaLink.Inspector.csproj
+```
+
+```powershell
+cmd /c .\scripts\Send-RiftSlash.cmd /reloadui
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- live 240 50
+```
+
+### Result
+
+- local verification passed:
+  - `dotnet test` passed `32/32`
+  - CLI build passed
+  - inspector build passed
+- the live client loaded the expanded contract with `ReservedFlags: 0xFF`
+- live accepted samples included:
+  - `AbilityWatch`
+  - `AuraPage`
+  - `AuxUnitCast`
+  - `CoreStatus`
+  - `FollowUnitStatus`
+  - `PlayerCast`
+  - `PlayerPosition`
+  - `PlayerResources`
+  - `PlayerVitals`
+  - `TargetPosition`
+  - `TargetVitals`
+  - `TextPage`
+- readiness stayed anchored to `CoreStatus`, `PlayerVitals`, and `PlayerPosition`
+
+### Decision
+
+Keep.
+
+---
+
 ## 2026-04-02 - Session AF3 - expanded telemetry live proof
 
 ### Goal

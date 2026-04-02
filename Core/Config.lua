@@ -49,7 +49,12 @@ ChromaLink.Config = {
   followUnit = {
     enabled = true,
     slot = 1,
-    specifier = "group01"
+    specifier = "group01",
+    slots = { 1 }
+  },
+  abilityWatch = {
+    enabled = true,
+    trackedAbilities = {}
   },
   preferHighestAvailableStrata = true,
   protocolVersion = 1,
@@ -59,7 +64,9 @@ ChromaLink.Config = {
     playerCast = 4,
     expandedStats = 8,
     targetPosition = 16,
-    followUnitStatus = 32
+    followUnitStatus = 32,
+    additionalTelemetry = 64,
+    textAndAuras = 128
   },
   frameTypes = {
     coreStatus = 1,
@@ -69,7 +76,13 @@ ChromaLink.Config = {
     playerResources = 5,
     playerCombat = 6,
     targetPosition = 7,
-    followUnitStatus = 8
+    followUnitStatus = 8,
+    targetVitals = 9,
+    targetResources = 10,
+    auxUnitCast = 11,
+    auraPage = 12,
+    textPage = 13,
+    abilityWatch = 14
   },
   frameRotation = {
     "coreStatus",
@@ -84,9 +97,25 @@ ChromaLink.Config = {
     "coreStatus",
     "playerCombat",
     "coreStatus",
+    "targetVitals",
+    "coreStatus",
+    "targetResources",
+    "coreStatus",
     "targetPosition",
     "coreStatus",
-    "followUnitStatus"
+    "auxUnitCast",
+    "coreStatus",
+    "followUnitStatus",
+    "coreStatus",
+    "auraPage",
+    "coreStatus",
+    "auraPage",
+    "coreStatus",
+    "textPage",
+    "coreStatus",
+    "textPage",
+    "coreStatus",
+    "abilityWatch"
   },
   syntheticMode = {
     enabled = false
@@ -157,6 +186,23 @@ ChromaLink.Config = {
     friendlyOther = 24,
     hostileOther = 25,
     other = 26
+  },
+  unitSelectorCodes = {
+    none = 0,
+    target = 1,
+    groupBase = 16
+  },
+  auraPageKinds = {
+    playerBuffs = 1,
+    playerDebuffs = 2,
+    targetBuffs = 3,
+    targetDebuffs = 4
+  },
+  textKindCodes = {
+    playerName = 1,
+    targetName = 2,
+    zoneName = 3,
+    shardName = 4
   }
 }
 

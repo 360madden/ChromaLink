@@ -10,7 +10,13 @@ local frameTypes = config.frameTypes or {
   playerResources = 5,
   playerCombat = 6,
   targetPosition = 7,
-  followUnitStatus = 8
+  followUnitStatus = 8,
+  targetVitals = 9,
+  targetResources = 10,
+  auxUnitCast = 11,
+  auraPage = 12,
+  textPage = 13,
+  abilityWatch = 14
 }
 local headerFlags = config.headerFlags or {
   multiFrameRotation = 1,
@@ -18,7 +24,9 @@ local headerFlags = config.headerFlags or {
   playerCast = 4,
   expandedStats = 8,
   targetPosition = 16,
-  followUnitStatus = 32
+  followUnitStatus = 32,
+  additionalTelemetry = 64,
+  textAndAuras = 128
 }
 
 local function ClampByte(value)
@@ -220,6 +228,8 @@ local function BuildFrame(payload, frameType, schemaId, sequence)
   reservedFlags = reservedFlags + ClampByte(headerFlags.expandedStats)
   reservedFlags = reservedFlags + ClampByte(headerFlags.targetPosition)
   reservedFlags = reservedFlags + ClampByte(headerFlags.followUnitStatus)
+  reservedFlags = reservedFlags + ClampByte(headerFlags.additionalTelemetry)
+  reservedFlags = reservedFlags + ClampByte(headerFlags.textAndAuras)
   bytes[6] = ClampByte(reservedFlags)
 
   headerCrc = ComputeCrc16(bytes, 1, 6)
@@ -324,6 +334,108 @@ function ChromaLink.Protocol.BuildTargetPositionFrame(snapshot, sequence)
   AppendBigEndian32(payload, 5, FloatToFixedInt32(snapshot.y))
   AppendBigEndian32(payload, 9, FloatToFixedInt32(snapshot.z))
   return BuildFrame(payload, frameTypes.targetPosition, 1, sequence)
+end
+
+function ChromaLink.Protocol.BuildTargetVitalsFrame(snapshot, sequence)
+  local payload = {}
+  AppendBigEndian32(payload, 1, snapshot.healthCurrent)
+  AppendBigEndian32(payload, 5, snapshot.healthMax)
+  AppendBigEndian16(payload, 9, snapshot.absorb)
+  payload[11] = ClampByte(snapshot.targetFlags)
+  payload[12] = ClampByte(snapshot.targetLevel)
+  return BuildFrame(payload, frameTypes.targetVitals, 1, sequence)
+end
+
+function ChromaLink.Protocol.BuildTargetResourcesFrame(snapshot, sequence)
+  local payload = {}
+  AppendBigEndian16(payload, 1, snapshot.manaCurrent)
+  AppendBigEndian16(payload, 3, snapshot.manaMax)
+  AppendBigEndian16(payload, 5, snapshot.energyCurrent)
+  AppendBigEndian16(payload, 7, snapshot.energyMax)
+  AppendBigEndian16(payload, 9, snapshot.powerCurrent)
+  AppendBigEndian16(payload, 11, snapshot.powerMax)
+  return BuildFrame(payload, frameTypes.targetResources, 1, sequence)
+end
+
+function ChromaLink.Protocol.BuildAuxUnitCastFrame(snapshot, sequence)
+  local payload = {
+    ClampByte(snapshot.unitSelectorCode),
+    ClampByte(snapshot.castFlags),
+    ClampByte(snapshot.progressPctQ8),
+    0,
+    0,
+    0,
+    0,
+    ClampByte(snapshot.castTargetCode)
+  }
+  local index
+
+  AppendBigEndian16(payload, 4, snapshot.durationCenti)
+  AppendBigEndian16(payload, 6, snapshot.remainingCenti)
+
+  for index = 1, 4 do
+    payload[8 + index] = ClampByte(snapshot.spellLabelBytes and snapshot.spellLabelBytes[index] or 32)
+  end
+
+  return BuildFrame(payload, frameTypes.auxUnitCast, 1, sequence)
+end
+
+function ChromaLink.Protocol.BuildAuraPageFrame(snapshot, sequence)
+  local payload = {
+    ClampByte(snapshot.pageKindCode),
+    ClampByte(snapshot.totalAuraCount),
+    0,
+    0,
+    ClampByte(snapshot.entry1RemainingQ4),
+    ClampByte(snapshot.entry1Stack),
+    ClampByte(snapshot.entry1Flags),
+    0,
+    0,
+    ClampByte(snapshot.entry2RemainingQ4),
+    ClampByte(snapshot.entry2Stack),
+    ClampByte(snapshot.entry2Flags)
+  }
+
+  AppendBigEndian16(payload, 3, snapshot.entry1Id)
+  AppendBigEndian16(payload, 8, snapshot.entry2Id)
+  return BuildFrame(payload, frameTypes.auraPage, 1, sequence)
+end
+
+function ChromaLink.Protocol.BuildTextPageFrame(snapshot, sequence)
+  local payload = {
+    ClampByte(snapshot.textKindCode),
+    0,
+    0
+  }
+  local index
+
+  AppendBigEndian16(payload, 2, snapshot.textHash16)
+  for index = 1, 9 do
+    payload[3 + index] = ClampByte(snapshot.textBytes and snapshot.textBytes[index] or 32)
+  end
+
+  return BuildFrame(payload, frameTypes.textPage, 1, sequence)
+end
+
+function ChromaLink.Protocol.BuildAbilityWatchFrame(snapshot, sequence)
+  local payload = {
+    ClampByte(snapshot.pageIndex),
+    0,
+    0,
+    ClampByte(snapshot.entry1CooldownQ4),
+    ClampByte(snapshot.entry1Flags),
+    0,
+    0,
+    ClampByte(snapshot.entry2CooldownQ4),
+    ClampByte(snapshot.entry2Flags),
+    ClampByte(snapshot.shortestCooldownQ4),
+    ClampByte(snapshot.readyCount),
+    ClampByte(snapshot.coolingCount)
+  }
+
+  AppendBigEndian16(payload, 2, snapshot.entry1Id)
+  AppendBigEndian16(payload, 6, snapshot.entry2Id)
+  return BuildFrame(payload, frameTypes.abilityWatch, 1, sequence)
 end
 
 function ChromaLink.Protocol.BuildFollowUnitStatusFrame(snapshot, sequence)

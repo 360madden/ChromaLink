@@ -166,6 +166,14 @@ local function FormatHeaderFlags(headerFlags)
     table.insert(labels, "follow-unit-status")
   end
 
+  if headerFlags.additionalTelemetry ~= nil and headerFlags.additionalTelemetry ~= 0 then
+    table.insert(labels, "additional-telemetry")
+  end
+
+  if headerFlags.textAndAuras ~= nil and headerFlags.textAndAuras ~= 0 then
+    table.insert(labels, "text-and-auras")
+  end
+
   if #labels == 0 then
     return "none"
   end
@@ -173,9 +181,111 @@ local function FormatHeaderFlags(headerFlags)
   return table.concat(labels, ", ")
 end
 
+local function ResolveNextAuraPageKind(state)
+  local kinds = ChromaLink.Config.auraPageKinds or {}
+  local sequence = {
+    kinds.playerBuffs or 1,
+    kinds.playerDebuffs or 2,
+    kinds.targetBuffs or 3,
+    kinds.targetDebuffs or 4
+  }
+  local index = state.auraPageIndex or 1
+  local selected = sequence[index] or sequence[1]
+
+  state.auraPageIndex = math.fmod(index, #sequence) + 1
+  return selected
+end
+
+local function ResolveNextTextKind(state)
+  local kinds = ChromaLink.Config.textKindCodes or {}
+  local sequence = {
+    kinds.playerName or 1,
+    kinds.targetName or 2,
+    kinds.zoneName or 3,
+    kinds.shardName or 4
+  }
+  local index = state.textPageIndex or 1
+  local selected = sequence[index] or sequence[1]
+
+  state.textPageIndex = math.fmod(index, #sequence) + 1
+  return selected
+end
+
+local function ResolveFollowSlots()
+  local followConfig = ChromaLink.Config.followUnit or {}
+  local slots = {}
+  local _, slot
+
+  if type(followConfig.slots) == "table" then
+    for _, slot in ipairs(followConfig.slots) do
+      if tonumber(slot) ~= nil then
+        table.insert(slots, math.max(1, math.min(20, math.floor(tonumber(slot)))))
+      end
+    end
+  end
+
+  if #slots == 0 and tonumber(followConfig.slot) ~= nil then
+    table.insert(slots, math.max(1, math.min(20, math.floor(tonumber(followConfig.slot)))))
+  end
+  if #slots == 0 then
+    table.insert(slots, 1)
+  end
+
+  return slots
+end
+
+local function ResolveNextFollowSlot(state)
+  local slots = ResolveFollowSlots()
+  local index = state.followSlotIndex or 1
+  local selected = slots[index] or slots[1]
+
+  state.followSlotIndex = math.fmod(index, #slots) + 1
+  return selected
+end
+
+local function ResolveNextAuxCastTarget(state)
+  local selectors = {}
+  local selectorCodes = ChromaLink.Config.unitSelectorCodes or {}
+  local slots = ResolveFollowSlots()
+  local _, slot
+
+  table.insert(selectors, {
+    selectorCode = selectorCodes.target or 1,
+    unitSpecifier = "player.target"
+  })
+
+  for _, slot in ipairs(slots) do
+    table.insert(selectors, {
+      selectorCode = (selectorCodes.groupBase or 16) + (slot - 1),
+      unitSpecifier = string.format("group%02d", slot)
+    })
+  end
+
+  local index = state.auxUnitCastIndex or 1
+  local selected = selectors[index] or selectors[1]
+
+  state.auxUnitCastIndex = math.fmod(index, #selectors) + 1
+  return selected
+end
+
+local function ResolveNextAbilityWatchPage(state)
+  local tracked = (ChromaLink.Config.abilityWatch and ChromaLink.Config.abilityWatch.trackedAbilities) or {}
+  local totalPages = math.max(1, math.ceil(#tracked / 2))
+  local index = state.abilityWatchPageIndex or 1
+  local selected = math.max(1, math.min(totalPages, index))
+
+  state.abilityWatchPageIndex = math.fmod(selected, totalPages) + 1
+  return selected
+end
+
 local function BuildSyntheticFrame(frameKind, sequence)
   local snapshot
   local _, symbols
+  local auraPageKind
+  local textKind
+  local auxCastTarget
+  local followSlot
+  local abilityWatchPage
 
   if frameKind == "playerVitals" then
     snapshot = ChromaLink.Gather.BuildSyntheticPlayerVitalsSnapshot()
@@ -192,12 +302,35 @@ local function BuildSyntheticFrame(frameKind, sequence)
   elseif frameKind == "playerCombat" then
     snapshot = ChromaLink.Gather.BuildSyntheticPlayerCombatSnapshot()
     _, symbols = ChromaLink.Protocol.BuildPlayerCombatFrame(snapshot, sequence)
+  elseif frameKind == "targetVitals" then
+    snapshot = ChromaLink.Gather.BuildSyntheticTargetVitalsSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildTargetVitalsFrame(snapshot, sequence)
+  elseif frameKind == "targetResources" then
+    snapshot = ChromaLink.Gather.BuildSyntheticTargetResourcesSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildTargetResourcesFrame(snapshot, sequence)
   elseif frameKind == "targetPosition" then
     snapshot = ChromaLink.Gather.BuildSyntheticTargetPositionSnapshot()
     _, symbols = ChromaLink.Protocol.BuildTargetPositionFrame(snapshot, sequence)
+  elseif frameKind == "auxUnitCast" then
+    auxCastTarget = ResolveNextAuxCastTarget(ChromaLink.Bootstrap.state or {})
+    snapshot = ChromaLink.Gather.BuildSyntheticAuxUnitCastSnapshot(auxCastTarget.selectorCode)
+    _, symbols = ChromaLink.Protocol.BuildAuxUnitCastFrame(snapshot, sequence)
   elseif frameKind == "followUnitStatus" then
-    snapshot = ChromaLink.Gather.BuildSyntheticFollowUnitStatusSnapshot()
+    followSlot = ResolveNextFollowSlot(ChromaLink.Bootstrap.state or {})
+    snapshot = ChromaLink.Gather.BuildSyntheticFollowUnitStatusSnapshot(followSlot)
     _, symbols = ChromaLink.Protocol.BuildFollowUnitStatusFrame(snapshot, sequence)
+  elseif frameKind == "auraPage" then
+    auraPageKind = ResolveNextAuraPageKind(ChromaLink.Bootstrap.state or {})
+    snapshot = ChromaLink.Gather.BuildSyntheticAuraPageSnapshot(auraPageKind)
+    _, symbols = ChromaLink.Protocol.BuildAuraPageFrame(snapshot, sequence)
+  elseif frameKind == "textPage" then
+    textKind = ResolveNextTextKind(ChromaLink.Bootstrap.state or {})
+    snapshot = ChromaLink.Gather.BuildSyntheticTextPageSnapshot(textKind)
+    _, symbols = ChromaLink.Protocol.BuildTextPageFrame(snapshot, sequence)
+  elseif frameKind == "abilityWatch" then
+    abilityWatchPage = ResolveNextAbilityWatchPage(ChromaLink.Bootstrap.state or {})
+    snapshot = ChromaLink.Gather.BuildSyntheticAbilityWatchSnapshot(abilityWatchPage)
+    _, symbols = ChromaLink.Protocol.BuildAbilityWatchFrame(snapshot, sequence)
   else
     snapshot = ChromaLink.Gather.BuildSyntheticCoreStatusSnapshot()
     _, symbols = ChromaLink.Protocol.BuildCoreFrame(snapshot, sequence)
@@ -210,6 +343,11 @@ end
 local function BuildLiveFrame(frameKind, sequence)
   local snapshot
   local _, symbols
+  local auraPageKind
+  local textKind
+  local auxCastTarget
+  local followSlot
+  local abilityWatchPage
 
   if frameKind == "playerVitals" then
     snapshot = ChromaLink.Gather.BuildPlayerVitalsSnapshot()
@@ -226,12 +364,35 @@ local function BuildLiveFrame(frameKind, sequence)
   elseif frameKind == "playerCombat" then
     snapshot = ChromaLink.Gather.BuildPlayerCombatSnapshot()
     _, symbols = ChromaLink.Protocol.BuildPlayerCombatFrame(snapshot, sequence)
+  elseif frameKind == "targetVitals" then
+    snapshot = ChromaLink.Gather.BuildTargetVitalsSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildTargetVitalsFrame(snapshot, sequence)
+  elseif frameKind == "targetResources" then
+    snapshot = ChromaLink.Gather.BuildTargetResourcesSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildTargetResourcesFrame(snapshot, sequence)
   elseif frameKind == "targetPosition" then
     snapshot = ChromaLink.Gather.BuildTargetPositionSnapshot()
     _, symbols = ChromaLink.Protocol.BuildTargetPositionFrame(snapshot, sequence)
+  elseif frameKind == "auxUnitCast" then
+    auxCastTarget = ResolveNextAuxCastTarget(ChromaLink.Bootstrap.state or {})
+    snapshot = ChromaLink.Gather.BuildAuxUnitCastSnapshot(auxCastTarget.selectorCode, auxCastTarget.unitSpecifier)
+    _, symbols = ChromaLink.Protocol.BuildAuxUnitCastFrame(snapshot, sequence)
   elseif frameKind == "followUnitStatus" then
-    snapshot = ChromaLink.Gather.BuildFollowUnitStatusSnapshot()
+    followSlot = ResolveNextFollowSlot(ChromaLink.Bootstrap.state or {})
+    snapshot = ChromaLink.Gather.BuildFollowUnitStatusSnapshot(followSlot)
     _, symbols = ChromaLink.Protocol.BuildFollowUnitStatusFrame(snapshot, sequence)
+  elseif frameKind == "auraPage" then
+    auraPageKind = ResolveNextAuraPageKind(ChromaLink.Bootstrap.state or {})
+    snapshot = ChromaLink.Gather.BuildAuraPageSnapshot(auraPageKind)
+    _, symbols = ChromaLink.Protocol.BuildAuraPageFrame(snapshot, sequence)
+  elseif frameKind == "textPage" then
+    textKind = ResolveNextTextKind(ChromaLink.Bootstrap.state or {})
+    snapshot = ChromaLink.Gather.BuildTextPageSnapshot(textKind)
+    _, symbols = ChromaLink.Protocol.BuildTextPageFrame(snapshot, sequence)
+  elseif frameKind == "abilityWatch" then
+    abilityWatchPage = ResolveNextAbilityWatchPage(ChromaLink.Bootstrap.state or {})
+    snapshot = ChromaLink.Gather.BuildAbilityWatchSnapshot(abilityWatchPage)
+    _, symbols = ChromaLink.Protocol.BuildAbilityWatchFrame(snapshot, sequence)
   else
     snapshot = ChromaLink.Gather.BuildCoreStatusSnapshot()
     _, symbols = ChromaLink.Protocol.BuildCoreFrame(snapshot, sequence)
@@ -365,7 +526,7 @@ function ChromaLink.Bootstrap.LogBuildStatus()
 
   ChromaLink.Diagnostics.Log(string.format("%s build: version=%s protocol=%s profile=%s.", identifier, tostring(version), tostring(protocolVersion), tostring(profile.id or "unknown")))
   ChromaLink.Diagnostics.Log(string.format(
-    "Frame types: coreStatus=%s playerVitals=%s playerPosition=%s playerCast=%s playerResources=%s playerCombat=%s targetPosition=%s followUnitStatus=%s.",
+    "Frame types: coreStatus=%s playerVitals=%s playerPosition=%s playerCast=%s playerResources=%s playerCombat=%s targetPosition=%s followUnitStatus=%s targetVitals=%s targetResources=%s auxUnitCast=%s auraPage=%s textPage=%s abilityWatch=%s.",
     tostring(frameTypes.coreStatus or "n/a"),
     tostring(frameTypes.playerVitals or "n/a"),
     tostring(frameTypes.playerPosition or "n/a"),
@@ -373,7 +534,13 @@ function ChromaLink.Bootstrap.LogBuildStatus()
     tostring(frameTypes.playerResources or "n/a"),
     tostring(frameTypes.playerCombat or "n/a"),
     tostring(frameTypes.targetPosition or "n/a"),
-    tostring(frameTypes.followUnitStatus or "n/a")))
+    tostring(frameTypes.followUnitStatus or "n/a"),
+    tostring(frameTypes.targetVitals or "n/a"),
+    tostring(frameTypes.targetResources or "n/a"),
+    tostring(frameTypes.auxUnitCast or "n/a"),
+    tostring(frameTypes.auraPage or "n/a"),
+    tostring(frameTypes.textPage or "n/a"),
+    tostring(frameTypes.abilityWatch or "n/a")))
   ChromaLink.Diagnostics.Log(string.format(
     "Header flags: 0x%02X (%s).",
     tonumber(headerFlags.multiFrameRotation or 0)
@@ -381,7 +548,9 @@ function ChromaLink.Bootstrap.LogBuildStatus()
       + tonumber(headerFlags.playerCast or 0)
       + tonumber(headerFlags.expandedStats or 0)
       + tonumber(headerFlags.targetPosition or 0)
-      + tonumber(headerFlags.followUnitStatus or 0),
+      + tonumber(headerFlags.followUnitStatus or 0)
+      + tonumber(headerFlags.additionalTelemetry or 0)
+      + tonumber(headerFlags.textAndAuras or 0),
     FormatHeaderFlags(headerFlags)))
   ChromaLink.Diagnostics.Log(string.format(
     "Strip profile: %s %dx%d band=%dx%d segments=%d x %d.",
@@ -407,7 +576,7 @@ function ChromaLink.Bootstrap.LogRotationStatus()
   end
 
   ChromaLink.Diagnostics.Log("Rotation sequence: " .. (#parts > 0 and table.concat(parts, " -> ") or "none") .. ".")
-  ChromaLink.Diagnostics.Log("Heartbeat priority: coreStatus is dominant; secondary telemetry slices are rotated in for throughput without widening the strip.")
+  ChromaLink.Diagnostics.Log("Heartbeat priority: coreStatus is dominant; secondary telemetry slices and generic pages are rotated in for throughput without widening the strip.")
 end
 
 function ChromaLink.Bootstrap.SetObserverEnabled(enabled)
@@ -475,6 +644,11 @@ function ChromaLink.Bootstrap.Initialize()
     resolvedStrata = resolvedStrata,
     strataList = strataList,
     render = ChromaLink.Render.Initialize(root, renderAnchor),
+    auraPageIndex = 1,
+    textPageIndex = 1,
+    followSlotIndex = 1,
+    auxUnitCastIndex = 1,
+    abilityWatchPageIndex = 1,
     lastRefreshAt = 0,
     lastReason = "startup",
     lastFrameKind = "coreStatus",

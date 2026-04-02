@@ -246,6 +246,8 @@ internal sealed class InspectorForm : Form
                 lines.Add($"Ready: {aggregate.GetProperty("ready").GetBoolean()} | AcceptedFrames: {aggregate.GetProperty("acceptedFrames").GetInt32()}");
                 lines.Add($"Frames: {SummarizeSnapshotFrame(aggregate, "coreStatus")} | {SummarizeSnapshotFrame(aggregate, "playerVitals")} | {SummarizeSnapshotFrame(aggregate, "playerPosition")} | {SummarizeSnapshotFrame(aggregate, "playerCast")}");
                 lines.Add($"Expanded: {SummarizeSnapshotFrame(aggregate, "playerResources")} | {SummarizeSnapshotFrame(aggregate, "playerCombat")} | {SummarizeSnapshotFrame(aggregate, "targetPosition")} | {SummarizeSnapshotFrame(aggregate, "followUnitStatus")}");
+                lines.Add($"More: {SummarizeSnapshotFrame(aggregate, "targetVitals")} | {SummarizeSnapshotFrame(aggregate, "targetResources")} | {SummarizeSnapshotFrame(aggregate, "auxUnitCast")} | {SummarizeSnapshotFrame(aggregate, "auraPage")} | {SummarizeSnapshotFrame(aggregate, "textPage")} | {SummarizeSnapshotFrame(aggregate, "abilityWatch")}");
+                lines.Add($"FollowSlots: {SummarizeSnapshotCollection(aggregate, "followUnitStatuses")}");
             }
 
             if (root.TryGetProperty("metrics", out var metrics))
@@ -289,6 +291,30 @@ internal sealed class InspectorForm : Form
         }
 
         return $"{propertyName}: seq={sequence} flags=0x{reservedFlags:X2} age={age.TotalSeconds:F1}s";
+    }
+
+    private static string SummarizeSnapshotCollection(JsonElement aggregate, string propertyName)
+    {
+        if (!aggregate.TryGetProperty(propertyName, out var collection) || collection.ValueKind != JsonValueKind.Array)
+        {
+            return $"{propertyName}: missing";
+        }
+
+        var items = collection.EnumerateArray().ToArray();
+        if (items.Length == 0)
+        {
+            return $"{propertyName}: empty";
+        }
+
+        var slots = new List<string>();
+        foreach (var item in items)
+        {
+            var slot = item.TryGetProperty("slot", out var slotProperty) ? slotProperty.GetInt32().ToString() : "?";
+            var sequence = item.TryGetProperty("sequence", out var sequenceProperty) ? sequenceProperty.GetInt32() : -1;
+            slots.Add($"{slot}@{sequence}");
+        }
+
+        return $"{propertyName}: count={items.Length} slots={string.Join(",", slots)}";
     }
 
     private static string BuildSummary(string path, Bgr24Frame frame, FrameValidationResult analysis)
@@ -404,6 +430,10 @@ internal sealed class InspectorForm : Form
                     builder.AppendLine($"  Combo: {combat.Payload.Combo}");
                     builder.AppendLine($"  Charge: {combat.Payload.ChargeCurrent}/{combat.Payload.ChargeMax}");
                     builder.AppendLine($"  Planar: {combat.Payload.PlanarCurrent}/{combat.Payload.PlanarMax}");
+                    builder.AppendLine($"  PvP: {(combat.Payload.CombatFlags & 0x10) != 0}");
+                    builder.AppendLine($"  Mentoring: {(combat.Payload.CombatFlags & 0x20) != 0}");
+                    builder.AppendLine($"  Ready: {(combat.Payload.CombatFlags & 0x40) != 0}");
+                    builder.AppendLine($"  Afk: {(combat.Payload.CombatFlags & 0x80) != 0}");
                     builder.AppendLine($"  Absorb: {combat.Payload.Absorb}");
                     break;
 
@@ -422,6 +452,56 @@ internal sealed class InspectorForm : Form
                     builder.AppendLine($"  Level: {follow.Payload.Level}");
                     builder.AppendLine($"  Calling: {follow.Payload.CallingRolePacked >> 4}");
                     builder.AppendLine($"  Role: {follow.Payload.CallingRolePacked & 0x0F}");
+                    break;
+
+                case TargetVitalsFrame targetVitals:
+                    builder.AppendLine($"  HealthCurrent: {targetVitals.Payload.HealthCurrent}");
+                    builder.AppendLine($"  HealthMax: {targetVitals.Payload.HealthMax}");
+                    builder.AppendLine($"  Absorb: {targetVitals.Payload.Absorb}");
+                    builder.AppendLine($"  TargetFlags: 0x{targetVitals.Payload.TargetFlags:X2}");
+                    builder.AppendLine($"  Present: {(targetVitals.Payload.TargetFlags & 0x01) != 0}");
+                    builder.AppendLine($"  Alive: {(targetVitals.Payload.TargetFlags & 0x02) != 0}");
+                    builder.AppendLine($"  Combat: {(targetVitals.Payload.TargetFlags & 0x04) != 0}");
+                    builder.AppendLine($"  Tagged: {(targetVitals.Payload.TargetFlags & 0x08) != 0}");
+                    builder.AppendLine($"  TargetLevel: {targetVitals.Payload.TargetLevel}");
+                    break;
+
+                case TargetResourcesFrame targetResources:
+                    builder.AppendLine($"  Mana: {targetResources.Payload.ManaCurrent}/{targetResources.Payload.ManaMax}");
+                    builder.AppendLine($"  Energy: {targetResources.Payload.EnergyCurrent}/{targetResources.Payload.EnergyMax}");
+                    builder.AppendLine($"  Power: {targetResources.Payload.PowerCurrent}/{targetResources.Payload.PowerMax}");
+                    break;
+
+                case AuxUnitCastFrame auxUnitCast:
+                    builder.AppendLine($"  UnitSelectorCode: {auxUnitCast.Payload.UnitSelectorCode}");
+                    builder.AppendLine($"  CastFlags: {auxUnitCast.Payload.CastFlags}");
+                    builder.AppendLine($"  ProgressPctQ8: {auxUnitCast.Payload.ProgressPctQ8}");
+                    builder.AppendLine($"  DurationSeconds: {auxUnitCast.Payload.DurationCenti / 100.0:F2}");
+                    builder.AppendLine($"  RemainingSeconds: {auxUnitCast.Payload.RemainingCenti / 100.0:F2}");
+                    builder.AppendLine($"  CastTargetCode: {auxUnitCast.Payload.CastTargetCode}");
+                    builder.AppendLine($"  Label: {FormatSpellLabel(auxUnitCast.Payload.Label)}");
+                    break;
+
+                case AuraPageFrame auraPage:
+                    builder.AppendLine($"  PageKindCode: {auraPage.Payload.PageKindCode}");
+                    builder.AppendLine($"  TotalAuraCount: {auraPage.Payload.TotalAuraCount}");
+                    builder.AppendLine($"  Entry1: {FormatAuraEntry(auraPage.Payload.Entry1)}");
+                    builder.AppendLine($"  Entry2: {FormatAuraEntry(auraPage.Payload.Entry2)}");
+                    break;
+
+                case TextPageFrame textPage:
+                    builder.AppendLine($"  TextKindCode: {textPage.Payload.TextKindCode}");
+                    builder.AppendLine($"  TextHash16: 0x{textPage.Payload.TextHash16:X4}");
+                    builder.AppendLine($"  Label: {FormatSpellLabel(textPage.Payload.Label)}");
+                    break;
+
+                case AbilityWatchFrame abilityWatch:
+                    builder.AppendLine($"  PageIndex: {abilityWatch.Payload.PageIndex}");
+                    builder.AppendLine($"  Entry1: {FormatAbilityEntry(abilityWatch.Payload.Entry1)}");
+                    builder.AppendLine($"  Entry2: {FormatAbilityEntry(abilityWatch.Payload.Entry2)}");
+                    builder.AppendLine($"  ShortestCooldownQ4: {abilityWatch.Payload.ShortestCooldownQ4}");
+                    builder.AppendLine($"  ReadyCount: {abilityWatch.Payload.ReadyCount}");
+                    builder.AppendLine($"  CoolingCount: {abilityWatch.Payload.CoolingCount}");
                     break;
             }
         }
@@ -473,6 +553,13 @@ internal sealed class InspectorForm : Form
                 AppendSnapshotFrame(builder, aggregate, "PlayerCombat", "playerCombat");
                 AppendSnapshotFrame(builder, aggregate, "TargetPosition", "targetPosition");
                 AppendSnapshotFrame(builder, aggregate, "FollowUnitStatus", "followUnitStatus");
+                AppendSnapshotFrame(builder, aggregate, "TargetVitals", "targetVitals");
+                AppendSnapshotFrame(builder, aggregate, "TargetResources", "targetResources");
+                AppendSnapshotFrame(builder, aggregate, "AuxUnitCast", "auxUnitCast");
+                AppendSnapshotFrame(builder, aggregate, "AuraPage", "auraPage");
+                AppendSnapshotFrame(builder, aggregate, "TextPage", "textPage");
+                AppendSnapshotFrame(builder, aggregate, "AbilityWatch", "abilityWatch");
+                AppendSnapshotCollection(builder, aggregate, "FollowSlots", "followUnitStatuses");
             }
 
             if (root.TryGetProperty("metrics", out var metrics))
@@ -510,9 +597,45 @@ internal sealed class InspectorForm : Form
             $"  {label}: seq={sequence} flags=0x{reservedFlags:X2} observed={observedAt:O}");
     }
 
+    private static void AppendSnapshotCollection(StringBuilder builder, JsonElement aggregate, string label, string propertyName)
+    {
+        if (!aggregate.TryGetProperty(propertyName, out var collection) || collection.ValueKind != JsonValueKind.Array)
+        {
+            builder.AppendLine($"  {label}: missing");
+            return;
+        }
+
+        var items = collection.EnumerateArray().ToArray();
+        if (items.Length == 0)
+        {
+            builder.AppendLine($"  {label}: empty");
+            return;
+        }
+
+        var slots = string.Join(
+            ",",
+            items.Select(item =>
+            {
+                var slot = item.TryGetProperty("slot", out var slotProperty) ? slotProperty.GetInt32().ToString() : "?";
+                var sequence = item.TryGetProperty("sequence", out var sequenceProperty) ? sequenceProperty.GetInt32() : -1;
+                return $"{slot}@{sequence}";
+            }));
+        builder.AppendLine($"  {label}: count={items.Length} slots={slots}");
+    }
+
     private static string FormatSpellLabel(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
+    }
+
+    private static string FormatAuraEntry(AuraPageEntrySnapshot entry)
+    {
+        return $"id={entry.Id} remQ4={entry.RemainingQ4} stack={entry.Stack} flags=0x{entry.Flags:X2}";
+    }
+
+    private static string FormatAbilityEntry(AbilityWatchEntrySnapshot entry)
+    {
+        return $"id={entry.Id} cdQ4={entry.CooldownQ4} flags=0x{entry.Flags:X2}";
     }
 
     private static string? GetLiveTelemetrySnapshotPath()

@@ -9,7 +9,13 @@ public enum FrameType : byte
     PlayerResources = 5,
     PlayerCombat = 6,
     TargetPosition = 7,
-    FollowUnitStatus = 8
+    FollowUnitStatus = 8,
+    TargetVitals = 9,
+    TargetResources = 10,
+    AuxUnitCast = 11,
+    AuraPage = 12,
+    TextPage = 13,
+    AbilityWatch = 14
 }
 
 public enum ResourceKind : byte
@@ -31,7 +37,9 @@ public enum HeaderCapabilityFlags : byte
     PlayerCast = 1 << 2,
     ExpandedStats = 1 << 3,
     TargetPosition = 1 << 4,
-    FollowUnitStatus = 1 << 5
+    FollowUnitStatus = 1 << 5,
+    AdditionalTelemetry = 1 << 6,
+    TextAndAuras = 1 << 7
 }
 
 public sealed record TelemetryFrameHeader(
@@ -86,18 +94,12 @@ public readonly record struct PlayerVitalsSnapshot(
     ushort ResourceCurrent,
     ushort ResourceMax)
 {
-    public static PlayerVitalsSnapshot CreateSynthetic()
-    {
-        return new PlayerVitalsSnapshot(3260, 3260, 100, 100);
-    }
+    public static PlayerVitalsSnapshot CreateSynthetic() => new(3260, 3260, 100, 100);
 }
 
 public readonly record struct PlayerPositionSnapshot(float X, float Y, float Z)
 {
-    public static PlayerPositionSnapshot CreateSynthetic()
-    {
-        return new PlayerPositionSnapshot(123.45f, 200.67f, -50.12f);
-    }
+    public static PlayerPositionSnapshot CreateSynthetic() => new(123.45f, 200.67f, -50.12f);
 }
 
 public readonly record struct PlayerCastSnapshot(
@@ -108,10 +110,7 @@ public readonly record struct PlayerCastSnapshot(
     byte CastTargetCode,
     string SpellLabel)
 {
-    public static PlayerCastSnapshot CreateSynthetic()
-    {
-        return new PlayerCastSnapshot(0b0001_1001, 96, 250, 150, 2, "HEALI");
-    }
+    public static PlayerCastSnapshot CreateSynthetic() => new(0b0001_1001, 96, 250, 150, 2, "HEALI");
 }
 
 public readonly record struct PlayerResourcesSnapshot(
@@ -122,10 +121,7 @@ public readonly record struct PlayerResourcesSnapshot(
     ushort PowerCurrent,
     ushort PowerMax)
 {
-    public static PlayerResourcesSnapshot CreateSynthetic()
-    {
-        return new PlayerResourcesSnapshot(4200, 5000, 85, 100, 12, 100);
-    }
+    public static PlayerResourcesSnapshot CreateSynthetic() => new(4200, 5000, 85, 100, 12, 100);
 }
 
 public readonly record struct PlayerCombatSnapshot(
@@ -137,18 +133,12 @@ public readonly record struct PlayerCombatSnapshot(
     ushort PlanarMax,
     ushort Absorb)
 {
-    public static PlayerCombatSnapshot CreateSynthetic()
-    {
-        return new PlayerCombatSnapshot(15, 4, 80, 100, 3, 6, 250);
-    }
+    public static PlayerCombatSnapshot CreateSynthetic() => new(255, 4, 80, 100, 3, 6, 250);
 }
 
 public readonly record struct TargetPositionSnapshot(float X, float Y, float Z)
 {
-    public static TargetPositionSnapshot CreateSynthetic()
-    {
-        return new TargetPositionSnapshot(128.75f, 201.50f, -48.25f);
-    }
+    public static TargetPositionSnapshot CreateSynthetic() => new(128.75f, 201.50f, -48.25f);
 }
 
 public readonly record struct FollowUnitStatusSnapshot(
@@ -165,6 +155,96 @@ public readonly record struct FollowUnitStatusSnapshot(
     public static FollowUnitStatusSnapshot CreateSynthetic()
     {
         return new FollowUnitStatusSnapshot(1, 143, 7123.5f, 865.0f, 3010.5f, 222, 144, 70, 0x31);
+    }
+}
+
+public readonly record struct TargetVitalsSnapshot(
+    uint HealthCurrent,
+    uint HealthMax,
+    ushort Absorb,
+    byte TargetFlags,
+    byte TargetLevel)
+{
+    public static TargetVitalsSnapshot CreateSynthetic() => new(31200, 35000, 120, 0b0000_1111, 72);
+}
+
+public readonly record struct TargetResourcesSnapshot(
+    ushort ManaCurrent,
+    ushort ManaMax,
+    ushort EnergyCurrent,
+    ushort EnergyMax,
+    ushort PowerCurrent,
+    ushort PowerMax)
+{
+    public static TargetResourcesSnapshot CreateSynthetic() => new(2200, 3000, 80, 100, 18, 100);
+}
+
+public readonly record struct AuxUnitCastSnapshot(
+    byte UnitSelectorCode,
+    byte CastFlags,
+    byte ProgressPctQ8,
+    ushort DurationCenti,
+    ushort RemainingCenti,
+    byte CastTargetCode,
+    string Label)
+{
+    public static AuxUnitCastSnapshot CreateSynthetic() => new(2, 0b0001_0011, 88, 180, 60, 1, "SHLD");
+}
+
+public readonly record struct AuraPageEntrySnapshot(
+    ushort Id,
+    byte RemainingQ4,
+    byte Stack,
+    byte Flags)
+{
+    public static AuraPageEntrySnapshot CreateSynthetic(uint seed)
+    {
+        return new AuraPageEntrySnapshot((ushort)(1000 + seed), 24, 2, 0b0001_0111);
+    }
+}
+
+public readonly record struct AuraPageSnapshot(
+    byte PageKindCode,
+    byte TotalAuraCount,
+    AuraPageEntrySnapshot Entry1,
+    AuraPageEntrySnapshot Entry2)
+{
+    public static AuraPageSnapshot CreateSynthetic()
+    {
+        return new AuraPageSnapshot(1, 8, AuraPageEntrySnapshot.CreateSynthetic(1), AuraPageEntrySnapshot.CreateSynthetic(2));
+    }
+}
+
+public readonly record struct TextPageSnapshot(
+    byte TextKindCode,
+    ushort TextHash16,
+    string Label)
+{
+    public static TextPageSnapshot CreateSynthetic() => new(3, 0xBEEF, "AURA TEXT");
+}
+
+public readonly record struct AbilityWatchEntrySnapshot(
+    ushort Id,
+    byte CooldownQ4,
+    byte Flags)
+{
+    public static AbilityWatchEntrySnapshot CreateSynthetic(uint seed)
+    {
+        return new AbilityWatchEntrySnapshot((ushort)(2000 + seed), 12, 0b0011_0011);
+    }
+}
+
+public readonly record struct AbilityWatchSnapshot(
+    byte PageIndex,
+    AbilityWatchEntrySnapshot Entry1,
+    AbilityWatchEntrySnapshot Entry2,
+    byte ShortestCooldownQ4,
+    byte ReadyCount,
+    byte CoolingCount)
+{
+    public static AbilityWatchSnapshot CreateSynthetic()
+    {
+        return new AbilityWatchSnapshot(4, AbilityWatchEntrySnapshot.CreateSynthetic(1), AbilityWatchEntrySnapshot.CreateSynthetic(2), 8, 3, 2);
     }
 }
 
@@ -224,6 +304,48 @@ public sealed record FollowUnitStatusFrame(
     byte[] TransportBytes)
     : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
 
+public sealed record TargetVitalsFrame(
+    TelemetryFrameHeader Header,
+    TargetVitalsSnapshot Payload,
+    uint PayloadCrc32C,
+    byte[] TransportBytes)
+    : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
+
+public sealed record TargetResourcesFrame(
+    TelemetryFrameHeader Header,
+    TargetResourcesSnapshot Payload,
+    uint PayloadCrc32C,
+    byte[] TransportBytes)
+    : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
+
+public sealed record AuxUnitCastFrame(
+    TelemetryFrameHeader Header,
+    AuxUnitCastSnapshot Payload,
+    uint PayloadCrc32C,
+    byte[] TransportBytes)
+    : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
+
+public sealed record AuraPageFrame(
+    TelemetryFrameHeader Header,
+    AuraPageSnapshot Payload,
+    uint PayloadCrc32C,
+    byte[] TransportBytes)
+    : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
+
+public sealed record TextPageFrame(
+    TelemetryFrameHeader Header,
+    TextPageSnapshot Payload,
+    uint PayloadCrc32C,
+    byte[] TransportBytes)
+    : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
+
+public sealed record AbilityWatchFrame(
+    TelemetryFrameHeader Header,
+    AbilityWatchSnapshot Payload,
+    uint PayloadCrc32C,
+    byte[] TransportBytes)
+    : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
+
 public sealed record TransportParseResult(
     bool IsAccepted,
     string Reason,
@@ -256,6 +378,18 @@ public static class TransportConstants
     public const byte TargetPositionSchemaId = 1;
     public const byte FollowUnitStatusFrameType = 8;
     public const byte FollowUnitStatusSchemaId = 1;
+    public const byte TargetVitalsFrameType = 9;
+    public const byte TargetVitalsSchemaId = 1;
+    public const byte TargetResourcesFrameType = 10;
+    public const byte TargetResourcesSchemaId = 1;
+    public const byte AuxUnitCastFrameType = 11;
+    public const byte AuxUnitCastSchemaId = 1;
+    public const byte AuraPageFrameType = 12;
+    public const byte AuraPageSchemaId = 1;
+    public const byte TextPageFrameType = 13;
+    public const byte TextPageSchemaId = 1;
+    public const byte AbilityWatchFrameType = 14;
+    public const byte AbilityWatchSchemaId = 1;
     public const int TransportBytes = 24;
     public const int HeaderBytes = 8;
     public const int PayloadBytes = 12;
@@ -267,7 +401,9 @@ public static class TransportConstants
         HeaderCapabilityFlags.PlayerCast |
         HeaderCapabilityFlags.ExpandedStats |
         HeaderCapabilityFlags.TargetPosition |
-        HeaderCapabilityFlags.FollowUnitStatus;
+        HeaderCapabilityFlags.FollowUnitStatus |
+        HeaderCapabilityFlags.AdditionalTelemetry |
+        HeaderCapabilityFlags.TextAndAuras;
 }
 
 public static class FrameProtocol
@@ -370,6 +506,73 @@ public static class FrameProtocol
         return BuildFrameBytes(profileId, sequence, FrameType.FollowUnitStatus, TransportConstants.FollowUnitStatusSchemaId, payload);
     }
 
+    public static byte[] BuildTargetVitalsFrameBytes(byte profileId, byte sequence, TargetVitalsSnapshot snapshot)
+    {
+        Span<byte> payload = stackalloc byte[TransportConstants.PayloadBytes];
+        WriteUInt32BigEndian(payload, 0, snapshot.HealthCurrent);
+        WriteUInt32BigEndian(payload, 4, snapshot.HealthMax);
+        WriteUInt16BigEndian(payload, 8, snapshot.Absorb);
+        payload[10] = snapshot.TargetFlags;
+        payload[11] = snapshot.TargetLevel;
+        return BuildFrameBytes(profileId, sequence, FrameType.TargetVitals, TransportConstants.TargetVitalsSchemaId, payload);
+    }
+
+    public static byte[] BuildTargetResourcesFrameBytes(byte profileId, byte sequence, TargetResourcesSnapshot snapshot)
+    {
+        Span<byte> payload = stackalloc byte[TransportConstants.PayloadBytes];
+        WriteUInt16BigEndian(payload, 0, snapshot.ManaCurrent);
+        WriteUInt16BigEndian(payload, 2, snapshot.ManaMax);
+        WriteUInt16BigEndian(payload, 4, snapshot.EnergyCurrent);
+        WriteUInt16BigEndian(payload, 6, snapshot.EnergyMax);
+        WriteUInt16BigEndian(payload, 8, snapshot.PowerCurrent);
+        WriteUInt16BigEndian(payload, 10, snapshot.PowerMax);
+        return BuildFrameBytes(profileId, sequence, FrameType.TargetResources, TransportConstants.TargetResourcesSchemaId, payload);
+    }
+
+    public static byte[] BuildAuxUnitCastFrameBytes(byte profileId, byte sequence, AuxUnitCastSnapshot snapshot)
+    {
+        Span<byte> payload = stackalloc byte[TransportConstants.PayloadBytes];
+        payload[0] = snapshot.UnitSelectorCode;
+        payload[1] = snapshot.CastFlags;
+        payload[2] = snapshot.ProgressPctQ8;
+        WriteUInt16BigEndian(payload, 3, snapshot.DurationCenti);
+        WriteUInt16BigEndian(payload, 5, snapshot.RemainingCenti);
+        payload[7] = snapshot.CastTargetCode;
+        WriteAsciiLabel(payload, 8, 4, snapshot.Label);
+        return BuildFrameBytes(profileId, sequence, FrameType.AuxUnitCast, TransportConstants.AuxUnitCastSchemaId, payload);
+    }
+
+    public static byte[] BuildAuraPageFrameBytes(byte profileId, byte sequence, AuraPageSnapshot snapshot)
+    {
+        Span<byte> payload = stackalloc byte[TransportConstants.PayloadBytes];
+        payload[0] = snapshot.PageKindCode;
+        payload[1] = snapshot.TotalAuraCount;
+        WriteAuraEntry(payload, 2, snapshot.Entry1);
+        WriteAuraEntry(payload, 7, snapshot.Entry2);
+        return BuildFrameBytes(profileId, sequence, FrameType.AuraPage, TransportConstants.AuraPageSchemaId, payload);
+    }
+
+    public static byte[] BuildTextPageFrameBytes(byte profileId, byte sequence, TextPageSnapshot snapshot)
+    {
+        Span<byte> payload = stackalloc byte[TransportConstants.PayloadBytes];
+        payload[0] = snapshot.TextKindCode;
+        WriteUInt16BigEndian(payload, 1, snapshot.TextHash16);
+        WriteAsciiLabel(payload, 3, 9, snapshot.Label);
+        return BuildFrameBytes(profileId, sequence, FrameType.TextPage, TransportConstants.TextPageSchemaId, payload);
+    }
+
+    public static byte[] BuildAbilityWatchFrameBytes(byte profileId, byte sequence, AbilityWatchSnapshot snapshot)
+    {
+        Span<byte> payload = stackalloc byte[TransportConstants.PayloadBytes];
+        payload[0] = snapshot.PageIndex;
+        WriteAbilityEntry(payload, 1, snapshot.Entry1);
+        WriteAbilityEntry(payload, 5, snapshot.Entry2);
+        payload[9] = snapshot.ShortestCooldownQ4;
+        payload[10] = snapshot.ReadyCount;
+        payload[11] = snapshot.CoolingCount;
+        return BuildFrameBytes(profileId, sequence, FrameType.AbilityWatch, TransportConstants.AbilityWatchSchemaId, payload);
+    }
+
     public static byte[] EncodeBytesToPayloadSymbols(ReadOnlySpan<byte> bytes)
     {
         if (bytes.Length != TransportConstants.TransportBytes)
@@ -462,16 +665,7 @@ public static class FrameProtocol
 
         if (bytes.Length != TransportConstants.TransportBytes)
         {
-            return new TransportParseResult(
-                false,
-                $"Expected {TransportConstants.TransportBytes} transport bytes, got {bytes.Length}.",
-                false,
-                false,
-                false,
-                false,
-                false,
-                transportBytes,
-                null);
+            return new TransportParseResult(false, $"Expected {TransportConstants.TransportBytes} transport bytes, got {bytes.Length}.", false, false, false, false, false, transportBytes, null);
         }
 
         var magicValid = bytes[0] == TransportConstants.MagicC && bytes[1] == TransportConstants.MagicL;
@@ -514,14 +708,7 @@ public static class FrameProtocol
             return new TransportParseResult(false, "Payload CRC failure.", true, true, true, true, false, transportBytes, null);
         }
 
-        var header = new TelemetryFrameHeader(
-            protocolVersion,
-            profileId,
-            frameType,
-            schemaId,
-            bytes[4],
-            bytes[5],
-            actualHeaderCrc);
+        var header = new TelemetryFrameHeader(protocolVersion, profileId, frameType, schemaId, bytes[4], bytes[5], actualHeaderCrc);
 
         frame = frameType switch
         {
@@ -615,6 +802,67 @@ public static class FrameProtocol
                     payload[11]),
                 actualPayloadCrc,
                 bytes.ToArray()),
+            FrameType.TargetVitals => new TargetVitalsFrame(
+                header,
+                new TargetVitalsSnapshot(
+                    ReadUInt32BigEndian(payload, 0),
+                    ReadUInt32BigEndian(payload, 4),
+                    ReadUInt16BigEndian(payload, 8),
+                    payload[10],
+                    payload[11]),
+                actualPayloadCrc,
+                bytes.ToArray()),
+            FrameType.TargetResources => new TargetResourcesFrame(
+                header,
+                new TargetResourcesSnapshot(
+                    ReadUInt16BigEndian(payload, 0),
+                    ReadUInt16BigEndian(payload, 2),
+                    ReadUInt16BigEndian(payload, 4),
+                    ReadUInt16BigEndian(payload, 6),
+                    ReadUInt16BigEndian(payload, 8),
+                    ReadUInt16BigEndian(payload, 10)),
+                actualPayloadCrc,
+                bytes.ToArray()),
+            FrameType.AuxUnitCast => new AuxUnitCastFrame(
+                header,
+                new AuxUnitCastSnapshot(
+                    payload[0],
+                    payload[1],
+                    payload[2],
+                    ReadUInt16BigEndian(payload, 3),
+                    ReadUInt16BigEndian(payload, 5),
+                    payload[7],
+                    ReadAsciiLabel(payload, 8, 4)),
+                actualPayloadCrc,
+                bytes.ToArray()),
+            FrameType.AuraPage => new AuraPageFrame(
+                header,
+                new AuraPageSnapshot(
+                    payload[0],
+                    payload[1],
+                    ReadAuraEntry(payload, 2),
+                    ReadAuraEntry(payload, 7)),
+                actualPayloadCrc,
+                bytes.ToArray()),
+            FrameType.TextPage => new TextPageFrame(
+                header,
+                new TextPageSnapshot(
+                    payload[0],
+                    ReadUInt16BigEndian(payload, 1),
+                    ReadAsciiLabel(payload, 3, 9)),
+                actualPayloadCrc,
+                bytes.ToArray()),
+            FrameType.AbilityWatch => new AbilityWatchFrame(
+                header,
+                new AbilityWatchSnapshot(
+                    payload[0],
+                    ReadAbilityEntry(payload, 1),
+                    ReadAbilityEntry(payload, 5),
+                    payload[9],
+                    payload[10],
+                    payload[11]),
+                actualPayloadCrc,
+                bytes.ToArray()),
             _ => null
         };
 
@@ -697,6 +945,12 @@ public static class FrameProtocol
             FrameType.PlayerCombat => schemaId == TransportConstants.PlayerCombatSchemaId,
             FrameType.TargetPosition => schemaId == TransportConstants.TargetPositionSchemaId,
             FrameType.FollowUnitStatus => schemaId == TransportConstants.FollowUnitStatusSchemaId,
+            FrameType.TargetVitals => schemaId == TransportConstants.TargetVitalsSchemaId,
+            FrameType.TargetResources => schemaId == TransportConstants.TargetResourcesSchemaId,
+            FrameType.AuxUnitCast => schemaId == TransportConstants.AuxUnitCastSchemaId,
+            FrameType.AuraPage => schemaId == TransportConstants.AuraPageSchemaId,
+            FrameType.TextPage => schemaId == TransportConstants.TextPageSchemaId,
+            FrameType.AbilityWatch => schemaId == TransportConstants.AbilityWatchSchemaId,
             _ => false
         };
     }
@@ -728,6 +982,38 @@ public static class FrameProtocol
         }
 
         return new string(chars).TrimEnd();
+    }
+
+    private static void WriteAuraEntry(Span<byte> payload, int offset, AuraPageEntrySnapshot entry)
+    {
+        WriteUInt16BigEndian(payload, offset, entry.Id);
+        payload[offset + 2] = entry.RemainingQ4;
+        payload[offset + 3] = entry.Stack;
+        payload[offset + 4] = entry.Flags;
+    }
+
+    private static AuraPageEntrySnapshot ReadAuraEntry(ReadOnlySpan<byte> payload, int offset)
+    {
+        return new AuraPageEntrySnapshot(
+            ReadUInt16BigEndian(payload, offset),
+            payload[offset + 2],
+            payload[offset + 3],
+            payload[offset + 4]);
+    }
+
+    private static void WriteAbilityEntry(Span<byte> payload, int offset, AbilityWatchEntrySnapshot entry)
+    {
+        WriteUInt16BigEndian(payload, offset, entry.Id);
+        payload[offset + 2] = entry.CooldownQ4;
+        payload[offset + 3] = entry.Flags;
+    }
+
+    private static AbilityWatchEntrySnapshot ReadAbilityEntry(ReadOnlySpan<byte> payload, int offset)
+    {
+        return new AbilityWatchEntrySnapshot(
+            ReadUInt16BigEndian(payload, offset),
+            payload[offset + 2],
+            payload[offset + 3]);
     }
 
     private static void WriteUInt16BigEndian(Span<byte> payload, int offset, ushort value)

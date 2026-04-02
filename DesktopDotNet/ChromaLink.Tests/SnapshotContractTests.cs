@@ -37,12 +37,14 @@ public class SnapshotContractTests
         Assert.Equal(8, transport.GetProperty("reservedFlags").GetProperty("expandedStats").GetInt32());
         Assert.Equal(16, transport.GetProperty("reservedFlags").GetProperty("targetPosition").GetInt32());
         Assert.Equal(32, transport.GetProperty("reservedFlags").GetProperty("followUnitStatus").GetInt32());
+        Assert.Equal(64, transport.GetProperty("reservedFlags").GetProperty("additionalTelemetry").GetInt32());
+        Assert.Equal(128, transport.GetProperty("reservedFlags").GetProperty("textAndAuras").GetInt32());
 
         var aggregateJson = root.GetProperty("aggregate");
         Assert.True(aggregateJson.GetProperty("ready").GetBoolean());
         Assert.True(aggregateJson.GetProperty("healthy").GetBoolean());
         Assert.False(aggregateJson.GetProperty("stale").GetBoolean());
-        Assert.Equal(8, aggregateJson.GetProperty("acceptedFrames").GetInt32());
+        Assert.Equal(14, aggregateJson.GetProperty("acceptedFrames").GetInt32());
 
         var freshness = aggregateJson.GetProperty("freshness");
         Assert.Equal(2000.0, freshness.GetProperty("windowMs").GetDouble(), 2);
@@ -57,9 +59,20 @@ public class SnapshotContractTests
         Assert.True(aggregateJson.GetProperty("playerCombat").GetProperty("fresh").GetBoolean());
         Assert.True(aggregateJson.GetProperty("targetPosition").GetProperty("fresh").GetBoolean());
         Assert.True(aggregateJson.GetProperty("followUnitStatus").GetProperty("fresh").GetBoolean());
+        Assert.True(aggregateJson.GetProperty("targetVitals").GetProperty("fresh").GetBoolean());
+        Assert.True(aggregateJson.GetProperty("targetResources").GetProperty("fresh").GetBoolean());
+        Assert.True(aggregateJson.GetProperty("auxUnitCast").GetProperty("fresh").GetBoolean());
+        Assert.True(aggregateJson.GetProperty("auraPage").GetProperty("fresh").GetBoolean());
+        Assert.True(aggregateJson.GetProperty("textPage").GetProperty("fresh").GetBoolean());
+        Assert.True(aggregateJson.GetProperty("abilityWatch").GetProperty("fresh").GetBoolean());
+        var followStatuses = aggregateJson.GetProperty("followUnitStatuses");
+        Assert.Equal(2, followStatuses.GetArrayLength());
+        var followStatusItems = followStatuses.EnumerateArray().ToArray();
+        Assert.Equal(1, followStatusItems[0].GetProperty("slot").GetInt32());
+        Assert.Equal(2, followStatusItems[1].GetProperty("slot").GetInt32());
 
         var metrics = root.GetProperty("metrics");
-        Assert.Equal(7, metrics.GetProperty("acceptedSamples").GetInt32());
+        Assert.Equal(13, metrics.GetProperty("acceptedSamples").GetInt32());
         Assert.Equal(1, metrics.GetProperty("rejectedSamples").GetInt32());
         Assert.Equal(3, metrics.GetProperty("frameTypeCounts").GetProperty("CoreStatus/schema-1").GetInt32());
         Assert.Equal(2, metrics.GetProperty("frameTypeCounts").GetProperty("PlayerVitals/schema-1").GetInt32());
@@ -69,6 +82,12 @@ public class SnapshotContractTests
         Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("PlayerCombat/schema-1").GetInt32());
         Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("TargetPosition/schema-1").GetInt32());
         Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("FollowUnitStatus/schema-1").GetInt32());
+        Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("TargetVitals/schema-1").GetInt32());
+        Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("TargetResources/schema-1").GetInt32());
+        Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("AuxUnitCast/schema-1").GetInt32());
+        Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("AuraPage/schema-1").GetInt32());
+        Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("TextPage/schema-1").GetInt32());
+        Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("AbilityWatch/schema-1").GetInt32());
 
         Assert.Equal("screen", root.GetProperty("lastBackend").GetString());
         Assert.Equal(0, root.GetProperty("lastDetection").GetProperty("originX").GetInt32());
@@ -125,7 +144,7 @@ public class SnapshotContractTests
         Assert.True(freshPayload.Fresh);
         Assert.True(freshDocument.Ok);
         Assert.Equal("chromalink-live-telemetry", freshJson.RootElement.GetProperty("contract").GetProperty("name").GetString());
-        Assert.Equal(8, freshJson.RootElement.GetProperty("aggregate").GetProperty("acceptedFrames").GetInt32());
+        Assert.Equal(14, freshJson.RootElement.GetProperty("aggregate").GetProperty("acceptedFrames").GetInt32());
         Assert.True(freshJson.RootElement.GetProperty("aggregate").GetProperty("ready").GetBoolean());
         Assert.True(freshJson.RootElement.GetProperty("aggregate").GetProperty("healthy").GetBoolean());
         Assert.False(freshJson.RootElement.GetProperty("aggregate").GetProperty("stale").GetBoolean());
@@ -319,12 +338,14 @@ public class SnapshotContractTests
                     playerCast = 4,
                     expandedStats = 8,
                     targetPosition = 16,
-                    followUnitStatus = 32
+                    followUnitStatus = 32,
+                    additionalTelemetry = 64,
+                    textAndAuras = 128
                 }
             },
             aggregate = new
             {
-                acceptedFrames = 8,
+                acceptedFrames = 14,
                 ready = true,
                 lastUpdatedUtc = nowUtc.AddMilliseconds(-20),
                 healthy = true,
@@ -442,12 +463,16 @@ public class SnapshotContractTests
                     frameType = "PlayerCombat",
                     schemaId = 1,
                     sequence = 6,
-                    reservedFlags = 63,
-                    combatFlags = 15,
+                    reservedFlags = 255,
+                    combatFlags = 255,
                     hasCombo = true,
                     hasCharge = true,
                     hasPlanar = true,
                     hasAbsorb = true,
+                    pvp = true,
+                    mentoring = true,
+                    ready = true,
+                    afk = true,
                     combo = 4,
                     chargeCurrent = 80,
                     chargeMax = 100,
@@ -469,39 +494,223 @@ public class SnapshotContractTests
                     y = 201.50,
                     z = -48.25
                 },
+                targetVitals = new
+                {
+                    observedAtUtc = nowUtc.AddMilliseconds(-7),
+                    ageMs = 7.0,
+                    fresh = true,
+                    stale = false,
+                    frameType = "TargetVitals",
+                    schemaId = 1,
+                    sequence = 9,
+                    reservedFlags = 255,
+                    healthCurrent = 31200,
+                    healthMax = 35000,
+                    absorb = 120,
+                    targetFlags = 15,
+                    present = true,
+                    alive = true,
+                    combat = true,
+                    tagged = true,
+                    targetLevel = 72
+                },
+                targetResources = new
+                {
+                    observedAtUtc = nowUtc.AddMilliseconds(-6),
+                    ageMs = 6.0,
+                    fresh = true,
+                    stale = false,
+                    frameType = "TargetResources",
+                    schemaId = 1,
+                    sequence = 10,
+                    reservedFlags = 255,
+                    manaCurrent = 2200,
+                    manaMax = 3000,
+                    energyCurrent = 80,
+                    energyMax = 100,
+                    powerCurrent = 18,
+                    powerMax = 100
+                },
+                auxUnitCast = new
+                {
+                    observedAtUtc = nowUtc.AddMilliseconds(-5),
+                    ageMs = 5.0,
+                    fresh = true,
+                    stale = false,
+                    frameType = "AuxUnitCast",
+                    schemaId = 1,
+                    sequence = 11,
+                    reservedFlags = 255,
+                    unitSelectorCode = 2,
+                    castFlags = 19,
+                    progressPctQ8 = 88,
+                    durationCenti = 180,
+                    remainingCenti = 60,
+                    castTargetCode = 1,
+                    label = "SHLD"
+                },
+                auraPage = new
+                {
+                    observedAtUtc = nowUtc.AddMilliseconds(-4),
+                    ageMs = 4.0,
+                    fresh = true,
+                    stale = false,
+                    frameType = "AuraPage",
+                    schemaId = 1,
+                    sequence = 12,
+                    reservedFlags = 255,
+                    pageKindCode = 1,
+                    totalAuraCount = 8,
+                    entry1 = new
+                    {
+                        id = 1001,
+                        remainingQ4 = 24,
+                        stack = 2,
+                        flags = 23
+                    },
+                    entry2 = new
+                    {
+                        id = 1002,
+                        remainingQ4 = 24,
+                        stack = 2,
+                        flags = 23
+                    }
+                },
+                textPage = new
+                {
+                    observedAtUtc = nowUtc.AddMilliseconds(-3),
+                    ageMs = 3.0,
+                    fresh = true,
+                    stale = false,
+                    frameType = "TextPage",
+                    schemaId = 1,
+                    sequence = 13,
+                    reservedFlags = 255,
+                    textKindCode = 3,
+                    textHash16 = 48879,
+                    label = "AURA TEXT"
+                },
+                abilityWatch = new
+                {
+                    observedAtUtc = nowUtc.AddMilliseconds(-2),
+                    ageMs = 2.0,
+                    fresh = true,
+                    stale = false,
+                    frameType = "AbilityWatch",
+                    schemaId = 1,
+                    sequence = 14,
+                    reservedFlags = 255,
+                    pageIndex = 4,
+                    entry1 = new
+                    {
+                        id = 2001,
+                        cooldownQ4 = 12,
+                        flags = 51
+                    },
+                    entry2 = new
+                    {
+                        id = 2002,
+                        cooldownQ4 = 12,
+                        flags = 51
+                    },
+                    shortestCooldownQ4 = 8,
+                    readyCount = 3,
+                    coolingCount = 2
+                },
                 followUnitStatus = new
                 {
-                    observedAtUtc = nowUtc.AddMilliseconds(-8),
-                    ageMs = 8.0,
+                    observedAtUtc = nowUtc.AddMilliseconds(-1),
+                    ageMs = 1.0,
                     fresh = true,
                     stale = false,
                     frameType = "FollowUnitStatus",
                     schemaId = 1,
-                    sequence = 8,
-                    reservedFlags = 63,
-                    slot = 1,
-                    followFlags = 143,
+                    sequence = 16,
+                    reservedFlags = 255,
+                    slot = 2,
+                    followFlags = 131,
                     present = true,
                     alive = true,
-                    combat = true,
-                    afk = true,
+                    combat = false,
+                    afk = false,
                     offline = false,
                     aggro = false,
                     blocked = false,
                     readyFlag = true,
-                    x = 7123.5,
-                    y = 865.0,
-                    z = 3010.5,
-                    healthPctQ8 = 222,
-                    resourcePctQ8 = 144,
-                    level = 70,
-                    calling = 3,
+                    x = 7124.5,
+                    y = 866.0,
+                    z = 3011.5,
+                    healthPctQ8 = 200,
+                    resourcePctQ8 = 120,
+                    level = 69,
+                    calling = 2,
                     role = 1
+                },
+                followUnitStatuses = new[]
+                {
+                    new
+                    {
+                        slot = 1,
+                        observedAtUtc = nowUtc.AddMilliseconds(-1),
+                        ageMs = 1.0,
+                        fresh = true,
+                        stale = false,
+                        frameType = "FollowUnitStatus",
+                        schemaId = 1,
+                        sequence = 15,
+                        reservedFlags = 255,
+                        followFlags = 143,
+                        present = true,
+                        alive = true,
+                        combat = true,
+                        afk = true,
+                        offline = false,
+                        aggro = false,
+                        blocked = false,
+                        readyFlag = true,
+                        x = 7123.5,
+                        y = 865.0,
+                        z = 3010.5,
+                        healthPctQ8 = 222,
+                        resourcePctQ8 = 144,
+                        level = 70,
+                        calling = 3,
+                        role = 1
+                    },
+                    new
+                    {
+                        slot = 2,
+                        observedAtUtc = nowUtc.AddMilliseconds(-1),
+                        ageMs = 1.0,
+                        fresh = true,
+                        stale = false,
+                        frameType = "FollowUnitStatus",
+                        schemaId = 1,
+                        sequence = 16,
+                        reservedFlags = 255,
+                        followFlags = 131,
+                        present = true,
+                        alive = true,
+                        combat = false,
+                        afk = false,
+                        offline = false,
+                        aggro = false,
+                        blocked = false,
+                        readyFlag = true,
+                        x = 7124.5,
+                        y = 866.0,
+                        z = 3011.5,
+                        healthPctQ8 = 200,
+                        resourcePctQ8 = 120,
+                        level = 69,
+                        calling = 2,
+                        role = 1
+                    }
                 }
             },
             metrics = new
             {
-                acceptedSamples = 7,
+                acceptedSamples = 13,
                 rejectedSamples = 1,
                 averageCaptureMs = 12.5,
                 averageDecodeMs = 4.25,
@@ -517,7 +726,13 @@ public class SnapshotContractTests
                     ["PlayerResources/schema-1"] = 1,
                     ["PlayerCombat/schema-1"] = 1,
                     ["TargetPosition/schema-1"] = 1,
-                    ["FollowUnitStatus/schema-1"] = 1
+                    ["FollowUnitStatus/schema-1"] = 1,
+                    ["TargetVitals/schema-1"] = 1,
+                    ["TargetResources/schema-1"] = 1,
+                    ["AuxUnitCast/schema-1"] = 1,
+                    ["AuraPage/schema-1"] = 1,
+                    ["TextPage/schema-1"] = 1,
+                    ["AbilityWatch/schema-1"] = 1
                 }
             },
             lastBackend = "screen",
@@ -537,8 +752,8 @@ public class SnapshotContractTests
             {
                 frameType = "FollowUnitStatus",
                 schemaId = 1,
-                sequence = 8,
-                reservedFlags = 63
+                sequence = 16,
+                reservedFlags = 255
             }
         };
 
