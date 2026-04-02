@@ -457,6 +457,12 @@ Or build the self-contained release flavor with:
 .\scripts\Package-ChromaLinkDesktop-SelfContained.cmd
 ```
 
+Release metadata now comes from:
+
+- [VERSION](C:/Users/mrkoo/OneDrive/Documents/RIFT/Interface/AddOns/ChromaLink/VERSION)
+- [CHANGELOG.md](C:/Users/mrkoo/OneDrive/Documents/RIFT/Interface/AddOns/ChromaLink/CHANGELOG.md)
+- [RELEASE_CHECKLIST.md](C:/Users/mrkoo/OneDrive/Documents/RIFT/Interface/AddOns/ChromaLink/RELEASE_CHECKLIST.md)
+
 The default package layout is:
 
 ```text
@@ -535,6 +541,7 @@ Package flavor guidance:
 
 - use `artifacts\package` when the target machine already has the matching .NET runtime
 - use `artifacts\package-selfcontained` when you want the safer handoff option for another Windows machine
+- bump `VERSION` and review `CHANGELOG.md` before cutting a release build
 
 ## Project Structure
 

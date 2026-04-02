@@ -13,6 +13,15 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
 }
 
 $desktopRoot = Join-Path $OutputRoot "desktop"
+$versionPath = Join-Path $repoRoot "VERSION"
+
+$packageBaseVersion = "0.1.0-dev"
+if (Test-Path -LiteralPath $versionPath) {
+  $candidate = (Get-Content -LiteralPath $versionPath -Raw).Trim()
+  if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+    $packageBaseVersion = $candidate
+  }
+}
 
 $sourceCommit = "unknown"
 try {
@@ -23,7 +32,7 @@ try {
 } catch {
 }
 
-$packageVersion = if ($sourceCommit -eq "unknown") { "0.1.0-dev" } else { "0.1.0-dev+$sourceCommit" }
+$packageVersion = if ($sourceCommit -eq "unknown") { $packageBaseVersion } else { "$packageBaseVersion+$sourceCommit" }
 
 $projects = @(
   [pscustomobject]@{
@@ -113,6 +122,7 @@ foreach ($project in $projects) {
 
 $manifest = [pscustomobject]@{
   PackageName = "ChromaLink Desktop Package"
+  PackageBaseVersion = $packageBaseVersion
   PackageVersion = $packageVersion
   GeneratedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
   SourceCommit = $sourceCommit

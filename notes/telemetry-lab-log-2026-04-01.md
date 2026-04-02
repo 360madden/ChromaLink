@@ -538,6 +538,54 @@ Keep.
 
 ---
 
+## 2026-04-02 - Session AL - release version source and checklist
+
+### Goal
+
+Make releases more intentional by adding a single version source and a lightweight release checklist.
+
+### Change
+
+- add top-level release files:
+  - `VERSION`
+  - `CHANGELOG.md`
+  - `RELEASE_CHECKLIST.md`
+- update `scripts/Package-ChromaLinkDesktop.ps1` to read the base version from `VERSION`
+- keep package build identity by appending the current short commit hash in `PackageVersion`
+- add `PackageBaseVersion` to `package-manifest.json`
+
+### Why
+
+The package flow had become strong enough to hand off, but versioning was still implicit and hardcoded. A final-product workflow needs one obvious version source and one short release checklist.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+.\scripts\Package-ChromaLinkDesktop.ps1
+```
+
+```powershell
+.\scripts\Package-ChromaLinkDesktop-SelfContained.cmd
+```
+
+### Result
+
+- release versioning now has a single source of truth in `VERSION`
+- package manifests now reflect both:
+  - `PackageBaseVersion`
+  - `PackageVersion`
+- the repo now includes a lightweight release checklist and changelog baseline
+
+### Decision
+
+Keep.
+
+---
+
 ## 2026-04-01 - Session B - quiet default diagnostics
 
 ### Goal
