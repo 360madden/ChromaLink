@@ -8,7 +8,7 @@ param(
   ),
   [switch]$ReloadUi,
   [ValidateSet("desktopdup", "screen", "printwindow")]
-  [string]$Backend = "desktopdup",
+  [string]$Backend = "printwindow",
   [int]$Left = 40,
   [int]$Top = 40,
   [string]$OutputRoot = ""

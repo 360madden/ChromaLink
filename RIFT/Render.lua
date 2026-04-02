@@ -123,34 +123,23 @@ local function ComputeLayout(renderState)
   }
 end
 
-local function ResolveDisplayScale(profile, layout)
-  local scaleX = tonumber(profile.displayScaleX) or tonumber(profile.displayScale) or 1
-  local scaleY = tonumber(profile.displayScaleY) or tonumber(profile.displayScale) or 1
-  local anchorWidth = layout.anchorWidth or profile.windowWidth
-
-  if anchorWidth > profile.windowWidth then
-    scaleX = tonumber(profile.wideClientDisplayScaleX) or scaleX
-    scaleY = tonumber(profile.wideClientDisplayScaleY) or scaleY
-  end
-
-  if scaleX <= 0 then
-    scaleX = 1
-  end
-  if scaleY <= 0 then
-    scaleY = 1
-  end
-
-  return scaleX, scaleY
-end
-
 local function ApplyLayout(renderState)
   local profile = renderState.profile
   local diagnosticsConfig = config.layoutDiagnostics or {}
   local layout = ComputeLayout(renderState)
-  local displayScaleX, displayScaleY = ResolveDisplayScale(profile, layout)
+  local displayScaleX = tonumber(profile.displayScaleX) or tonumber(profile.displayScale) or 1
+  local displayScaleY = tonumber(profile.displayScaleY) or tonumber(profile.displayScale) or 1
+  local index
+
+  if displayScaleX <= 0 then
+    displayScaleX = 1
+  end
+  if displayScaleY <= 0 then
+    displayScaleY = 1
+  end
+
   local bandWidth = profile.bandWidth * displayScaleX
   local bandHeight = profile.bandHeight * displayScaleY
-  local index
 
   if renderState.lastRootLeft == layout.rootLeft
       and renderState.lastRootTop == layout.rootTop

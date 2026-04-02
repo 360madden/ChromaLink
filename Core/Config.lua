@@ -49,9 +49,7 @@ ChromaLink.Config = {
     payloadStartIndex = 9,
     payloadSymbolCount = 64,
     displayScaleX = 1.0,
-    displayScaleY = 1.0,
-    wideClientDisplayScaleX = 1.0,
-    wideClientDisplayScaleY = 1.0
+    displayScaleY = 1.0
   },
   controlLeft = { 0, 1, 0, 1, 2, 3, 4, 5 },
   controlRight = { 5, 4, 3, 2, 1, 0, 1, 0 },

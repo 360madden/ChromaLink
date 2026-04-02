@@ -97,4 +97,22 @@ public class ProtocolAndReplayTests
         Assert.True(validation.ParseResult!.HeaderCrcValid);
         Assert.True(validation.ParseResult.PayloadCrcValid);
     }
+
+    [Fact]
+    public void Analyzer_Accepts_Synthetic640CanvasAtLiveScale()
+    {
+        var bytes = FrameProtocol.BuildCoreFrameBytes(_profile.NumericId, 31, CoreStatusSnapshot.CreateSynthetic());
+        var strip = ColorStripRenderer.Render(_profile, bytes).ScaleNearest(0.35, "scaled-live-strip");
+        var canvas = Bgr24Frame.CreateSolid(_profile.WindowWidth, _profile.CaptureHeight, _profile.GetPaletteColor(0), "scaled-live-canvas");
+        canvas.Paste(strip, 0, 0);
+
+        var validation = ColorStripAnalyzer.Analyze(canvas, _profile);
+
+        Assert.True(validation.IsAccepted, validation.Reason);
+        Assert.NotNull(validation.Detection);
+        Assert.Equal(0.35, validation.Detection!.Scale, 2);
+        Assert.Equal(2.8, validation.Detection.Pitch, 1);
+        Assert.NotNull(validation.Frame);
+        Assert.Equal(FrameType.CoreStatus, validation.Frame!.Header.FrameType);
+    }
 }

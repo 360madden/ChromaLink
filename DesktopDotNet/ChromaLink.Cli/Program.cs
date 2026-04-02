@@ -7,7 +7,12 @@ return new CliApp().Run(args);
 internal sealed class CliApp
 {
     private readonly StripProfile _profile = StripProfiles.Default;
-    private static readonly CaptureBackend[] DefaultCaptureBackends = { CaptureBackend.DesktopDuplication, CaptureBackend.ScreenBitBlt };
+    private static readonly CaptureBackend[] DefaultCaptureBackends =
+    {
+        CaptureBackend.PrintWindow,
+        CaptureBackend.DesktopDuplication,
+        CaptureBackend.ScreenBitBlt
+    };
 
     public int Run(string[] args)
     {

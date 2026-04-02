@@ -12,8 +12,35 @@ internal static class DiagnosticsArtifacts
         FrameValidationResult validation,
         IReadOnlyList<string> attemptSummaries)
     {
-        WriteAnnotatedBmp(rawBmpPath, profile, capture, validation);
+        TryWriteAnnotatedBmp(rawBmpPath, profile, capture, validation, attemptSummaries);
         WriteSidecar(rawBmpPath, profile, capture, validation, attemptSummaries);
+    }
+
+    private static void TryWriteAnnotatedBmp(
+        string rawBmpPath,
+        StripProfile profile,
+        CaptureResult capture,
+        FrameValidationResult validation,
+        IReadOnlyList<string> attemptSummaries)
+    {
+        try
+        {
+            WriteAnnotatedBmp(rawBmpPath, profile, capture, validation);
+        }
+        catch (Exception ex)
+        {
+            var annotatedPath = Path.Combine(
+                Path.GetDirectoryName(rawBmpPath) ?? ".",
+                $"{Path.GetFileNameWithoutExtension(rawBmpPath)}-annotated.txt");
+            var lines = new List<string>(attemptSummaries.Count + 3)
+            {
+                $"Annotated BMP generation failed: {ex.GetType().Name}: {ex.Message}",
+                $"Raw BMP: {rawBmpPath}",
+                $"Backend: {capture.Backend}"
+            };
+            lines.AddRange(attemptSummaries);
+            File.WriteAllLines(annotatedPath, lines);
+        }
     }
 
     private static void WriteAnnotatedBmp(
