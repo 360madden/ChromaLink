@@ -184,11 +184,19 @@ internal static class DiagnosticsArtifacts
                 {
                     configured = observerReport.IsConfigured,
                     probablyVisible = observerReport.IsProbablyVisible,
+                    visibilityHint = observerReport.VisibilityHint,
                     matchedMarkers = observerReport.MatchedMarkers,
                     totalMarkers = observerReport.TotalMarkers,
                     averageConfidence = observerReport.AverageConfidence,
                     expectedPattern = observerReport.ExpectedPattern,
                     observedPattern = observerReport.ObservedPattern,
+                    fullyVisibleMarkers = observerReport.FullyVisibleMarkers,
+                    partiallyVisibleMarkers = observerReport.PartiallyVisibleMarkers,
+                    outsideMarkers = observerReport.OutsideMarkers,
+                    leftEdgeAffectedMarkers = observerReport.LeftEdgeAffectedMarkers,
+                    rightEdgeAffectedMarkers = observerReport.RightEdgeAffectedMarkers,
+                    topEdgeAffectedMarkers = observerReport.TopEdgeAffectedMarkers,
+                    bottomEdgeAffectedMarkers = observerReport.BottomEdgeAffectedMarkers,
                     markers = observerReport.Markers.Select(marker => new
                     {
                         markerIndex = marker.MarkerIndex,
@@ -204,6 +212,9 @@ internal static class DiagnosticsArtifacts
                         height = marker.Height,
                         centerX = marker.CenterX,
                         centerY = marker.CenterY,
+                        visibleFraction = marker.VisibleFraction,
+                        centerInBounds = marker.CenterInBounds,
+                        boundsState = marker.BoundsState.ToString(),
                         sampleColor = new
                         {
                             r = marker.SampleColor.R,
@@ -281,6 +292,7 @@ internal static class DiagnosticsArtifacts
             lines.Add($"Obs:   {observerReport.ExpectedPattern}");
             lines.Add($"Obs':  {observerReport.ObservedPattern}");
             lines.Add($"ObsOk: {observerReport.MatchedMarkers}/{observerReport.TotalMarkers} vis={observerReport.IsProbablyVisible} conf={observerReport.AverageConfidence:F3}");
+            lines.Add($"ObsHint:{observerReport.VisibilityHint} full={observerReport.FullyVisibleMarkers} part={observerReport.PartiallyVisibleMarkers} out={observerReport.OutsideMarkers}");
         }
 
         if (validation.ParseResult is not null)

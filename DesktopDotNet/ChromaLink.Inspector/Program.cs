@@ -250,16 +250,18 @@ internal sealed class InspectorForm : Form
         if (root.TryGetProperty("observerLane", out var observerLane) && observerLane.ValueKind == JsonValueKind.Object)
         {
             builder.AppendLine(
-                $"ObserverLane: visible={observerLane.GetProperty("probablyVisible").GetBoolean()} matched={observerLane.GetProperty("matchedMarkers").GetInt32()}/{observerLane.GetProperty("totalMarkers").GetInt32()} conf={observerLane.GetProperty("averageConfidence").GetDouble():F3}");
+                $"ObserverLane: visible={observerLane.GetProperty("probablyVisible").GetBoolean()} matched={observerLane.GetProperty("matchedMarkers").GetInt32()}/{observerLane.GetProperty("totalMarkers").GetInt32()} conf={observerLane.GetProperty("averageConfidence").GetDouble():F3} hint={observerLane.GetProperty("visibilityHint").GetString()}");
             builder.AppendLine($"ObserverExpected: {observerLane.GetProperty("expectedPattern").GetString()}");
             builder.AppendLine($"ObserverObserved: {observerLane.GetProperty("observedPattern").GetString()}");
+            builder.AppendLine(
+                $"ObserverBounds: full={observerLane.GetProperty("fullyVisibleMarkers").GetInt32()} part={observerLane.GetProperty("partiallyVisibleMarkers").GetInt32()} out={observerLane.GetProperty("outsideMarkers").GetInt32()}");
 
             if (observerLane.TryGetProperty("markers", out var markers) && markers.ValueKind == JsonValueKind.Array)
             {
                 foreach (var marker in markers.EnumerateArray())
                 {
                     builder.AppendLine(
-                        $"  marker[{marker.GetProperty("markerIndex").GetInt32()}]: expected={marker.GetProperty("expectedSymbol").GetInt32()} observed={marker.GetProperty("observedSymbol").GetInt32()} conf={marker.GetProperty("confidence").GetDouble():F3} rect={marker.GetProperty("left").GetInt32()},{marker.GetProperty("top").GetInt32()} {marker.GetProperty("width").GetInt32()}x{marker.GetProperty("height").GetInt32()}");
+                        $"  marker[{marker.GetProperty("markerIndex").GetInt32()}]: expected={marker.GetProperty("expectedSymbol").GetInt32()} observed={marker.GetProperty("observedSymbol").GetInt32()} conf={marker.GetProperty("confidence").GetDouble():F3} bounds={marker.GetProperty("boundsState").GetString()} visible={marker.GetProperty("visibleFraction").GetDouble():F2} rect={marker.GetProperty("left").GetInt32()},{marker.GetProperty("top").GetInt32()} {marker.GetProperty("width").GetInt32()}x{marker.GetProperty("height").GetInt32()}");
                 }
             }
         }

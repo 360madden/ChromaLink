@@ -1,5 +1,12 @@
 namespace ChromaLink.Reader;
 
+public enum ObserverMarkerBoundsState
+{
+    Inside,
+    Partial,
+    Outside
+}
+
 public sealed record ObserverLaneMarkerSample(
     int MarkerIndex,
     byte ExpectedSymbol,
@@ -14,6 +21,9 @@ public sealed record ObserverLaneMarkerSample(
     int Height,
     int CenterX,
     int CenterY,
+    double VisibleFraction,
+    bool CenterInBounds,
+    ObserverMarkerBoundsState BoundsState,
     Bgr24Color SampleColor);
 
 public sealed record ObserverLaneReport(
@@ -24,6 +34,14 @@ public sealed record ObserverLaneReport(
     double AverageConfidence,
     string ExpectedPattern,
     string ObservedPattern,
+    string VisibilityHint,
+    int FullyVisibleMarkers,
+    int PartiallyVisibleMarkers,
+    int OutsideMarkers,
+    int LeftEdgeAffectedMarkers,
+    int RightEdgeAffectedMarkers,
+    int TopEdgeAffectedMarkers,
+    int BottomEdgeAffectedMarkers,
     IReadOnlyList<ObserverLaneMarkerSample> Markers);
 
 internal readonly record struct ObserverClassification(
@@ -39,7 +57,7 @@ public static class ObserverLaneAnalyzer
     {
         if (profile.ObserverLane is null || profile.ObserverLane.MarkerSymbols.Length == 0)
         {
-            return new ObserverLaneReport(false, false, 0, 0, 0, "-", "-", Array.Empty<ObserverLaneMarkerSample>());
+            return new ObserverLaneReport(false, false, 0, 0, 0, "-", "-", "not-configured", 0, 0, 0, 0, 0, 0, 0, Array.Empty<ObserverLaneMarkerSample>());
         }
 
         var observer = profile.ObserverLane;
@@ -49,6 +67,13 @@ public static class ObserverLaneAnalyzer
         var samples = new List<ObserverLaneMarkerSample>(observer.MarkerSymbols.Length);
         var matchCount = 0;
         double confidenceTotal = 0;
+        var fullyVisibleMarkers = 0;
+        var partiallyVisibleMarkers = 0;
+        var outsideMarkers = 0;
+        var leftEdgeAffectedMarkers = 0;
+        var rightEdgeAffectedMarkers = 0;
+        var topEdgeAffectedMarkers = 0;
+        var bottomEdgeAffectedMarkers = 0;
 
         for (var index = 0; index < observer.MarkerSymbols.Length; index++)
         {
@@ -65,6 +90,25 @@ public static class ObserverLaneAnalyzer
             var color = image.SampleAverage(centerX, centerY, 1);
             var classification = Classify(color, profile);
             var expected = observer.MarkerSymbols[index];
+            var clippedLeft = scaledLeft < 0;
+            var clippedTop = scaledTop < 0;
+            var clippedRight = scaledLeft + scaledWidth > image.Width;
+            var clippedBottom = scaledTop + scaledHeight > image.Height;
+            var visibleLeft = Math.Max(0, scaledLeft);
+            var visibleTop = Math.Max(0, scaledTop);
+            var visibleRight = Math.Min(image.Width, scaledLeft + scaledWidth);
+            var visibleBottom = Math.Min(image.Height, scaledTop + scaledHeight);
+            var visibleWidth = Math.Max(0, visibleRight - visibleLeft);
+            var visibleHeight = Math.Max(0, visibleBottom - visibleTop);
+            var visibleArea = visibleWidth * visibleHeight;
+            var totalArea = Math.Max(1, scaledWidth * scaledHeight);
+            var visibleFraction = visibleArea / (double)totalArea;
+            var centerInBounds = centerX >= 0 && centerX < image.Width && centerY >= 0 && centerY < image.Height;
+            var boundsState = visibleArea <= 0
+                ? ObserverMarkerBoundsState.Outside
+                : visibleArea < totalArea
+                    ? ObserverMarkerBoundsState.Partial
+                    : ObserverMarkerBoundsState.Inside;
 
             if (classification.Symbol == expected)
             {
@@ -72,6 +116,40 @@ public static class ObserverLaneAnalyzer
             }
 
             confidenceTotal += classification.Confidence;
+
+            switch (boundsState)
+            {
+                case ObserverMarkerBoundsState.Inside:
+                    fullyVisibleMarkers++;
+                    break;
+                case ObserverMarkerBoundsState.Partial:
+                    partiallyVisibleMarkers++;
+                    break;
+                case ObserverMarkerBoundsState.Outside:
+                    outsideMarkers++;
+                    break;
+            }
+
+            if (clippedLeft)
+            {
+                leftEdgeAffectedMarkers++;
+            }
+
+            if (clippedRight)
+            {
+                rightEdgeAffectedMarkers++;
+            }
+
+            if (clippedTop)
+            {
+                topEdgeAffectedMarkers++;
+            }
+
+            if (clippedBottom)
+            {
+                bottomEdgeAffectedMarkers++;
+            }
+
             samples.Add(new ObserverLaneMarkerSample(
                 index,
                 expected,
@@ -86,6 +164,9 @@ public static class ObserverLaneAnalyzer
                 scaledHeight,
                 centerX,
                 centerY,
+                visibleFraction,
+                centerInBounds,
+                boundsState,
                 color));
         }
 
@@ -94,7 +175,21 @@ public static class ObserverLaneAnalyzer
         var observedPattern = string.Join(" ", samples.Select(static sample => sample.ObservedSymbol.ToString()));
         var isProbablyVisible = samples.Count > 0
             && matchCount >= Math.Max(1, (int)Math.Ceiling(samples.Count * 0.75))
+            && partiallyVisibleMarkers == 0
+            && outsideMarkers == 0
             && averageConfidence >= 0.35;
+        var visibilityHint = BuildVisibilityHint(
+            isProbablyVisible,
+            samples.Count,
+            averageConfidence,
+            matchCount,
+            fullyVisibleMarkers,
+            partiallyVisibleMarkers,
+            outsideMarkers,
+            leftEdgeAffectedMarkers,
+            rightEdgeAffectedMarkers,
+            topEdgeAffectedMarkers,
+            bottomEdgeAffectedMarkers);
 
         return new ObserverLaneReport(
             true,
@@ -104,7 +199,81 @@ public static class ObserverLaneAnalyzer
             averageConfidence,
             expectedPattern,
             observedPattern,
+            visibilityHint,
+            fullyVisibleMarkers,
+            partiallyVisibleMarkers,
+            outsideMarkers,
+            leftEdgeAffectedMarkers,
+            rightEdgeAffectedMarkers,
+            topEdgeAffectedMarkers,
+            bottomEdgeAffectedMarkers,
             samples);
+    }
+
+    private static string BuildVisibilityHint(
+        bool isProbablyVisible,
+        int totalMarkers,
+        double averageConfidence,
+        int matchCount,
+        int fullyVisibleMarkers,
+        int partiallyVisibleMarkers,
+        int outsideMarkers,
+        int leftEdgeAffectedMarkers,
+        int rightEdgeAffectedMarkers,
+        int topEdgeAffectedMarkers,
+        int bottomEdgeAffectedMarkers)
+    {
+        if (totalMarkers == 0)
+        {
+            return "no-markers";
+        }
+
+        if (outsideMarkers == totalMarkers)
+        {
+            return "offscreen";
+        }
+
+        if (rightEdgeAffectedMarkers > 0 && leftEdgeAffectedMarkers == 0)
+        {
+            return outsideMarkers > 0 ? "right-offscreen" : "right-clipped";
+        }
+
+        if (leftEdgeAffectedMarkers > 0 && rightEdgeAffectedMarkers == 0)
+        {
+            return outsideMarkers > 0 ? "left-offscreen" : "left-clipped";
+        }
+
+        if (bottomEdgeAffectedMarkers > 0 && topEdgeAffectedMarkers == 0)
+        {
+            return outsideMarkers > 0 ? "bottom-offscreen" : "bottom-clipped";
+        }
+
+        if (topEdgeAffectedMarkers > 0 && bottomEdgeAffectedMarkers == 0)
+        {
+            return outsideMarkers > 0 ? "top-offscreen" : "top-clipped";
+        }
+
+        if (partiallyVisibleMarkers > 0 || outsideMarkers > 0)
+        {
+            return "partially-clipped";
+        }
+
+        if (isProbablyVisible)
+        {
+            return "visible";
+        }
+
+        if (fullyVisibleMarkers == totalMarkers && averageConfidence < 0.35)
+        {
+            return "weak-colors";
+        }
+
+        if (matchCount == 0)
+        {
+            return "pattern-mismatch";
+        }
+
+        return "uncertain";
     }
 
     private static ObserverClassification Classify(Bgr24Color sampleColor, StripProfile profile)

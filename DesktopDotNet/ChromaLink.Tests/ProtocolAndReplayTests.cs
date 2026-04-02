@@ -137,6 +137,10 @@ public class ProtocolAndReplayTests
         Assert.True(report.IsProbablyVisible);
         Assert.Equal(observer.MarkerSymbols.Length, report.MatchedMarkers);
         Assert.Equal("0 1 2 3 4 5 6 7", report.ObservedPattern);
+        Assert.Equal("visible", report.VisibilityHint);
+        Assert.Equal(observer.MarkerSymbols.Length, report.FullyVisibleMarkers);
+        Assert.Equal(0, report.PartiallyVisibleMarkers);
+        Assert.Equal(0, report.OutsideMarkers);
     }
 
     [Fact]
@@ -166,5 +170,37 @@ public class ProtocolAndReplayTests
         Assert.True(report.IsProbablyVisible);
         Assert.Equal(observer.MarkerSymbols.Length, report.MatchedMarkers);
         Assert.Equal("0 1 2 3 4 5 6 7", report.ObservedPattern);
+        Assert.Equal("visible", report.VisibilityHint);
+    }
+
+    [Fact]
+    public void ObserverLaneAnalyzer_Flags_RightClipping_WhenMarkersRunPastCanvas()
+    {
+        var observer = _profile.ObserverLane!;
+        var scale = 0.35;
+        var canvas = Bgr24Frame.CreateSolid(_profile.WindowWidth, _profile.CaptureHeight, _profile.GetPaletteColor(0), "observer-right-clipped");
+        var detection = new DetectionResult(420, 0, 2.8, scale, 0, 0, 0, 229, "fixed-profile", Bgr24Color.Black, Bgr24Color.White);
+
+        for (var index = 0; index < observer.MarkerSymbols.Length; index++)
+        {
+            var fraction = observer.MarkerSymbols.Length > 1
+                ? index / (double)(observer.MarkerSymbols.Length - 1)
+                : 0.0;
+            var left = fraction * Math.Max(0, _profile.BandWidth - observer.MarkerWidth);
+            var scaledLeft = detection.OriginX + (int)Math.Round(left * scale);
+            var scaledTop = (int)Math.Round(observer.OffsetY * scale);
+            var scaledWidth = Math.Max(1, (int)Math.Round(observer.MarkerWidth * scale));
+            var scaledHeight = Math.Max(1, (int)Math.Round(observer.Height * scale));
+            canvas.FillRect(scaledLeft, scaledTop, scaledWidth, scaledHeight, _profile.GetPaletteColor(observer.MarkerSymbols[index]));
+        }
+
+        var report = ObserverLaneAnalyzer.Analyze(canvas, _profile, detection);
+
+        Assert.True(report.IsConfigured);
+        Assert.False(report.IsProbablyVisible);
+        Assert.Equal("right-clipped", report.VisibilityHint);
+        Assert.True(report.RightEdgeAffectedMarkers > 0);
+        Assert.True(report.PartiallyVisibleMarkers > 0 || report.OutsideMarkers > 0);
+        Assert.Contains(report.Markers, marker => marker.BoundsState != ObserverMarkerBoundsState.Inside);
     }
 }

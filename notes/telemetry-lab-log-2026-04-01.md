@@ -473,6 +473,54 @@ Keep.
 
 ---
 
+## 2026-04-01 - Session J - clipping-aware observer diagnostics
+
+### Goal
+
+Make observer-lane diagnostics explain boundary problems directly instead of only reporting marker matches.
+
+### Change
+
+- extend observer marker samples with:
+  - visible fraction
+  - center-in-bounds flag
+  - bounds state
+- extend observer reports with:
+  - visibility hint
+  - visible/partial/outside counts
+  - per-edge affected counts
+- expose the new fields in:
+  - capture sidecars
+  - annotated BMP overlay summary text
+  - inspector sidecar summary
+- add a synthetic right-clipping test case
+
+### Why
+
+The old observer report was useful, but it still left too much ambiguity when the lane was shifted or clipped. We need the tooling to tell us whether a failure looks like geometry loss, off-screen placement, or simple color mismatch.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+### Result
+
+- tests passed: `10/10`
+- observer diagnostics now distinguish normal visibility from clipping-oriented failures
+- saved sidecars and overlays can now explain why the observer lane is unhealthy instead of only showing counts
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for clipping-aware observer diagnostics
+
+---
+
 ## Current Stable Baseline At End Of Log
 
 - target client: `640x360`
