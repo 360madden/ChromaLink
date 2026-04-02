@@ -26,9 +26,45 @@ function Invoke-BridgeEndpoint {
   )
 
   try {
-    return Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec $TimeoutSeconds
+    $response = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec $TimeoutSeconds
+    return [pscustomobject]@{
+      Responded = $true
+      StatusCode = [int]$response.StatusCode
+      ContentType = $response.Headers['Content-Type']
+      Length = if ($response.Content) { $response.Content.Length } else { 0 }
+    }
   } catch {
-    return $null
+    $httpResponse = $_.Exception.Response
+    if ($null -ne $httpResponse) {
+      $contentType = $httpResponse.Headers['Content-Type']
+      $length = 0
+
+      try {
+        $stream = $httpResponse.GetResponseStream()
+        if ($null -ne $stream) {
+          $reader = New-Object System.IO.StreamReader($stream)
+          $body = $reader.ReadToEnd()
+          $length = $body.Length
+          $reader.Dispose()
+          $stream.Dispose()
+        }
+      } catch {
+      }
+
+      return [pscustomobject]@{
+        Responded = $true
+        StatusCode = [int]$httpResponse.StatusCode
+        ContentType = $contentType
+        Length = $length
+      }
+    }
+
+    return [pscustomobject]@{
+      Responded = $false
+      StatusCode = 0
+      ContentType = ''
+      Length = 0
+    }
   }
 }
 
@@ -47,24 +83,16 @@ Write-Host ("BaseUrl: {0}" -f $BaseUrl)
 $results = @()
 foreach ($url in $healthUrls) {
   $response = Invoke-BridgeEndpoint -Url $url -TimeoutSeconds $TimeoutSeconds
-  if ($null -ne $response) {
-    $contentType = $response.Headers['Content-Type']
-    if ($contentType -is [Array]) {
-      $contentType = $contentType -join ', '
-    }
-    $results += [pscustomobject]@{
-      Url = $url
-      StatusCode = [int]$response.StatusCode
-      ContentType = $contentType
-      Length = if ($response.Content) { $response.Content.Length } else { 0 }
-    }
-  } else {
-    $results += [pscustomobject]@{
-      Url = $url
-      StatusCode = 0
-      ContentType = ''
-      Length = 0
-    }
+  $contentType = $response.ContentType
+  if ($contentType -is [Array]) {
+    $contentType = $contentType -join ', '
+  }
+  $results += [pscustomobject]@{
+    Url = $url
+    StatusCode = $response.StatusCode
+    ContentType = $contentType
+    Length = $response.Length
+    Responded = $response.Responded
   }
 }
 
@@ -72,9 +100,9 @@ foreach ($result in $results) {
   Write-Host ("{0} -> {1} {2} bytes {3}" -f $result.Url, $result.StatusCode, $result.Length, $result.ContentType)
 }
 
-$anyOk = $results | Where-Object { $_.StatusCode -ge 200 -and $_.StatusCode -lt 300 }
-if (-not $anyOk) {
-  Write-Error "No HTTP bridge endpoints responded successfully."
+$anyResponse = $results | Where-Object { $_.Responded }
+if (-not $anyResponse) {
+  Write-Error "No HTTP bridge endpoints responded."
   exit 1
 }
 

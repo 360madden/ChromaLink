@@ -239,6 +239,7 @@ Use the live monitor when you want a product-style view of the rolling bridge sn
 - the inspector is still the artifact and BMP analyzer
 - `Bridge-ChromaLink.cmd` keeps the snapshot fresh in the background
 - `Open-ChromaLink-Monitor.cmd` launches the live monitor directly
+- `Open-ChromaLink-LiveStack.cmd` launches the local HTTP bridge, rolling snapshot loop, and monitor together
 - `Open-ChromaLinkHttpBridge.cmd` opens the local HTTP bridge
 - `Probe-ChromaLinkHttpBridge.cmd` checks the local HTTP bridge endpoints
 - `Watch-ChromaLinkTelemetry.cmd` opens the console snapshot view if you want something lighter than the GUI
@@ -246,24 +247,31 @@ Use the live monitor when you want a product-style view of the rolling bridge sn
 
 ## Local HTTP Bridge
 
-The next planned layer is a tiny local HTTP bridge on top of the same rolling snapshot contract.
-The bridge project is expected to live in `DesktopDotNet/ChromaLink.HttpBridge`.
+ChromaLink now includes a tiny local HTTP bridge on top of the same rolling snapshot contract.
+The bridge project lives in `DesktopDotNet/ChromaLink.HttpBridge`.
 
-It should fit alongside the current tools like this:
+It fits alongside the current tools like this:
 
 - the rolling JSON snapshot remains the source of truth
 - the live monitor stays the human-facing live viewer
 - the inspector stays the BMP and overlay analyzer
 - the readiness script stays the automation gate
-- the HTTP bridge will make the same live state easier for other local tools to consume
-- `Open-ChromaLinkHttpBridge.cmd`, `Launch-ChromaLinkHttpBridge.cmd`, and `Probe-ChromaLinkHttpBridge.cmd` are the expected bridge helpers
+- the HTTP bridge makes the same live state easier for other local tools to consume
+- `Open-ChromaLinkHttpBridge.cmd`, `Launch-ChromaLinkHttpBridge.cmd`, and `Probe-ChromaLinkHttpBridge.cmd` are the bridge helpers
 
-The intended shape is local-only and lightweight, and it should read the snapshot rather than bypassing the existing bridge contract.
+Endpoints:
+
+- `/latest-snapshot`
+- `/snapshot`
+- `/health`
+- `/ready`
+
+The bridge is local-only and lightweight, and it reads the snapshot rather than bypassing the existing bridge contract.
 
 Recommended workflow:
 
-1. Start `Bridge-ChromaLink.cmd` or `Watch-ChromaLinkTelemetry.cmd`
-2. Open `Open-ChromaLink-Monitor.cmd` for the live bridge view
+1. Start `Open-ChromaLink-LiveStack.cmd` for the fastest full setup
+2. Use `Probe-ChromaLinkHttpBridge.cmd` when you want to verify the local API surface
 3. Open the inspector only when you need BMP artifacts or overlay diagnostics
 4. Use `Test-ChromaLinkTelemetryReady.cmd` in scripts or checks
 
@@ -274,6 +282,7 @@ Useful helper scripts:
 - [scripts/Bridge-ChromaLink.cmd](scripts/Bridge-ChromaLink.cmd)
 - [scripts/Launch-ChromaLinkHttpBridge.cmd](scripts/Launch-ChromaLinkHttpBridge.cmd)
 - [scripts/Open-ChromaLinkHttpBridge.cmd](scripts/Open-ChromaLinkHttpBridge.cmd)
+- [scripts/Open-ChromaLink-LiveStack.cmd](scripts/Open-ChromaLink-LiveStack.cmd)
 - [scripts/Probe-ChromaLinkHttpBridge.cmd](scripts/Probe-ChromaLinkHttpBridge.cmd)
 - [scripts/Prepare-ChromaLink-640x360.cmd](scripts/Prepare-ChromaLink-640x360.cmd)
 - [scripts/Smoke-ChromaLink.cmd](scripts/Smoke-ChromaLink.cmd)

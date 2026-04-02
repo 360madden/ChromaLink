@@ -1220,10 +1220,10 @@ $bridge = Start-Process -FilePath dotnet -ArgumentList @('run','--no-build','--p
 
 - solution build succeeded
 - HTTP bridge project build succeeded
-- the probe reached all four endpoints successfully
-- `/latest-snapshot` returned the rolling JSON snapshot
-- `/health`, `/ready`, and `/snapshot` also responded successfully
-- the probe output now reports readable content types
+- the bridge served `/latest-snapshot` and `/snapshot` successfully
+- `/health` and `/ready` return structured readiness JSON and may legitimately return `503` when the snapshot is stale or incomplete
+- the probe was adjusted so real HTTP error responses are reported accurately instead of being shown as fake misses
+- added `Open-ChromaLink-LiveStack.cmd` as a one-command launch path for bridge plus monitor workflow
 
 ### Decision
 
