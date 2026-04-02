@@ -1321,3 +1321,69 @@ Keep.
 ### Saved Checkpoint
 
 - pending commit for local HTTP bridge docs
+
+---
+
+## 2026-04-05 - Session X - bridge contract hardening
+
+### Goal
+
+Add automated safety rails around the rolling snapshot and local HTTP bridge so the newer consumer layers do not drift accidentally.
+
+### Change
+
+- add snapshot contract tests in `DesktopDotNet/ChromaLink.Tests`
+- add testable HTTP bridge structure in `DesktopDotNet/ChromaLink.HttpBridge`
+- add endpoint tests for:
+  - `/latest-snapshot`
+  - `/snapshot`
+  - `/health`
+  - `/ready`
+- cover missing-snapshot and stale/not-ready behavior
+- align docs so the HTTP bridge is clearly described as real and local-only
+
+### Why
+
+After adding the monitor, readiness scripts, and HTTP bridge, the highest-value next step was to stabilize the contracts before adding more product layers.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+dotnet build .\DesktopDotNet\ChromaLink.HttpBridge\ChromaLink.HttpBridge.csproj
+```
+
+```powershell
+dotnet build .\DesktopDotNet\ChromaLink.Monitor\ChromaLink.Monitor.csproj
+```
+
+```powershell
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- live 8 50 --backend screen
+```
+
+```powershell
+.\scripts\Probe-ChromaLinkHttpBridge.cmd
+```
+
+### Result
+
+- full solution tests passed: `20/20`
+- HTTP bridge build succeeded after stopping the running bridge process that was holding its own executable open
+- monitor build succeeded
+- live telemetry capture still accepted and produced a ready aggregate
+- bridge probe succeeded with:
+  - `200` on `/latest-snapshot`
+  - `200` on `/snapshot`
+  - readiness endpoints returning structured HTTP status accurately
+- the probe script now reports real HTTP `503` readiness responses instead of showing them as fake misses
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for bridge contract hardening
