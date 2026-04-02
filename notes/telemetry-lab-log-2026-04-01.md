@@ -312,6 +312,59 @@ Keep.
 
 ---
 
+## 2026-04-02 - Session AH - minimized helper windows
+
+### Goal
+
+Reduce the chance that ChromaLink helper windows cover the RIFT client and interfere with live strip capture.
+
+### Change
+
+- update repo-native helper launchers to use minimized startup where practical:
+  - `Launch-ChromaLinkHttpBridge.cmd`
+  - `Open-ChromaLink-Monitor.cmd`
+  - `Open-ChromaLink-LiveStack.cmd`
+  - `Open-ChromaLinkDashboard.cmd`
+  - `Open-ChromaLink-DashboardStack.cmd`
+  - `Open-ChromaLinkHttpBridge.cmd`
+- add minimized-start support to `ChromaLink.Monitor` with:
+  - `--start-minimized`
+  - `--minimized`
+- update `scripts/Package-ChromaLinkDesktop.ps1` so emitted package launchers also start minimized by default
+
+### Why
+
+Some helper windows were opening directly on top of the game client. That can occlude the strip, distort capture results, and make live decode failures look worse than they really are.
+
+### Verification
+
+```powershell
+dotnet build .\DesktopDotNet\ChromaLink.Monitor\ChromaLink.Monitor.csproj
+```
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+.\scripts\Package-ChromaLinkDesktop.ps1
+```
+
+### Result
+
+- monitor build succeeded
+- tests passed: `20/20`
+- the package script completed successfully
+- generated package launchers now use `/min`
+- generated packaged monitor startup now includes `--start-minimized`
+- helper launchers now default toward minimized auxiliary windows instead of opening directly over the RIFT client
+
+### Decision
+
+Keep.
+
+---
+
 ## 2026-04-01 - Session B - quiet default diagnostics
 
 ### Goal

@@ -56,6 +56,7 @@ internal sealed class MonitorForm : Form
 
     private string _snapshotPath = DefaultSnapshotPath;
     private DateTime _snapshotWriteTimeUtc;
+    private bool _startMinimized;
 
     public MonitorForm(string[] args)
     {
@@ -65,11 +66,7 @@ internal sealed class MonitorForm : Form
         BackColor = Color.FromArgb(24, 28, 36);
         ForeColor = Color.White;
         StartPosition = FormStartPosition.CenterScreen;
-
-        if (args.Length > 0 && File.Exists(args[0]))
-        {
-            _snapshotPath = args[0];
-        }
+        ParseArgs(args);
 
         var openButton = new Button
         {
@@ -147,6 +144,32 @@ internal sealed class MonitorForm : Form
         _refreshTimer.Start();
 
         RefreshSnapshot(force: true);
+
+        if (_startMinimized)
+        {
+            Shown += (_, _) =>
+            {
+                WindowState = FormWindowState.Minimized;
+            };
+        }
+    }
+
+    private void ParseArgs(string[] args)
+    {
+        foreach (var arg in args)
+        {
+            if (string.Equals(arg, "--start-minimized", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(arg, "--minimized", StringComparison.OrdinalIgnoreCase))
+            {
+                _startMinimized = true;
+                continue;
+            }
+
+            if (File.Exists(arg))
+            {
+                _snapshotPath = arg;
+            }
+        }
     }
 
     private void OpenSnapshot()

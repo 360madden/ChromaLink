@@ -145,6 +145,7 @@ Common launchers:
 Notes:
 
 - The package is framework-dependent unless `-SelfContained` is used.
+- launcher windows start minimized by default to reduce the chance of covering the RIFT client during live capture
 - `Bridge-ChromaLink.cmd` starts the packaged CLI in `watch` mode so it can keep the rolling snapshot fresh.
 - `Start-ChromaLinkStack.cmd` starts the packaged CLI watch loop, HTTP bridge, and monitor together.
 - `Status-ChromaLinkStack.cmd` reports bridge endpoint health, snapshot freshness, and package-local process counts.
@@ -157,7 +158,7 @@ $bridgeScript = Join-Path $OutputRoot "Bridge-ChromaLink.cmd"
 @echo off
 setlocal
 
-start "" "%~dp0desktop\ChromaLink.Cli\ChromaLink.Cli.exe" watch
+start "" /min "%~dp0desktop\ChromaLink.Cli\ChromaLink.Cli.exe" watch
 
 exit /b 0
 '@ | Set-Content -LiteralPath $bridgeScript -Encoding ascii
@@ -167,9 +168,9 @@ $startScript = Join-Path $OutputRoot "Start-ChromaLinkStack.cmd"
 @echo off
 setlocal
 
-start "" "%~dp0desktop\ChromaLink.Cli\ChromaLink.Cli.exe" watch
-start "" "%~dp0desktop\ChromaLink.HttpBridge\ChromaLink.HttpBridge.exe"
-start "" "%~dp0desktop\ChromaLink.Monitor\ChromaLink.Monitor.exe"
+start "" /min "%~dp0desktop\ChromaLink.Cli\ChromaLink.Cli.exe" watch
+start "" /min "%~dp0desktop\ChromaLink.HttpBridge\ChromaLink.HttpBridge.exe"
+start "" /min "%~dp0desktop\ChromaLink.Monitor\ChromaLink.Monitor.exe" --start-minimized
 
 exit /b 0
 '@ | Set-Content -LiteralPath $startScript -Encoding ascii
@@ -372,7 +373,7 @@ $dashboardScript = Join-Path $OutputRoot "Open-ChromaLinkDashboard.cmd"
 @echo off
 setlocal
 
-start "" "http://127.0.0.1:7337/"
+start "" /min "http://127.0.0.1:7337/"
 
 exit /b 0
 '@ | Set-Content -LiteralPath $dashboardScript -Encoding ascii

@@ -436,6 +436,8 @@ The inspector also watches the live bridge snapshot now, so it can act as a live
 - the details pane shows aggregate state, frame freshness, metrics, and last backend
 - when no BMP is loaded, the inspector can still show useful live bridge state from the rolling snapshot
 
+To reduce the chance of covering the RIFT client during live capture, the helper launchers that open auxiliary windows now default to minimized startup where practical. That includes the repo-native bridge, monitor, stack, and browser-open helpers, plus the packaged stack launchers.
+
 ## Packaged Output
 
 ChromaLink is still source-first in this repository. The packaged output is the assembled publish folder we want for handoff or run-from-folder use, not a replacement for the repo.

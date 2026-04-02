@@ -9,5 +9,5 @@ if not exist "%HTTP_BRIDGE_PROJECT%" (
   exit /b 1
 )
 
-start "" dotnet run --project "%HTTP_BRIDGE_PROJECT%" %*
+start "" /min dotnet run --project "%HTTP_BRIDGE_PROJECT%" %*
 exit /b 0
