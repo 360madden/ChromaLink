@@ -89,6 +89,7 @@ Observer lane diagnostics:
 - capture sidecars now include an `observerLane` section when the profile defines one
 - observer sampling follows the live detected strip scale/origin, so the report remains meaningful on the current `scale 0.35` baseline
 - annotated BMP artifacts now draw observer marker boxes and sample centers, so saved captures are easier to inspect without opening the JSON first
+- the inspector preview now draws the same observer marker boxes and centers directly on the zoomed capture
 
 ## Wrapper Scripts
 

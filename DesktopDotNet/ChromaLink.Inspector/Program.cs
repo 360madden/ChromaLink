@@ -286,6 +286,7 @@ internal sealed class StripPreviewControl : Control
     private const int Zoom = 2;
     private Bitmap? _bitmap;
     private FrameValidationResult? _analysis;
+    private ObserverLaneReport? _observerReport;
 
     public StripPreviewControl()
     {
@@ -297,6 +298,7 @@ internal sealed class StripPreviewControl : Control
         _bitmap?.Dispose();
         _bitmap = ToBitmap(frame);
         _analysis = analysis;
+        _observerReport = ObserverLaneAnalyzer.Analyze(frame, StripProfiles.Default, analysis.Detection);
         Width = frame.Width * Zoom;
         Height = frame.Height * Zoom;
         Invalidate();
@@ -322,6 +324,9 @@ internal sealed class StripPreviewControl : Control
         using var pen = new Pen(Color.LimeGreen, 1);
         using var roiPen = new Pen(Color.Gold, 1);
         using var probeBrush = new SolidBrush(Color.DeepPink);
+        using var observerMatchPen = new Pen(Color.DeepSkyBlue, 1);
+        using var observerMismatchPen = new Pen(Color.OrangeRed, 1);
+        using var observerCenterBrush = new SolidBrush(Color.Cyan);
         var detection = _analysis.Detection;
         var bandHeight = StripProfiles.Default.SegmentHeight * detection.Scale * Zoom;
         var bandWidth = StripProfiles.Default.SegmentCount * detection.Pitch * Zoom;
@@ -343,6 +348,23 @@ internal sealed class StripPreviewControl : Control
             {
                 e.Graphics.FillEllipse(probeBrush, (probe.X * Zoom) - 2, (probe.Y * Zoom) - 2, 4, 4);
             }
+        }
+
+        if (_observerReport is null)
+        {
+            return;
+        }
+
+        foreach (var marker in _observerReport.Markers)
+        {
+            var penToUse = marker.ExpectedSymbol == marker.ObservedSymbol ? observerMatchPen : observerMismatchPen;
+            e.Graphics.DrawRectangle(
+                penToUse,
+                marker.Left * Zoom,
+                marker.Top * Zoom,
+                Math.Max(1, (marker.Width * Zoom) - 1),
+                Math.Max(1, (marker.Height * Zoom) - 1));
+            e.Graphics.FillEllipse(observerCenterBrush, (marker.CenterX * Zoom) - 2, (marker.CenterY * Zoom) - 2, 4, 4);
         }
     }
 

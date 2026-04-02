@@ -349,6 +349,47 @@ Keep.
 
 ---
 
+## 2026-04-01 - Session G - inspector observer overlay
+
+### Goal
+
+Make the desktop inspector preview show observer-lane geometry directly instead of only through sidecar text or annotated BMP exports.
+
+### Change
+
+- wire the shared observer analyzer into the inspector preview control
+- draw observer marker boxes and sample centers in the zoomed inspector preview
+
+### Why
+
+At this point the CLI artifacts already showed observer geometry, but the live inspector preview still only drew strip ROI lines and payload sample probes. That made observer debugging slower than it needed to be.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+dotnet build .\DesktopDotNet\ChromaLink.Inspector\ChromaLink.Inspector.csproj
+```
+
+### Result
+
+- tests passed: `9/9`
+- inspector build succeeded
+- the inspector now uses the same shared observer report as the CLI artifact path
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for inspector observer overlay
+
+---
+
 ## Current Stable Baseline At End Of Log
 
 - target client: `640x360`
