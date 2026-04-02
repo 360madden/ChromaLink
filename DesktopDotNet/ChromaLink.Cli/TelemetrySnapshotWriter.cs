@@ -51,7 +51,8 @@ internal static class TelemetrySnapshotWriter
                 reservedFlags = new
                 {
                     multiFrameRotation = 1,
-                    playerPosition = 2
+                    playerPosition = 2,
+                    playerCast = 4
                 }
             },
             aggregate = new
@@ -123,6 +124,28 @@ internal static class TelemetrySnapshotWriter
                     x = aggregate.PlayerPosition.Frame.Payload.X,
                     y = aggregate.PlayerPosition.Frame.Payload.Y,
                     z = aggregate.PlayerPosition.Frame.Payload.Z
+                },
+                playerCast = aggregate.PlayerCast is null ? null : new
+                {
+                    observedAtUtc = aggregate.PlayerCast.ObservedAtUtc,
+                    ageMs = AgeMs(nowUtc, aggregate.PlayerCast.ObservedAtUtc),
+                    fresh = IsFresh(AgeMs(nowUtc, aggregate.PlayerCast.ObservedAtUtc)),
+                    stale = !IsFresh(AgeMs(nowUtc, aggregate.PlayerCast.ObservedAtUtc)),
+                    frameType = aggregate.PlayerCast.Frame.Header.FrameType.ToString(),
+                    schemaId = aggregate.PlayerCast.Frame.Header.SchemaId,
+                    sequence = aggregate.PlayerCast.Frame.Header.Sequence,
+                    reservedFlags = aggregate.PlayerCast.Frame.Header.ReservedFlags,
+                    castFlags = aggregate.PlayerCast.Frame.Payload.CastFlags,
+                    castActive = IsFlagSet(aggregate.PlayerCast.Frame.Payload.CastFlags, 0x01),
+                    channeled = IsFlagSet(aggregate.PlayerCast.Frame.Payload.CastFlags, 0x02),
+                    uninterruptible = IsFlagSet(aggregate.PlayerCast.Frame.Payload.CastFlags, 0x04),
+                    hasLabel = IsFlagSet(aggregate.PlayerCast.Frame.Payload.CastFlags, 0x08),
+                    progressPctQ8 = aggregate.PlayerCast.Frame.Payload.ProgressPctQ8,
+                    durationQ4 = aggregate.PlayerCast.Frame.Payload.DurationQ4,
+                    remainingQ4 = aggregate.PlayerCast.Frame.Payload.RemainingQ4,
+                    durationSeconds = Q4ToSeconds(aggregate.PlayerCast.Frame.Payload.DurationQ4),
+                    remainingSeconds = Q4ToSeconds(aggregate.PlayerCast.Frame.Payload.RemainingQ4),
+                    spellLabel = aggregate.PlayerCast.Frame.Payload.SpellLabel
                 }
             },
             metrics = new
@@ -206,6 +229,16 @@ internal static class TelemetrySnapshotWriter
     private static bool IsFresh(double? ageMs)
     {
         return ageMs.HasValue && ageMs.Value <= FreshnessWindowMilliseconds;
+    }
+
+    private static bool IsFlagSet(byte flags, byte mask)
+    {
+        return (flags & mask) != 0;
+    }
+
+    private static double Q4ToSeconds(byte value)
+    {
+        return Math.Round(value / 4.0, 2);
     }
 
     private sealed record AggregateFreshness(

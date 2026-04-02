@@ -33,12 +33,13 @@ public class SnapshotContractTests
         Assert.Equal(1, transport.GetProperty("protocolVersion").GetInt32());
         Assert.Equal(1, transport.GetProperty("reservedFlags").GetProperty("multiFrameRotation").GetInt32());
         Assert.Equal(2, transport.GetProperty("reservedFlags").GetProperty("playerPosition").GetInt32());
+        Assert.Equal(4, transport.GetProperty("reservedFlags").GetProperty("playerCast").GetInt32());
 
         var aggregateJson = root.GetProperty("aggregate");
         Assert.True(aggregateJson.GetProperty("ready").GetBoolean());
         Assert.True(aggregateJson.GetProperty("healthy").GetBoolean());
         Assert.False(aggregateJson.GetProperty("stale").GetBoolean());
-        Assert.Equal(3, aggregateJson.GetProperty("acceptedFrames").GetInt32());
+        Assert.Equal(4, aggregateJson.GetProperty("acceptedFrames").GetInt32());
 
         var freshness = aggregateJson.GetProperty("freshness");
         Assert.Equal(2000.0, freshness.GetProperty("windowMs").GetDouble(), 2);
@@ -48,6 +49,7 @@ public class SnapshotContractTests
         Assert.True(aggregateJson.GetProperty("coreStatus").GetProperty("fresh").GetBoolean());
         Assert.True(aggregateJson.GetProperty("playerVitals").GetProperty("fresh").GetBoolean());
         Assert.True(aggregateJson.GetProperty("playerPosition").GetProperty("fresh").GetBoolean());
+        Assert.True(aggregateJson.GetProperty("playerCast").GetProperty("fresh").GetBoolean());
 
         var metrics = root.GetProperty("metrics");
         Assert.Equal(3, metrics.GetProperty("acceptedSamples").GetInt32());
@@ -55,10 +57,11 @@ public class SnapshotContractTests
         Assert.Equal(3, metrics.GetProperty("frameTypeCounts").GetProperty("CoreStatus/schema-1").GetInt32());
         Assert.Equal(2, metrics.GetProperty("frameTypeCounts").GetProperty("PlayerVitals/schema-1").GetInt32());
         Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("PlayerPosition/schema-1").GetInt32());
+        Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("PlayerCast/schema-1").GetInt32());
 
         Assert.Equal("screen", root.GetProperty("lastBackend").GetString());
         Assert.Equal(0, root.GetProperty("lastDetection").GetProperty("originX").GetInt32());
-        Assert.Equal("PlayerPosition", root.GetProperty("lastFrame").GetProperty("frameType").GetString());
+        Assert.Equal("PlayerCast", root.GetProperty("lastFrame").GetProperty("frameType").GetString());
     }
 
     [Fact]
@@ -111,7 +114,7 @@ public class SnapshotContractTests
         Assert.True(freshPayload.Fresh);
         Assert.True(freshDocument.Ok);
         Assert.Equal("chromalink-live-telemetry", freshJson.RootElement.GetProperty("contract").GetProperty("name").GetString());
-        Assert.Equal(3, freshJson.RootElement.GetProperty("aggregate").GetProperty("acceptedFrames").GetInt32());
+        Assert.Equal(4, freshJson.RootElement.GetProperty("aggregate").GetProperty("acceptedFrames").GetInt32());
         Assert.True(freshJson.RootElement.GetProperty("aggregate").GetProperty("ready").GetBoolean());
         Assert.True(freshJson.RootElement.GetProperty("aggregate").GetProperty("healthy").GetBoolean());
         Assert.False(freshJson.RootElement.GetProperty("aggregate").GetProperty("stale").GetBoolean());
@@ -301,12 +304,13 @@ public class SnapshotContractTests
                 reservedFlags = new
                 {
                     multiFrameRotation = 1,
-                    playerPosition = 2
+                    playerPosition = 2,
+                    playerCast = 4
                 }
             },
             aggregate = new
             {
-                acceptedFrames = 3,
+                acceptedFrames = 4,
                 ready = true,
                 lastUpdatedUtc = nowUtc.AddMilliseconds(-20),
                 healthy = true,
@@ -373,6 +377,28 @@ public class SnapshotContractTests
                     x = 12.5,
                     y = 44.25,
                     z = -8.0
+                },
+                playerCast = new
+                {
+                    observedAtUtc = nowUtc.AddMilliseconds(-15),
+                    ageMs = 15.0,
+                    fresh = true,
+                    stale = false,
+                    frameType = "PlayerCast",
+                    schemaId = 1,
+                    sequence = 4,
+                    reservedFlags = 7,
+                    castFlags = 9,
+                    castActive = true,
+                    channeled = false,
+                    uninterruptible = false,
+                    hasLabel = true,
+                    progressPctQ8 = 96,
+                    durationQ4 = 10,
+                    remainingQ4 = 6,
+                    durationSeconds = 2.5,
+                    remainingSeconds = 1.5,
+                    spellLabel = "HEALING"
                 }
             },
             metrics = new
@@ -388,7 +414,8 @@ public class SnapshotContractTests
                 {
                     ["CoreStatus/schema-1"] = 3,
                     ["PlayerVitals/schema-1"] = 2,
-                    ["PlayerPosition/schema-1"] = 1
+                    ["PlayerPosition/schema-1"] = 1,
+                    ["PlayerCast/schema-1"] = 1
                 }
             },
             lastBackend = "screen",
@@ -406,10 +433,10 @@ public class SnapshotContractTests
             },
             lastFrame = new
             {
-                frameType = "PlayerPosition",
+                frameType = "PlayerCast",
                 schemaId = 1,
-                sequence = 3,
-                reservedFlags = 3
+                sequence = 4,
+                reservedFlags = 7
             }
         };
 

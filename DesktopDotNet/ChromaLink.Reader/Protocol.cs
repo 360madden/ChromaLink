@@ -4,7 +4,8 @@ public enum FrameType : byte
 {
     CoreStatus = 1,
     PlayerVitals = 2,
-    PlayerPosition = 3
+    PlayerPosition = 3,
+    PlayerCast = 4
 }
 
 public enum ResourceKind : byte
@@ -22,7 +23,8 @@ public enum HeaderCapabilityFlags : byte
 {
     None = 0,
     MultiFrameRotation = 1 << 0,
-    PlayerPosition = 1 << 1
+    PlayerPosition = 1 << 1,
+    PlayerCast = 1 << 2
 }
 
 public sealed record TelemetryFrameHeader(
@@ -112,6 +114,26 @@ public sealed record PlayerPositionFrame(
     byte[] TransportBytes)
     : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
 
+public readonly record struct PlayerCastSnapshot(
+    byte CastFlags,
+    byte ProgressPctQ8,
+    byte DurationQ4,
+    byte RemainingQ4,
+    string SpellLabel)
+{
+    public static PlayerCastSnapshot CreateSynthetic()
+    {
+        return new PlayerCastSnapshot(0b0000_1001, 96, 10, 6, "HEALING");
+    }
+}
+
+public sealed record PlayerCastFrame(
+    TelemetryFrameHeader Header,
+    PlayerCastSnapshot Payload,
+    uint PayloadCrc32C,
+    byte[] TransportBytes)
+    : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
+
 public sealed record TransportParseResult(
     bool IsAccepted,
     string Reason,
@@ -134,6 +156,8 @@ public static class TransportConstants
     public const byte PlayerVitalsSchemaId = 1;
     public const byte PlayerPositionFrameType = 3;
     public const byte PlayerPositionSchemaId = 1;
+    public const byte PlayerCastFrameType = 4;
+    public const byte PlayerCastSchemaId = 1;
     public const int TransportBytes = 24;
     public const int HeaderBytes = 8;
     public const int PayloadBytes = 12;
@@ -141,7 +165,8 @@ public static class TransportConstants
     public const int PayloadSymbols = 64;
     public const HeaderCapabilityFlags HeaderCapabilities =
         HeaderCapabilityFlags.MultiFrameRotation |
-        HeaderCapabilityFlags.PlayerPosition;
+        HeaderCapabilityFlags.PlayerPosition |
+        HeaderCapabilityFlags.PlayerCast;
 }
 
 public static class FrameProtocol
@@ -181,6 +206,17 @@ public static class FrameProtocol
         WriteInt32BigEndian(payload, 4, FloatToFixed(snapshot.Y));
         WriteInt32BigEndian(payload, 8, FloatToFixed(snapshot.Z));
         return BuildFrameBytes(profileId, sequence, FrameType.PlayerPosition, TransportConstants.PlayerPositionSchemaId, payload);
+    }
+
+    public static byte[] BuildPlayerCastFrameBytes(byte profileId, byte sequence, PlayerCastSnapshot snapshot)
+    {
+        Span<byte> payload = stackalloc byte[TransportConstants.PayloadBytes];
+        payload[0] = snapshot.CastFlags;
+        payload[1] = snapshot.ProgressPctQ8;
+        payload[2] = snapshot.DurationQ4;
+        payload[3] = snapshot.RemainingQ4;
+        WriteAsciiLabel(payload, 4, 8, snapshot.SpellLabel);
+        return BuildFrameBytes(profileId, sequence, FrameType.PlayerCast, TransportConstants.PlayerCastSchemaId, payload);
     }
 
     public static byte[] EncodeBytesToPayloadSymbols(ReadOnlySpan<byte> bytes)
@@ -372,6 +408,16 @@ public static class FrameProtocol
                     FixedToFloat(ReadInt32BigEndian(payload, 8))),
                 actualPayloadCrc,
                 bytes.ToArray()),
+            FrameType.PlayerCast => new PlayerCastFrame(
+                header,
+                new PlayerCastSnapshot(
+                    payload[0],
+                    payload[1],
+                    payload[2],
+                    payload[3],
+                    ReadAsciiLabel(payload, 4, 8)),
+                actualPayloadCrc,
+                bytes.ToArray()),
             _ => null
         };
 
@@ -449,8 +495,38 @@ public static class FrameProtocol
             FrameType.CoreStatus => schemaId == TransportConstants.CoreSchemaId,
             FrameType.PlayerVitals => schemaId == TransportConstants.PlayerVitalsSchemaId,
             FrameType.PlayerPosition => schemaId == TransportConstants.PlayerPositionSchemaId,
+            FrameType.PlayerCast => schemaId == TransportConstants.PlayerCastSchemaId,
             _ => false
         };
+    }
+
+    private static void WriteAsciiLabel(Span<byte> payload, int offset, int length, string? text)
+    {
+        var source = string.IsNullOrWhiteSpace(text)
+            ? string.Empty
+            : text.ToUpperInvariant();
+
+        for (var index = 0; index < length; index++)
+        {
+            var value = index < source.Length ? source[index] : ' ';
+            payload[offset + index] = value is >= ' ' and <= '~'
+                ? (byte)value
+                : (byte)'?';
+        }
+    }
+
+    private static string ReadAsciiLabel(ReadOnlySpan<byte> payload, int offset, int length)
+    {
+        Span<char> chars = stackalloc char[length];
+        for (var index = 0; index < length; index++)
+        {
+            var value = payload[offset + index];
+            chars[index] = value is >= 32 and <= 126
+                ? (char)value
+                : '?';
+        }
+
+        return new string(chars).TrimEnd();
     }
 
     private static void WriteUInt16BigEndian(Span<byte> payload, int offset, ushort value)

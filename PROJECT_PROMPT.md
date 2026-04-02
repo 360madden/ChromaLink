@@ -17,6 +17,7 @@ Current project direction:
 - heartbeat frame: `coreStatus`
 - first throughput expansion: `playerVitals`
 - second throughput expansion: `playerPosition`
+- third throughput expansion: `playerCast`
 
 Working rules:
 - optimize for the fastest proven vertical slice
@@ -64,10 +65,16 @@ Current throughput expansion payload:
   - x (`int32`, fixed-point `*100`)
   - y (`int32`, fixed-point `*100`)
   - z (`int32`, fixed-point `*100`)
+- `playerCast-v1`
+  - cast flags (`byte`)
+  - progress (`byte`, `Q8`)
+  - duration (`byte`, `Q4`)
+  - remaining (`byte`, `Q4`)
+  - short spell label (`8` transport-safe bytes)
 
 Current rotation strategy:
 - keep `coreStatus` as the dominant heartbeat
-- rotate in `playerVitals` and `playerPosition` periodically to increase throughput without changing strip geometry
+- rotate in `playerVitals`, `playerPosition`, and `playerCast` periodically to increase throughput without changing strip geometry
 
 Desktop requirements:
 - `smoke`

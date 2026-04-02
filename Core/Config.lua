@@ -50,19 +50,23 @@ ChromaLink.Config = {
   protocolVersion = 1,
   headerFlags = {
     multiFrameRotation = 1,
-    playerPosition = 2
+    playerPosition = 2,
+    playerCast = 4
   },
   frameTypes = {
     coreStatus = 1,
     playerVitals = 2,
-    playerPosition = 3
+    playerPosition = 3,
+    playerCast = 4
   },
   frameRotation = {
     "coreStatus",
     "coreStatus",
     "playerVitals",
     "coreStatus",
-    "playerPosition"
+    "playerPosition",
+    "coreStatus",
+    "playerCast"
   },
   syntheticMode = {
     enabled = false

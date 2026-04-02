@@ -2,8 +2,8 @@ ChromaLink = ChromaLink or {}
 ChromaLink.Protocol = {}
 
 local config = ChromaLink.Config
-local frameTypes = config.frameTypes or { coreStatus = 1, playerVitals = 2 }
-local headerFlags = config.headerFlags or { multiFrameRotation = 1, playerPosition = 2 }
+local frameTypes = config.frameTypes or { coreStatus = 1, playerVitals = 2, playerPosition = 3, playerCast = 4 }
+local headerFlags = config.headerFlags or { multiFrameRotation = 1, playerPosition = 2, playerCast = 4 }
 
 local function ClampByte(value)
   local number = tonumber(value) or 0
@@ -229,4 +229,20 @@ function ChromaLink.Protocol.BuildPlayerPositionFrame(snapshot, sequence)
   AppendBigEndian32(payload, 5, FloatToFixedInt32(snapshot.y))
   AppendBigEndian32(payload, 9, FloatToFixedInt32(snapshot.z))
   return BuildFrame(payload, frameTypes.playerPosition, 1, sequence)
+end
+
+function ChromaLink.Protocol.BuildPlayerCastFrame(snapshot, sequence)
+  local payload = {
+    ClampByte(snapshot.castFlags),
+    ClampByte(snapshot.progressPctQ8),
+    ClampByte(snapshot.durationQ4),
+    ClampByte(snapshot.remainingQ4)
+  }
+  local index
+
+  for index = 1, 8 do
+    payload[4 + index] = ClampByte(snapshot.spellLabelBytes and snapshot.spellLabelBytes[index] or 32)
+  end
+
+  return BuildFrame(payload, frameTypes.playerCast, 1, sequence)
 end

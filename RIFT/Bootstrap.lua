@@ -150,6 +150,10 @@ local function FormatHeaderFlags(headerFlags)
     table.insert(labels, "player-position")
   end
 
+  if headerFlags.playerCast ~= nil and headerFlags.playerCast ~= 0 then
+    table.insert(labels, "player-cast")
+  end
+
   if #labels == 0 then
     return "none"
   end
@@ -186,6 +190,9 @@ function ChromaLink.Bootstrap.Refresh(forceRefresh, reason)
     elseif frameKind == "playerPosition" then
       snapshot = ChromaLink.Gather.BuildSyntheticPlayerPositionSnapshot()
       _, symbols = ChromaLink.Protocol.BuildPlayerPositionFrame(snapshot, state.sequence)
+    elseif frameKind == "playerCast" then
+      snapshot = ChromaLink.Gather.BuildSyntheticPlayerCastSnapshot()
+      _, symbols = ChromaLink.Protocol.BuildPlayerCastFrame(snapshot, state.sequence)
     else
       snapshot = ChromaLink.Gather.BuildSyntheticCoreStatusSnapshot()
       _, symbols = ChromaLink.Protocol.BuildCoreFrame(snapshot, state.sequence)
@@ -198,6 +205,9 @@ function ChromaLink.Bootstrap.Refresh(forceRefresh, reason)
     elseif frameKind == "playerPosition" then
       snapshot = ChromaLink.Gather.BuildPlayerPositionSnapshot()
       _, symbols = ChromaLink.Protocol.BuildPlayerPositionFrame(snapshot, state.sequence)
+    elseif frameKind == "playerCast" then
+      snapshot = ChromaLink.Gather.BuildPlayerCastSnapshot()
+      _, symbols = ChromaLink.Protocol.BuildPlayerCastFrame(snapshot, state.sequence)
     else
       snapshot = ChromaLink.Gather.BuildCoreStatusSnapshot()
       _, symbols = ChromaLink.Protocol.BuildCoreFrame(snapshot, state.sequence)
@@ -301,13 +311,14 @@ function ChromaLink.Bootstrap.LogBuildStatus()
 
   ChromaLink.Diagnostics.Log(string.format("%s build: version=%s protocol=%s profile=%s.", identifier, tostring(version), tostring(protocolVersion), tostring(profile.id or "unknown")))
   ChromaLink.Diagnostics.Log(string.format(
-    "Frame types: coreStatus=%s playerVitals=%s playerPosition=%s.",
+    "Frame types: coreStatus=%s playerVitals=%s playerPosition=%s playerCast=%s.",
     tostring(frameTypes.coreStatus or "n/a"),
     tostring(frameTypes.playerVitals or "n/a"),
-    tostring(frameTypes.playerPosition or "n/a")))
+    tostring(frameTypes.playerPosition or "n/a"),
+    tostring(frameTypes.playerCast or "n/a")))
   ChromaLink.Diagnostics.Log(string.format(
     "Header flags: 0x%02X (%s).",
-    tonumber(headerFlags.multiFrameRotation or 0) + tonumber(headerFlags.playerPosition or 0),
+    tonumber(headerFlags.multiFrameRotation or 0) + tonumber(headerFlags.playerPosition or 0) + tonumber(headerFlags.playerCast or 0),
     FormatHeaderFlags(headerFlags)))
   ChromaLink.Diagnostics.Log(string.format(
     "Strip profile: %s %dx%d band=%dx%d segments=%d x %d.",
@@ -333,7 +344,7 @@ function ChromaLink.Bootstrap.LogRotationStatus()
   end
 
   ChromaLink.Diagnostics.Log("Rotation sequence: " .. (#parts > 0 and table.concat(parts, " -> ") or "none") .. ".")
-  ChromaLink.Diagnostics.Log("Heartbeat priority: coreStatus is the dominant frame; playerVitals and playerPosition are rotated in for throughput.")
+  ChromaLink.Diagnostics.Log("Heartbeat priority: coreStatus is the dominant frame; playerVitals, playerPosition, and playerCast are rotated in for throughput.")
 end
 
 function ChromaLink.Bootstrap.SetObserverEnabled(enabled)

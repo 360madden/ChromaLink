@@ -69,6 +69,19 @@ local function SafeUnitDetail(unit)
   return nil
 end
 
+local function SafeUnitCastbar(unit)
+  if unit == nil or Inspect == nil or Inspect.Unit == nil or Inspect.Unit.Castbar == nil then
+    return nil
+  end
+
+  local ok, result = pcall(Inspect.Unit.Castbar, unit)
+  if ok then
+    return result
+  end
+
+  return nil
+end
+
 local function QuantizePercent(current, maximum)
   local currentNumber = tonumber(current) or 0
   local maxNumber = tonumber(maximum) or 0
@@ -78,6 +91,44 @@ local function QuantizePercent(current, maximum)
   end
 
   return ClampByte((currentNumber / maxNumber) * 255)
+end
+
+local function QuantizeSecondsQ4(seconds)
+  local value = tonumber(seconds) or 0
+  if value < 0 then
+    return 0
+  end
+
+  return ClampByte(value * 4)
+end
+
+local function BuildSpellLabelBytes(value)
+  local source = string.upper(tostring(value or ""))
+  local bytes = {}
+  local index
+
+  for index = 1, 8 do
+    local byteValue = string.byte(source, index) or 32
+    if byteValue < 32 or byteValue > 126 then
+      byteValue = 63
+    end
+
+    bytes[index] = byteValue
+  end
+
+  return bytes
+end
+
+local function HasVisibleLabel(labelBytes)
+  local index
+
+  for index = 1, #labelBytes do
+    if (labelBytes[index] or 32) ~= 32 then
+      return true
+    end
+  end
+
+  return false
 end
 
 local function EncodeCallingCode(value)
@@ -257,6 +308,45 @@ function ChromaLink.Gather.BuildPlayerPositionSnapshot()
   }
 end
 
+function ChromaLink.Gather.BuildPlayerCastSnapshot()
+  local castbar = SafeUnitCastbar("player")
+  local durationSeconds = math.max(0, tonumber(castbar and castbar.duration) or 0)
+  local remainingSeconds = math.max(0, tonumber(castbar and castbar.remaining) or 0)
+  local progress = 0
+  local spellLabelBytes = BuildSpellLabelBytes(castbar and (castbar.abilityName or castbar.ability))
+  local flags = 0
+
+  if durationSeconds > 0 then
+    local completedSeconds = durationSeconds - remainingSeconds
+    if completedSeconds < 0 then
+      completedSeconds = 0
+    end
+
+    progress = ClampByte((completedSeconds / durationSeconds) * 255)
+  end
+
+  if castbar ~= nil and (durationSeconds > 0 or remainingSeconds > 0 or HasVisibleLabel(spellLabelBytes)) then
+    flags = flags + 1
+  end
+  if castbar ~= nil and castbar.channeled then
+    flags = flags + 2
+  end
+  if castbar ~= nil and castbar.uninterruptible then
+    flags = flags + 4
+  end
+  if HasVisibleLabel(spellLabelBytes) then
+    flags = flags + 8
+  end
+
+  return {
+    castFlags = ClampByte(flags),
+    progressPctQ8 = ClampByte(progress),
+    durationQ4 = QuantizeSecondsQ4(durationSeconds),
+    remainingQ4 = QuantizeSecondsQ4(remainingSeconds),
+    spellLabelBytes = spellLabelBytes
+  }
+end
+
 function ChromaLink.Gather.BuildSyntheticCoreStatusSnapshot()
   return {
     playerStateFlags = 7,
@@ -289,5 +379,15 @@ function ChromaLink.Gather.BuildSyntheticPlayerPositionSnapshot()
     x = 123.45,
     y = 200.67,
     z = -50.12
+  }
+end
+
+function ChromaLink.Gather.BuildSyntheticPlayerCastSnapshot()
+  return {
+    castFlags = 9,
+    progressPctQ8 = 96,
+    durationQ4 = 10,
+    remainingQ4 = 6,
+    spellLabelBytes = BuildSpellLabelBytes("HEALING")
   }
 end

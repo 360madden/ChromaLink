@@ -355,6 +355,17 @@ internal sealed class CliApp
                 Console.WriteLine($"PositionY: {position.Payload.Y:F2}");
                 Console.WriteLine($"PositionZ: {position.Payload.Z:F2}");
                 break;
+
+            case PlayerCastFrame cast:
+                Console.WriteLine($"CastFlags: {cast.Payload.CastFlags}");
+                Console.WriteLine($"CastActive: {((cast.Payload.CastFlags & 0x01) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"CastChanneled: {((cast.Payload.CastFlags & 0x02) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"CastUninterruptible: {((cast.Payload.CastFlags & 0x04) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"SpellLabel: {FormatSpellLabel(cast.Payload.SpellLabel)}");
+                Console.WriteLine($"ProgressPctQ8: {cast.Payload.ProgressPctQ8}");
+                Console.WriteLine($"DurationSeconds: {cast.Payload.DurationQ4 / 4.0:F2}");
+                Console.WriteLine($"RemainingSeconds: {cast.Payload.RemainingQ4 / 4.0:F2}");
+                break;
         }
     }
 
@@ -387,6 +398,12 @@ internal sealed class CliApp
             nowUtc,
             observation =>
                 $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} pos={observation.Frame.Payload.X:F2},{observation.Frame.Payload.Y:F2},{observation.Frame.Payload.Z:F2}");
+        WriteAggregateObservation(
+            "AggregatePlayerCast",
+            snapshot.PlayerCast,
+            nowUtc,
+            observation =>
+                $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} active={((observation.Frame.Payload.CastFlags & 0x01) != 0).ToString().ToLowerInvariant()} spell={FormatSpellLabel(observation.Frame.Payload.SpellLabel)} progressQ8={observation.Frame.Payload.ProgressPctQ8} remaining={observation.Frame.Payload.RemainingQ4 / 4.0:F2}s");
     }
 
     private static void WriteAggregateObservation<TFrame>(
@@ -416,6 +433,11 @@ internal sealed class CliApp
         return Math.Round(age.TotalMilliseconds, 0).ToString("0");
     }
 
+    private static string FormatSpellLabel(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
+    }
+
     private static string DescribeHeaderFlags(HeaderCapabilityFlags flags)
     {
         if (flags == HeaderCapabilityFlags.None)
@@ -432,6 +454,11 @@ internal sealed class CliApp
         if (flags.HasFlag(HeaderCapabilityFlags.PlayerPosition))
         {
             labels.Add("player-position");
+        }
+
+        if (flags.HasFlag(HeaderCapabilityFlags.PlayerCast))
+        {
+            labels.Add("player-cast");
         }
 
         var unknown = (byte)(flags & ~(TransportConstants.HeaderCapabilities));

@@ -244,7 +244,7 @@ internal sealed class InspectorForm : Form
             if (root.TryGetProperty("aggregate", out var aggregate))
             {
                 lines.Add($"Ready: {aggregate.GetProperty("ready").GetBoolean()} | AcceptedFrames: {aggregate.GetProperty("acceptedFrames").GetInt32()}");
-                lines.Add($"Frames: {SummarizeSnapshotFrame(aggregate, "coreStatus")} | {SummarizeSnapshotFrame(aggregate, "playerVitals")} | {SummarizeSnapshotFrame(aggregate, "playerPosition")}");
+                lines.Add($"Frames: {SummarizeSnapshotFrame(aggregate, "coreStatus")} | {SummarizeSnapshotFrame(aggregate, "playerVitals")} | {SummarizeSnapshotFrame(aggregate, "playerPosition")} | {SummarizeSnapshotFrame(aggregate, "playerCast")}");
             }
 
             if (root.TryGetProperty("metrics", out var metrics))
@@ -378,6 +378,17 @@ internal sealed class InspectorForm : Form
                     builder.AppendLine($"  PositionY: {position.Payload.Y:F2}");
                     builder.AppendLine($"  PositionZ: {position.Payload.Z:F2}");
                     break;
+
+                case PlayerCastFrame cast:
+                    builder.AppendLine($"  CastFlags: {cast.Payload.CastFlags}");
+                    builder.AppendLine($"  CastActive: {(cast.Payload.CastFlags & 0x01) != 0}");
+                    builder.AppendLine($"  CastChanneled: {(cast.Payload.CastFlags & 0x02) != 0}");
+                    builder.AppendLine($"  CastUninterruptible: {(cast.Payload.CastFlags & 0x04) != 0}");
+                    builder.AppendLine($"  SpellLabel: {FormatSpellLabel(cast.Payload.SpellLabel)}");
+                    builder.AppendLine($"  ProgressPctQ8: {cast.Payload.ProgressPctQ8}");
+                    builder.AppendLine($"  DurationSeconds: {cast.Payload.DurationQ4 / 4.0:F2}");
+                    builder.AppendLine($"  RemainingSeconds: {cast.Payload.RemainingQ4 / 4.0:F2}");
+                    break;
             }
         }
 
@@ -423,6 +434,7 @@ internal sealed class InspectorForm : Form
                 AppendSnapshotFrame(builder, aggregate, "CoreStatus", "coreStatus");
                 AppendSnapshotFrame(builder, aggregate, "PlayerVitals", "playerVitals");
                 AppendSnapshotFrame(builder, aggregate, "PlayerPosition", "playerPosition");
+                AppendSnapshotFrame(builder, aggregate, "PlayerCast", "playerCast");
             }
 
             if (root.TryGetProperty("metrics", out var metrics))
@@ -458,6 +470,11 @@ internal sealed class InspectorForm : Form
         var observedAt = frame.TryGetProperty("observedAtUtc", out var observedProperty) ? observedProperty.GetDateTimeOffset() : default;
         builder.AppendLine(
             $"  {label}: seq={sequence} flags=0x{reservedFlags:X2} observed={observedAt:O}");
+    }
+
+    private static string FormatSpellLabel(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
     }
 
     private static string? GetLiveTelemetrySnapshotPath()

@@ -55,6 +55,22 @@ public class ProtocolAndReplayTests
     }
 
     [Fact]
+    public void PlayerCastFrame_RoundTripsThroughRendererAndAnalyzer()
+    {
+        var bytes = FrameProtocol.BuildPlayerCastFrameBytes(_profile.NumericId, 15, PlayerCastSnapshot.CreateSynthetic());
+        var image = ColorStripRenderer.Render(_profile, bytes);
+        var validation = ColorStripAnalyzer.Analyze(image, _profile);
+
+        Assert.True(validation.IsAccepted, validation.Reason);
+        var frame = Assert.IsType<PlayerCastFrame>(validation.Frame);
+        Assert.Equal(FrameType.PlayerCast, frame.Header.FrameType);
+        Assert.Equal(TransportConstants.HeaderCapabilities, (HeaderCapabilityFlags)frame.Header.ReservedFlags);
+        Assert.Equal((byte)0b0000_1001, frame.Payload.CastFlags);
+        Assert.Equal((byte)96, frame.Payload.ProgressPctQ8);
+        Assert.Equal("HEALING", frame.Payload.SpellLabel);
+    }
+
+    [Fact]
     public void ReplayRunner_AcceptsConfiguredBenchScenarios()
     {
         var bytes = FrameProtocol.BuildCoreFrameBytes(_profile.NumericId, 9, CoreStatusSnapshot.CreateSynthetic());
@@ -252,22 +268,28 @@ public class ProtocolAndReplayTests
         var position = Assert.IsType<PlayerPositionFrame>(
             FrameProtocol.AnalyzeFrameBytes(
                 FrameProtocol.BuildPlayerPositionFrameBytes(_profile.NumericId, 13, PlayerPositionSnapshot.CreateSynthetic())).Frame);
+        var cast = Assert.IsType<PlayerCastFrame>(
+            FrameProtocol.AnalyzeFrameBytes(
+                FrameProtocol.BuildPlayerCastFrameBytes(_profile.NumericId, 15, PlayerCastSnapshot.CreateSynthetic())).Frame);
 
         aggregate.Update(core, baseTime);
         aggregate.Update(vitals, baseTime.AddMilliseconds(100));
         aggregate.Update(position, baseTime.AddMilliseconds(200));
+        aggregate.Update(cast, baseTime.AddMilliseconds(300));
 
         var snapshot = aggregate.Snapshot();
         Assert.True(snapshot.HasAny);
         Assert.True(snapshot.HasCompleteState);
-        Assert.Equal(3, snapshot.AcceptedFrames);
+        Assert.Equal(4, snapshot.AcceptedFrames);
         Assert.NotNull(snapshot.CoreStatus);
         Assert.NotNull(snapshot.PlayerVitals);
         Assert.NotNull(snapshot.PlayerPosition);
+        Assert.NotNull(snapshot.PlayerCast);
         Assert.Equal((byte)7, snapshot.CoreStatus!.Frame.Header.Sequence);
         Assert.Equal((byte)11, snapshot.PlayerVitals!.Frame.Header.Sequence);
         Assert.Equal((byte)13, snapshot.PlayerPosition!.Frame.Header.Sequence);
-        Assert.Equal(baseTime.AddMilliseconds(200), snapshot.LastUpdatedUtc);
+        Assert.Equal((byte)15, snapshot.PlayerCast!.Frame.Header.Sequence);
+        Assert.Equal(baseTime.AddMilliseconds(300), snapshot.LastUpdatedUtc);
     }
 
     [Fact]

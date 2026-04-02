@@ -84,6 +84,44 @@ Keep.
 
 ---
 
+## 2026-04-02 - Session AE - player cast telemetry
+
+### Goal
+
+Add a compact cast-bar/current-spell telemetry lane without changing the proven strip geometry.
+
+### Change
+
+- documented the pre-execution plan for player cast telemetry
+- used `Inspect.Unit.Castbar("player")` as the addon data source
+- added a new rotating `playerCast` frame with:
+  - cast flags
+  - progress
+  - quantized duration and remaining time
+  - an `8`-byte transport-safe spell label
+- updated the .NET reader, aggregate, CLI, snapshot contract, inspector, and tests for the new frame type
+
+### Why
+
+The RIFT API exposes a real castbar inspection surface, so this is the next high-value telemetry slice that can help leader/follower logic and external HUDs without widening the strip.
+
+### Verification
+
+- `dotnet test .\DesktopDotNet\ChromaLink.sln`
+
+### Result
+
+- full solution tests passed: `21/21`
+- `PlayerCast` now round-trips through renderer/analyzer tests
+- the aggregate and rolling snapshot now surface cast telemetry
+- live RIFT validation is still pending a safe `/reloadui` + capture pass
+
+### Decision
+
+Keep.
+
+---
+
 ## 2026-04-02 - Session AD - release candidate polish
 
 ### Goal
