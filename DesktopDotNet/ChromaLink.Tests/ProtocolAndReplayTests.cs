@@ -236,4 +236,61 @@ public class ProtocolAndReplayTests
         Assert.True(report.PartiallyVisibleMarkers > 0 || report.OutsideMarkers > 0);
         Assert.Contains(report.Markers, marker => marker.BoundsState != ObserverMarkerBoundsState.Inside);
     }
+
+    [Fact]
+    public void TelemetryAggregate_BecomesReady_WhenAllFrameTypesArrive()
+    {
+        var aggregate = new TelemetryAggregate();
+        var baseTime = new DateTimeOffset(2026, 4, 2, 12, 0, 0, TimeSpan.Zero);
+
+        var core = Assert.IsType<CoreStatusFrame>(
+            FrameProtocol.AnalyzeFrameBytes(
+                FrameProtocol.BuildCoreFrameBytes(_profile.NumericId, 7, CoreStatusSnapshot.CreateSynthetic())).Frame);
+        var vitals = Assert.IsType<PlayerVitalsFrame>(
+            FrameProtocol.AnalyzeFrameBytes(
+                FrameProtocol.BuildPlayerVitalsFrameBytes(_profile.NumericId, 11, PlayerVitalsSnapshot.CreateSynthetic())).Frame);
+        var position = Assert.IsType<PlayerPositionFrame>(
+            FrameProtocol.AnalyzeFrameBytes(
+                FrameProtocol.BuildPlayerPositionFrameBytes(_profile.NumericId, 13, PlayerPositionSnapshot.CreateSynthetic())).Frame);
+
+        aggregate.Update(core, baseTime);
+        aggregate.Update(vitals, baseTime.AddMilliseconds(100));
+        aggregate.Update(position, baseTime.AddMilliseconds(200));
+
+        var snapshot = aggregate.Snapshot();
+        Assert.True(snapshot.HasAny);
+        Assert.True(snapshot.HasCompleteState);
+        Assert.Equal(3, snapshot.AcceptedFrames);
+        Assert.NotNull(snapshot.CoreStatus);
+        Assert.NotNull(snapshot.PlayerVitals);
+        Assert.NotNull(snapshot.PlayerPosition);
+        Assert.Equal((byte)7, snapshot.CoreStatus!.Frame.Header.Sequence);
+        Assert.Equal((byte)11, snapshot.PlayerVitals!.Frame.Header.Sequence);
+        Assert.Equal((byte)13, snapshot.PlayerPosition!.Frame.Header.Sequence);
+        Assert.Equal(baseTime.AddMilliseconds(200), snapshot.LastUpdatedUtc);
+    }
+
+    [Fact]
+    public void TelemetryAggregate_ReplacesOlderFrame_WithNewerObservationOfSameType()
+    {
+        var aggregate = new TelemetryAggregate();
+        var baseTime = new DateTimeOffset(2026, 4, 2, 12, 0, 0, TimeSpan.Zero);
+
+        var first = Assert.IsType<PlayerPositionFrame>(
+            FrameProtocol.AnalyzeFrameBytes(
+                FrameProtocol.BuildPlayerPositionFrameBytes(_profile.NumericId, 13, new PlayerPositionSnapshot(1.23f, 4.56f, 7.89f))).Frame);
+        var second = Assert.IsType<PlayerPositionFrame>(
+            FrameProtocol.AnalyzeFrameBytes(
+                FrameProtocol.BuildPlayerPositionFrameBytes(_profile.NumericId, 14, new PlayerPositionSnapshot(9.87f, 6.54f, 3.21f))).Frame);
+
+        aggregate.Update(first, baseTime);
+        aggregate.Update(second, baseTime.AddMilliseconds(150));
+
+        var snapshot = aggregate.Snapshot();
+        Assert.Equal(2, snapshot.AcceptedFrames);
+        Assert.NotNull(snapshot.PlayerPosition);
+        Assert.Equal((byte)14, snapshot.PlayerPosition!.Frame.Header.Sequence);
+        Assert.Equal(9.87f, snapshot.PlayerPosition.Frame.Payload.X, 2);
+        Assert.Equal(baseTime.AddMilliseconds(150), snapshot.PlayerPosition.ObservedAtUtc);
+    }
 }

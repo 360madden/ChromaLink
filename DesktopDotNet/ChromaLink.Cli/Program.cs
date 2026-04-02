@@ -206,10 +206,12 @@ internal sealed class CliApp
             ? Math.Max(1, int.Parse(invocation.Positionals[0])) * 1000
             : int.MaxValue;
         var metrics = new LiveMetrics();
+        var aggregate = new TelemetryAggregate();
         var started = Stopwatch.StartNew();
         FrameValidationResult? lastValidation = null;
         CaptureBackend? lastBackend = null;
         string? firstRejectPath = null;
+        string? telemetrySnapshotPath = null;
 
         for (var iteration = 0; iteration < iterationLimit && started.ElapsedMilliseconds < durationMs; iteration++)
         {
@@ -222,6 +224,10 @@ internal sealed class CliApp
                     bestAttempt.DecodeElapsedMs,
                     bestAttempt.Validation.Reason,
                     bestAttempt.Validation.Frame);
+                if (bestAttempt.Validation.IsAccepted && bestAttempt.Validation.Frame is not null)
+                {
+                    aggregate.Update(bestAttempt.Validation.Frame);
+                }
                 lastValidation = bestAttempt.Validation;
                 lastBackend = bestAttempt.Backend;
 
@@ -245,6 +251,8 @@ internal sealed class CliApp
                 metrics.Add(false, 0, 0, "No capture backend produced an image.");
                 lastValidation = new FrameValidationResult(false, "No capture backend produced an image.", null, Array.Empty<SegmentSample>(), null, null);
             }
+
+            telemetrySnapshotPath = TelemetrySnapshotWriter.WriteLatest(aggregate.Snapshot(), metrics, lastBackend, lastValidation);
 
             if (sleepMs > 0)
             {
@@ -272,6 +280,7 @@ internal sealed class CliApp
         {
             Console.WriteLine($"LastBackend: {lastBackend}");
         }
+        WriteAggregateSummary(aggregate.Snapshot());
         WriteDetectionSummary(lastValidation?.Detection);
         if (lastValidation?.Frame is not null)
         {
@@ -281,6 +290,10 @@ internal sealed class CliApp
         if (firstRejectPath is not null)
         {
             Console.WriteLine($"FirstRejectBmp: {firstRejectPath}");
+        }
+        if (telemetrySnapshotPath is not null)
+        {
+            Console.WriteLine($"TelemetrySnapshot: {telemetrySnapshotPath}");
         }
 
         return metrics.AcceptedCount > 0 ? 0 : 1;
@@ -342,6 +355,64 @@ internal sealed class CliApp
                 Console.WriteLine($"PositionZ: {position.Payload.Z:F2}");
                 break;
         }
+    }
+
+    private static void WriteAggregateSummary(TelemetryAggregateSnapshot snapshot)
+    {
+        if (!snapshot.HasAny)
+        {
+            return;
+        }
+
+        Console.WriteLine($"AggregateAcceptedFrames: {snapshot.AcceptedFrames}");
+        Console.WriteLine($"AggregateReady: {snapshot.HasCompleteState.ToString().ToLowerInvariant()}");
+
+        var nowUtc = snapshot.LastUpdatedUtc ?? DateTimeOffset.UtcNow;
+        WriteAggregateObservation(
+            "AggregateCoreStatus",
+            snapshot.CoreStatus,
+            nowUtc,
+            observation =>
+                $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} hpPctQ8={observation.Frame.Payload.PlayerHealthPctQ8} targetHpPctQ8={observation.Frame.Payload.TargetHealthPctQ8}");
+        WriteAggregateObservation(
+            "AggregatePlayerVitals",
+            snapshot.PlayerVitals,
+            nowUtc,
+            observation =>
+                $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} health={observation.Frame.Payload.HealthCurrent}/{observation.Frame.Payload.HealthMax} resource={observation.Frame.Payload.ResourceCurrent}/{observation.Frame.Payload.ResourceMax}");
+        WriteAggregateObservation(
+            "AggregatePlayerPosition",
+            snapshot.PlayerPosition,
+            nowUtc,
+            observation =>
+                $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} pos={observation.Frame.Payload.X:F2},{observation.Frame.Payload.Y:F2},{observation.Frame.Payload.Z:F2}");
+    }
+
+    private static void WriteAggregateObservation<TFrame>(
+        string label,
+        FrameObservation<TFrame>? observation,
+        DateTimeOffset nowUtc,
+        Func<FrameObservation<TFrame>, string> formatter)
+        where TFrame : TelemetryFrame
+    {
+        if (observation is null)
+        {
+            Console.WriteLine($"{label}: missing");
+            return;
+        }
+
+        Console.WriteLine($"{label}: {formatter(observation)}");
+    }
+
+    private static string FormatAgeMs(DateTimeOffset observedAtUtc, DateTimeOffset nowUtc)
+    {
+        var age = nowUtc - observedAtUtc;
+        if (age < TimeSpan.Zero)
+        {
+            age = TimeSpan.Zero;
+        }
+
+        return Math.Round(age.TotalMilliseconds, 0).ToString("0");
     }
 
     private static string DescribeHeaderFlags(HeaderCapabilityFlags flags)

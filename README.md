@@ -118,6 +118,10 @@ dotnet run --project .\DesktopDotNet\ChromaLink.Inspector\ChromaLink.Inspector.c
 
 `live` and `watch` now report per-frame-type counts for accepted samples, which makes rotating telemetry easier to verify.
 
+They also emit a compact aggregate summary showing the newest accepted `CoreStatus`, `PlayerVitals`, and `PlayerPosition` observations plus rough age in milliseconds. That makes the rotating strip immediately usable as one reader-side telemetry state instead of three unrelated frame types.
+
+While `live` or `watch` runs, the CLI also writes a rolling machine-readable snapshot to `%LOCALAPPDATA%\ChromaLink\DesktopDotNet\out\chromalink-live-telemetry.json`.
+
 Capture backend flag:
 
 - `--backend desktopdup|screen|printwindow`

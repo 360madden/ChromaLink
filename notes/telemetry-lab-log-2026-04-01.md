@@ -913,3 +913,56 @@ Keep.
 ### Saved Checkpoint
 
 - pending commit for live proof of header flags and player position
+
+---
+
+## 2026-04-02 - Session R - reader-side telemetry aggregate
+
+### Goal
+
+Turn the rotating live frame stream into a coherent reader-side telemetry state that downstream tools can use directly.
+
+### Change
+
+- add a shared `TelemetryAggregate` to the reader layer
+- keep the newest accepted `CoreStatus`, `PlayerVitals`, and `PlayerPosition` observations with timestamps
+- print an aggregate summary from CLI `live` and `watch`
+- write a rolling JSON snapshot for live aggregate state under `%LOCALAPPDATA%\ChromaLink\DesktopDotNet\out`
+- show `ReservedFlags` in inspector header details
+- add tests for aggregate readiness and same-type replacement behavior
+
+### Why
+
+Once all three frame types were decoding live, the next practical step was to make the stream useful as a single state object. That reduces the gap between “the strip decodes” and “tools can consume live telemetry.”
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- live 8 50 --backend screen
+```
+
+```powershell
+dotnet build .\DesktopDotNet\ChromaLink.Inspector\ChromaLink.Inspector.csproj
+```
+
+### Result
+
+- tests passed: `14/14`
+- inspector build succeeded
+- live sample stayed `Accepted` at `origin 0,0`, `pitch 2.8`, `scale 0.35`
+- CLI `live` now prints an aggregate summary with newest `CoreStatus`, `PlayerVitals`, and `PlayerPosition`
+- the rolling JSON snapshot was written successfully to:
+  - `%LOCALAPPDATA%\ChromaLink\DesktopDotNet\out\chromalink-live-telemetry.json`
+- the JSON snapshot included merged aggregate state, frame counts, last detection, last frame metadata, and reserved build flags
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for reader-side telemetry aggregate

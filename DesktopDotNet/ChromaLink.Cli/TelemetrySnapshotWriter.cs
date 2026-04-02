@@ -1,0 +1,112 @@
+using System.Text.Json;
+using ChromaLink.Reader;
+
+internal static class TelemetrySnapshotWriter
+{
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true
+    };
+
+    public static string WriteLatest(
+        TelemetryAggregateSnapshot aggregate,
+        LiveMetrics metrics,
+        CaptureBackend? lastBackend,
+        FrameValidationResult? lastValidation)
+    {
+        var outDirectory = PathProvider.EnsureOutDirectory();
+        var path = Path.Combine(outDirectory, "chromalink-live-telemetry.json");
+        var payload = new
+        {
+            artifactKind = "live-telemetry",
+            generatedAtUtc = DateTime.UtcNow,
+            aggregate = new
+            {
+                acceptedFrames = aggregate.AcceptedFrames,
+                ready = aggregate.HasCompleteState,
+                lastUpdatedUtc = aggregate.LastUpdatedUtc,
+                coreStatus = aggregate.CoreStatus is null ? null : new
+                {
+                    observedAtUtc = aggregate.CoreStatus.ObservedAtUtc,
+                    frameType = aggregate.CoreStatus.Frame.Header.FrameType.ToString(),
+                    schemaId = aggregate.CoreStatus.Frame.Header.SchemaId,
+                    sequence = aggregate.CoreStatus.Frame.Header.Sequence,
+                    reservedFlags = aggregate.CoreStatus.Frame.Header.ReservedFlags,
+                    playerFlags = aggregate.CoreStatus.Frame.Payload.PlayerStateFlags,
+                    playerHealthPctQ8 = aggregate.CoreStatus.Frame.Payload.PlayerHealthPctQ8,
+                    playerResourceKind = aggregate.CoreStatus.Frame.Payload.PlayerResourceKind,
+                    playerResourcePctQ8 = aggregate.CoreStatus.Frame.Payload.PlayerResourcePctQ8,
+                    targetFlags = aggregate.CoreStatus.Frame.Payload.TargetStateFlags,
+                    targetHealthPctQ8 = aggregate.CoreStatus.Frame.Payload.TargetHealthPctQ8,
+                    targetResourceKind = aggregate.CoreStatus.Frame.Payload.TargetResourceKind,
+                    targetResourcePctQ8 = aggregate.CoreStatus.Frame.Payload.TargetResourcePctQ8,
+                    playerLevel = aggregate.CoreStatus.Frame.Payload.PlayerLevel,
+                    targetLevel = aggregate.CoreStatus.Frame.Payload.TargetLevel,
+                    playerCalling = aggregate.CoreStatus.Frame.Payload.PlayerCallingRolePacked >> 4,
+                    playerRole = aggregate.CoreStatus.Frame.Payload.PlayerCallingRolePacked & 0x0F,
+                    targetCalling = aggregate.CoreStatus.Frame.Payload.TargetCallingRelationPacked >> 4,
+                    targetRelation = aggregate.CoreStatus.Frame.Payload.TargetCallingRelationPacked & 0x0F
+                },
+                playerVitals = aggregate.PlayerVitals is null ? null : new
+                {
+                    observedAtUtc = aggregate.PlayerVitals.ObservedAtUtc,
+                    frameType = aggregate.PlayerVitals.Frame.Header.FrameType.ToString(),
+                    schemaId = aggregate.PlayerVitals.Frame.Header.SchemaId,
+                    sequence = aggregate.PlayerVitals.Frame.Header.Sequence,
+                    reservedFlags = aggregate.PlayerVitals.Frame.Header.ReservedFlags,
+                    healthCurrent = aggregate.PlayerVitals.Frame.Payload.HealthCurrent,
+                    healthMax = aggregate.PlayerVitals.Frame.Payload.HealthMax,
+                    resourceCurrent = aggregate.PlayerVitals.Frame.Payload.ResourceCurrent,
+                    resourceMax = aggregate.PlayerVitals.Frame.Payload.ResourceMax
+                },
+                playerPosition = aggregate.PlayerPosition is null ? null : new
+                {
+                    observedAtUtc = aggregate.PlayerPosition.ObservedAtUtc,
+                    frameType = aggregate.PlayerPosition.Frame.Header.FrameType.ToString(),
+                    schemaId = aggregate.PlayerPosition.Frame.Header.SchemaId,
+                    sequence = aggregate.PlayerPosition.Frame.Header.Sequence,
+                    reservedFlags = aggregate.PlayerPosition.Frame.Header.ReservedFlags,
+                    x = aggregate.PlayerPosition.Frame.Payload.X,
+                    y = aggregate.PlayerPosition.Frame.Payload.Y,
+                    z = aggregate.PlayerPosition.Frame.Payload.Z
+                }
+            },
+            metrics = new
+            {
+                acceptedSamples = metrics.AcceptedCount,
+                rejectedSamples = metrics.RejectedCount,
+                averageCaptureMs = metrics.AverageCaptureMs,
+                averageDecodeMs = metrics.AverageDecodeMs,
+                medianDecodeMs = metrics.MedianDecodeMs,
+                p95DecodeMs = metrics.P95DecodeMs,
+                lastReason = metrics.LastReason,
+                frameTypeCounts = metrics.FrameTypeCounts
+                    .OrderBy(static entry => entry.Key)
+                    .ToDictionary(static entry => entry.Key, static entry => entry.Value, StringComparer.Ordinal)
+            },
+            lastBackend = lastBackend?.ToString(),
+            lastDetection = lastValidation?.Detection is null ? null : new
+            {
+                originX = lastValidation.Detection.OriginX,
+                originY = lastValidation.Detection.OriginY,
+                pitch = lastValidation.Detection.Pitch,
+                scale = lastValidation.Detection.Scale,
+                controlError = lastValidation.Detection.ControlError,
+                leftControlScore = lastValidation.Detection.LeftControlScore,
+                rightControlScore = lastValidation.Detection.RightControlScore,
+                anchorLumaDelta = lastValidation.Detection.AnchorLumaDelta,
+                searchMode = lastValidation.Detection.SearchMode
+            },
+            lastFrame = lastValidation?.Frame is null ? null : new
+            {
+                frameType = lastValidation.Frame.Header.FrameType.ToString(),
+                schemaId = lastValidation.Frame.Header.SchemaId,
+                sequence = lastValidation.Frame.Header.Sequence,
+                reservedFlags = lastValidation.Frame.Header.ReservedFlags
+            }
+        };
+
+        File.WriteAllText(path, JsonSerializer.Serialize(payload, JsonOptions));
+        return path;
+    }
+}

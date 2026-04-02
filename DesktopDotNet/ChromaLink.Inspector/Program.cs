@@ -195,6 +195,7 @@ internal sealed class InspectorForm : Form
             builder.AppendLine($"  FrameType: {analysis.Frame.Header.FrameType}");
             builder.AppendLine($"  Schema: {analysis.Frame.Header.SchemaId}");
             builder.AppendLine($"  Sequence: {analysis.Frame.Header.Sequence}");
+            builder.AppendLine($"  ReservedFlags: 0x{analysis.Frame.Header.ReservedFlags:X2}");
             builder.AppendLine("Payload:");
             switch (analysis.Frame)
             {
