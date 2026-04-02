@@ -14,5 +14,6 @@ RunOnStartup = {
   "RIFT/Diagnostics.lua",
   "RIFT/ErrorTrap.lua",
   "RIFT/Render.lua",
-  "RIFT/Bootstrap.lua"
+  "RIFT/Bootstrap.lua",
+  "RIFT/Commands.lua"
 }

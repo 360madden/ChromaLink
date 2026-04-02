@@ -127,6 +127,14 @@ local function InstallLayoutDiagnostics(state)
   end
 end
 
+local function LogFrameStatus(label, frame, reason)
+  if frame == nil then
+    return
+  end
+
+  ChromaLink.Diagnostics.LogLayout(label, frame, reason)
+end
+
 function ChromaLink.Bootstrap.Refresh(forceRefresh, reason)
   local state = ChromaLink.Bootstrap.state
   local now
@@ -163,6 +171,55 @@ function ChromaLink.Bootstrap.SafeRefresh(forceRefresh, reason)
 
   if not ok then
     ChromaLink.Diagnostics.Log("Refresh failed: " .. tostring(failure))
+  end
+end
+
+function ChromaLink.Bootstrap.LogStatus(includeNativeFrames)
+  local state = ChromaLink.Bootstrap.state
+  local diagnosticsConfig = ChromaLink.Config.layoutDiagnostics or {}
+  local nativeFrames
+  local entry
+
+  if state == nil then
+    ChromaLink.Diagnostics.Log("Status requested before initialization.")
+    return
+  end
+
+  ChromaLink.Diagnostics.Log(string.format(
+    "Status: seq=%d lastReason=%s diag=%s traces=%s.",
+    tonumber(state.sequence) or 0,
+    tostring(state.lastReason or "unknown"),
+    diagnosticsConfig.enabled and "on" or "off",
+    diagnosticsConfig.logEvents and "on" or "off"))
+  ChromaLink.Diagnostics.Log(string.format(
+    "Anchor=%s strata=%s.",
+    tostring(state.layoutAnchorReason or "context"),
+    tostring(state.resolvedStrata or ChromaLink.Config.requestedStrata or "default")))
+
+  LogFrameStatus("layout.anchor", state.layoutAnchor, "status")
+  LogFrameStatus("layout.root", state.root, "status")
+  if state.render ~= nil then
+    LogFrameStatus("layout.band", state.render.band, "status")
+    LogFrameStatus("layout.quietZone", state.render.quietZone, "status")
+    if state.render.probeBar ~= nil then
+      LogFrameStatus("layout.probeBar", state.render.probeBar.bar, "status")
+    end
+  end
+
+  if not includeNativeFrames then
+    return
+  end
+
+  nativeFrames = {
+    { label = "native.portraitPlayer", frame = UI.Native.PortraitPlayer },
+    { label = "native.questStickies", frame = UI.Native.QuestStickies },
+    { label = "native.mapMini", frame = UI.Native.MapMini },
+    { label = "native.menu", frame = UI.Native.Menu },
+    { label = "native.rift", frame = UI.Native.Rift }
+  }
+
+  for _, entry in ipairs(nativeFrames) do
+    LogFrameStatus(entry.label, entry.frame, "status")
   end
 end
 

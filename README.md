@@ -20,7 +20,7 @@ This repo now targets a single live profile:
 
 Current proof level:
 - offline smoke, replay, bench, build, and tests are passing
-- live capture works against the running client with `DesktopDuplication` as the primary backend
+- live capture works against the running client and currently prefers `PrintWindow` for the most reliable `640x360` baseline, with `DesktopDuplication` and `ScreenBitBlt` still available for comparison
 - live decode is proven on the current client and currently locks the real strip at `origin 0,0`, `pitch 2.8`, `scale 0.35`
 - capture runs emit raw BMP, annotated BMP, and JSON sidecar diagnostics under `AppData\\Local\\ChromaLink\\DesktopDotNet\\out`
 
@@ -53,8 +53,8 @@ dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- rep
 ### 5) Capture + decode live strip
 
 ```powershell
-dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- capture-dump --backend desktopdup
-dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- live 5 100 --backend desktopdup
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- capture-dump
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- live 5 100
 ```
 
 ### 6) Open inspector
@@ -76,8 +76,13 @@ dotnet run --project .\DesktopDotNet\ChromaLink.Inspector\ChromaLink.Inspector.c
 
 Capture command backend flag:
 - `--backend desktopdup|screen|printwindow`
-- default live backend order: `DesktopDuplication`, then `ScreenBitBlt`
-- `PrintWindow` is debug-only
+- default live backend order: `PrintWindow`, then `DesktopDuplication`, then `ScreenBitBlt`
+
+In-game slash commands:
+- `/cl status` prints the current ChromaLink layout summary
+- `/cl diag` adds nearby native RIFT frame summaries for overlap/debug checks
+- `/cl refresh` forces an immediate strip refresh
+- `/cl traces on|off` arms or disables verbose layout tracing for the next `/reloadui`
 
 ## Wrapper Scripts
 
