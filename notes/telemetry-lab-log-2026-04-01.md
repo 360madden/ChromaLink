@@ -1075,3 +1075,63 @@ Keep.
 ### Saved Checkpoint
 
 - pending commit for console telemetry consumer
+
+---
+
+## 2026-04-02 - Session U - bridge freshness and live-first monitoring
+
+### Goal
+
+Make the live bridge easier to trust and easier to consume without changing the strip itself.
+
+### Change
+
+- add bridge freshness metadata to the rolling JSON snapshot
+- add aggregate-level `healthy` and `stale` signals
+- add per-frame age/freshness fields for `CoreStatus`, `PlayerVitals`, and `PlayerPosition`
+- make the inspector more live-first with a dedicated `Live Bridge` panel and live-only fallback behavior
+- add an automation-friendly readiness consumer:
+  - `scripts/Test-ChromaLinkTelemetryReady.ps1`
+  - `scripts/Test-ChromaLinkTelemetryReady.cmd`
+
+### Why
+
+Once the bridge contract existed, the next product step was making it easy for both people and tools to decide whether the bridge was currently usable.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+dotnet build .\DesktopDotNet\ChromaLink.Inspector\ChromaLink.Inspector.csproj
+```
+
+```powershell
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- live 8 50 --backend screen
+```
+
+```powershell
+.\scripts\Test-ChromaLinkTelemetryReady.cmd
+```
+
+### Result
+
+- tests passed: `14/14`
+- inspector build succeeded
+- live sample stayed `Accepted` at `origin 0,0`, `pitch 2.8`, `scale 0.35`
+- rolling snapshot now includes bridge freshness/readiness metadata
+- inspector now functions as a clearer live-first bridge monitor
+- readiness script reported:
+  - `TelemetryReady=true`
+  - `TelemetryFresh=true`
+  - `TelemetryHasAnyFrame=true`
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for bridge freshness and live-first monitoring

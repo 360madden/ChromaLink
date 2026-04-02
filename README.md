@@ -128,6 +128,7 @@ The bridge snapshot now includes a small contract header:
 - `contract.schemaVersion = 1`
 - stable `profile` metadata for the proven `P360C` baseline
 - stable `transport` metadata including reserved build-flag meanings
+- aggregate freshness fields such as `healthy`, `stale`, and per-frame age/freshness metadata
 
 Capture backend flag:
 
@@ -261,6 +262,7 @@ For a simple always-on desktop bridge, run:
 That runs the CLI in continuous watch mode and keeps `%LOCALAPPDATA%\ChromaLink\DesktopDotNet\out\chromalink-live-telemetry.json` refreshed with:
 
 - latest merged aggregate state
+- aggregate freshness and readiness metadata
 - frame counts
 - most recent detection geometry
 - last decoded frame metadata
@@ -279,13 +281,23 @@ For a simple console watcher:
 .\scripts\Show-ChromaLinkTelemetry.cmd -Watch
 ```
 
+For an automation-friendly readiness check that exits nonzero when the bridge is stale or missing:
+
+```powershell
+.\scripts\Test-ChromaLinkTelemetryReady.cmd
+```
+
 `Reload-RiftUi.cmd` sends the normal RIFT `/reloadui` command to the active game window.
 
 `Send-RiftSlash.cmd` can send other ChromaLink slash commands when we explicitly want scripted in-game control.
 
 The slash-sender helpers now abort if RIFT does not actually become the foreground window, which is safer than typing into another app by mistake.
 
-The inspector also watches the live bridge snapshot now, so the details pane can show aggregate state, frame freshness, metrics, and last backend even when you are mainly inspecting BMP artifacts.
+The inspector also watches the live bridge snapshot now, so it can act as a live-first bridge monitor:
+
+- a dedicated `Live Bridge` panel surfaces readiness and freshness clearly
+- the details pane shows aggregate state, frame freshness, metrics, and last backend
+- when no BMP is loaded, the inspector can still show useful live bridge state from the rolling snapshot
 
 ## Project Structure
 
