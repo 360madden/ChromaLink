@@ -521,6 +521,48 @@ Keep.
 
 ---
 
+## 2026-04-01 - Session K - inspector observer summary without sidecar
+
+### Goal
+
+Make the inspector useful on raw BMPs even when a sidecar JSON file is missing.
+
+### Change
+
+- compute an observer-lane report directly from the loaded frame inside the inspector
+- show the current observer health, pattern, and bounds summary in the details pane before sidecar-specific information
+- keep sidecar summaries in place as an additional source, not the only source
+
+### Why
+
+The preview overlay was already using live observer analysis, but the text summary still depended too heavily on sidecar data. For debugging ad hoc BMPs, the inspector should explain observer health from the pixels it already has.
+
+### Verification
+
+```powershell
+dotnet build .\DesktopDotNet\ChromaLink.Inspector\ChromaLink.Inspector.csproj
+```
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+### Result
+
+- inspector build succeeded
+- tests passed: `10/10`
+- the inspector details pane now reports live observer health even on standalone BMP files
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for inspector observer summary without sidecar
+
+---
+
 ## Current Stable Baseline At End Of Log
 
 - target client: `640x360`

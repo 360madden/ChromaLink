@@ -158,6 +158,7 @@ Observer diagnostics are now visible in all major tooling layers:
 - annotated BMP artifacts draw observer marker boxes and sample centers
 - the inspector preview draws the same observer geometry directly on the zoomed capture
 - observer reports now include visibility hints such as `visible`, `right-clipped`, or `offscreen`
+- the inspector details pane can now compute observer health directly from the loaded BMP even when no sidecar exists
 
 ## Protocol Snapshot
 

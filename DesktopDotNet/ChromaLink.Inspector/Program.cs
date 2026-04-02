@@ -143,11 +143,13 @@ internal sealed class InspectorForm : Form
     private static string BuildSummary(string path, Bgr24Frame frame, FrameValidationResult analysis)
     {
         var builder = new StringBuilder();
+        var observerReport = ObserverLaneAnalyzer.Analyze(frame, StripProfiles.Default, analysis.Detection);
         builder.AppendLine("ChromaLink Inspector");
         builder.AppendLine($"Path: {path}");
         builder.AppendLine($"Size: {frame.Width}x{frame.Height}");
         builder.AppendLine($"Accepted: {analysis.IsAccepted}");
         builder.AppendLine($"Reason: {analysis.Reason}");
+        AppendObserverSummary(builder, observerReport, prefix: "ObserverNow");
 
         var sidecarPath = Path.ChangeExtension(path, ".json");
         if (File.Exists(sidecarPath))
@@ -265,6 +267,22 @@ internal sealed class InspectorForm : Form
                 }
             }
         }
+    }
+
+    private static void AppendObserverSummary(StringBuilder builder, ObserverLaneReport observerReport, string prefix)
+    {
+        if (!observerReport.IsConfigured)
+        {
+            builder.AppendLine($"{prefix}: not configured");
+            return;
+        }
+
+        builder.AppendLine(
+            $"{prefix}: visible={observerReport.IsProbablyVisible} matched={observerReport.MatchedMarkers}/{observerReport.TotalMarkers} conf={observerReport.AverageConfidence:F3} hint={observerReport.VisibilityHint}");
+        builder.AppendLine($"{prefix}Expected: {observerReport.ExpectedPattern}");
+        builder.AppendLine($"{prefix}Observed: {observerReport.ObservedPattern}");
+        builder.AppendLine(
+            $"{prefix}Bounds: full={observerReport.FullyVisibleMarkers} part={observerReport.PartiallyVisibleMarkers} out={observerReport.OutsideMarkers} left={observerReport.LeftEdgeAffectedMarkers} right={observerReport.RightEdgeAffectedMarkers} top={observerReport.TopEdgeAffectedMarkers} bottom={observerReport.BottomEdgeAffectedMarkers}");
     }
 
     private static string FormatPattern(IEnumerable<byte> symbols)
