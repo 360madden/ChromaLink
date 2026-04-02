@@ -722,6 +722,70 @@ After `/reloadui`, repeated `capture-dump` runs showed accepted live decodes alt
 
 ---
 
+## 2026-04-01 - Session O - rotating position telemetry
+
+### Goal
+
+Extend the rotating telemetry model with player position while keeping the strip geometry unchanged.
+
+### Change
+
+- add a third frame type, `playerPosition`
+- gather live `coordX`, `coordY`, and `coordZ` from the RIFT player detail
+- encode position as signed fixed-point `int32` values at `*100` scale
+- add reader support, CLI summary support, and inspector summary support for the new frame
+- update the addon rotation to:
+  - `coreStatus`
+  - `coreStatus`
+  - `playerVitals`
+  - `coreStatus`
+  - `playerPosition`
+- add a synthetic round-trip test for `playerPosition`
+
+### Why
+
+Once rotating multi-frame telemetry was proven live, the next highest-value addition was position. It fits naturally into the fixed `24`-byte transport and raises the practical usefulness of the strip without touching the proven physical geometry.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+dotnet build .\DesktopDotNet\ChromaLink.Inspector\ChromaLink.Inspector.csproj
+```
+
+### Result
+
+- tests passed: `12/12`
+- inspector build succeeded
+- local synthetic round-trip for `playerPosition` passed
+- live RIFT validation after `/reloadui` did **not** yet show `playerPosition`
+- observed live frame counts still matched the older two-frame mix:
+  - `CoreStatus`
+  - `PlayerVitals`
+- this suggests the running client did not pick up the new five-step rotation even after reload, or that another live-side issue is still masking the new frame
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for rotating position telemetry
+
+### Live Investigation Notes
+
+- added per-frame-type counts to the CLI `live` command to make rotation verification easier
+- a `100`-sample live run with `--backend screen` reported:
+  - `FrameCount[CoreStatus/schema-1]: 74`
+  - `FrameCount[PlayerVitals/schema-1]: 26`
+- no `PlayerPosition` frames were observed in that live sample set
+- slash-sender scripts were also hardened to abort if RIFT is not actually foreground
+
+---
+
 ## Current Stable Baseline At End Of Log
 
 - target client: `640x360`

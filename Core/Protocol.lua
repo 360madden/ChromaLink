@@ -115,6 +115,15 @@ local function AppendBigEndian32(bytes, offset, value)
   bytes[offset + 3] = math.fmod(clamped, 256)
 end
 
+local function FloatToFixedInt32(value)
+  local number = tonumber(value) or 0
+  local scaled = math.floor(number * 100 + 0.5)
+  if scaled < 0 then
+    scaled = scaled + 4294967296
+  end
+  return scaled
+end
+
 function ChromaLink.Protocol.EncodeBytesToSymbols(bytes)
   local symbols = {}
   local symbolIndex
@@ -208,4 +217,12 @@ function ChromaLink.Protocol.BuildPlayerVitalsFrame(snapshot, sequence)
   AppendBigEndian16(payload, 9, snapshot.resourceCurrent)
   AppendBigEndian16(payload, 11, snapshot.resourceMax)
   return BuildFrame(payload, frameTypes.playerVitals, 1, sequence)
+end
+
+function ChromaLink.Protocol.BuildPlayerPositionFrame(snapshot, sequence)
+  local payload = {}
+  AppendBigEndian32(payload, 1, FloatToFixedInt32(snapshot.x))
+  AppendBigEndian32(payload, 5, FloatToFixedInt32(snapshot.y))
+  AppendBigEndian32(payload, 9, FloatToFixedInt32(snapshot.z))
+  return BuildFrame(payload, frameTypes.playerPosition, 1, sequence)
 end

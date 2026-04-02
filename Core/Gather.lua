@@ -247,6 +247,16 @@ function ChromaLink.Gather.BuildPlayerVitalsSnapshot()
   }
 end
 
+function ChromaLink.Gather.BuildPlayerPositionSnapshot()
+  local player = SafeUnitDetail("player")
+
+  return {
+    x = tonumber(player and player.coordX) or 0,
+    y = tonumber(player and player.coordY) or 0,
+    z = tonumber(player and player.coordZ) or 0
+  }
+end
+
 function ChromaLink.Gather.BuildSyntheticCoreStatusSnapshot()
   return {
     playerStateFlags = 7,
@@ -271,5 +281,13 @@ function ChromaLink.Gather.BuildSyntheticPlayerVitalsSnapshot()
     healthMax = 3260,
     resourceCurrent = 100,
     resourceMax = 100
+  }
+end
+
+function ChromaLink.Gather.BuildSyntheticPlayerPositionSnapshot()
+  return {
+    x = 123.45,
+    y = 200.67,
+    z = -50.12
   }
 end

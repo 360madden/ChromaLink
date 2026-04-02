@@ -18,6 +18,9 @@ public static class ChromaLinkReloadTools
 
     [DllImport("user32.dll")]
     public static extern bool IsIconic(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
 }
 "@
 
@@ -43,12 +46,27 @@ if ([ChromaLinkReloadTools]::IsIconic($handle)) {
     Start-Sleep -Milliseconds 250
 }
 
-[void][ChromaLinkReloadTools]::SetForegroundWindow($handle)
-Start-Sleep -Milliseconds 250
-
 $shell = New-Object -ComObject WScript.Shell
-$null = $shell.AppActivate($process.Id)
-Start-Sleep -Milliseconds 250
+
+$activated = $false
+for ($attempt = 0; $attempt -lt 5; $attempt++) {
+    [void][ChromaLinkReloadTools]::SetForegroundWindow($handle)
+    Start-Sleep -Milliseconds 100
+    $null = $shell.AppActivate($process.Id)
+    Start-Sleep -Milliseconds 100
+
+    if ([ChromaLinkReloadTools]::GetForegroundWindow() -eq $handle) {
+        $activated = $true
+        break
+    }
+
+    [System.Windows.Forms.SendKeys]::SendWait("%")
+    Start-Sleep -Milliseconds 100
+}
+
+if (-not $activated) {
+    throw "RIFT did not become the foreground window. Aborting to avoid typing into another app."
+}
 
 [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
 Start-Sleep -Milliseconds 150

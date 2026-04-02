@@ -37,6 +37,21 @@ public class ProtocolAndReplayTests
     }
 
     [Fact]
+    public void PlayerPositionFrame_RoundTripsThroughRendererAndAnalyzer()
+    {
+        var bytes = FrameProtocol.BuildPlayerPositionFrameBytes(_profile.NumericId, 13, PlayerPositionSnapshot.CreateSynthetic());
+        var image = ColorStripRenderer.Render(_profile, bytes);
+        var validation = ColorStripAnalyzer.Analyze(image, _profile);
+
+        Assert.True(validation.IsAccepted, validation.Reason);
+        var frame = Assert.IsType<PlayerPositionFrame>(validation.Frame);
+        Assert.Equal(FrameType.PlayerPosition, frame.Header.FrameType);
+        Assert.Equal(123.45f, frame.Payload.X, 2);
+        Assert.Equal(200.67f, frame.Payload.Y, 2);
+        Assert.Equal(-50.12f, frame.Payload.Z, 2);
+    }
+
+    [Fact]
     public void ReplayRunner_AcceptsConfiguredBenchScenarios()
     {
         var bytes = FrameProtocol.BuildCoreFrameBytes(_profile.NumericId, 9, CoreStatusSnapshot.CreateSynthetic());

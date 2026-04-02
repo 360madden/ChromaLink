@@ -220,7 +220,8 @@ internal sealed class CliApp
                     bestAttempt.Validation!.IsAccepted,
                     bestAttempt.CaptureElapsedMs,
                     bestAttempt.DecodeElapsedMs,
-                    bestAttempt.Validation.Reason);
+                    bestAttempt.Validation.Reason,
+                    bestAttempt.Validation.Frame);
                 lastValidation = bestAttempt.Validation;
                 lastBackend = bestAttempt.Backend;
 
@@ -260,6 +261,13 @@ internal sealed class CliApp
         Console.WriteLine($"MedianDecodeMs: {metrics.MedianDecodeMs:F2}");
         Console.WriteLine($"P95DecodeMs: {metrics.P95DecodeMs:F2}");
         Console.WriteLine($"LastReason: {metrics.LastReason}");
+        if (metrics.FrameTypeCounts.Count > 0)
+        {
+            foreach (var entry in metrics.FrameTypeCounts.OrderBy(static entry => entry.Key))
+            {
+                Console.WriteLine($"FrameCount[{entry.Key}]: {entry.Value}");
+            }
+        }
         if (lastBackend is not null)
         {
             Console.WriteLine($"LastBackend: {lastBackend}");
@@ -325,6 +333,12 @@ internal sealed class CliApp
                 Console.WriteLine($"HealthMax: {vitals.Payload.HealthMax}");
                 Console.WriteLine($"ResourceCurrent: {vitals.Payload.ResourceCurrent}");
                 Console.WriteLine($"ResourceMax: {vitals.Payload.ResourceMax}");
+                break;
+
+            case PlayerPositionFrame position:
+                Console.WriteLine($"PositionX: {position.Payload.X:F2}");
+                Console.WriteLine($"PositionY: {position.Payload.Y:F2}");
+                Console.WriteLine($"PositionZ: {position.Payload.Z:F2}");
                 break;
         }
     }

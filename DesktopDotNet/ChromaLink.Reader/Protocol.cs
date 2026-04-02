@@ -3,7 +3,8 @@ namespace ChromaLink.Reader;
 public enum FrameType : byte
 {
     CoreStatus = 1,
-    PlayerVitals = 2
+    PlayerVitals = 2,
+    PlayerPosition = 3
 }
 
 public enum ResourceKind : byte
@@ -88,6 +89,21 @@ public sealed record PlayerVitalsFrame(
     byte[] TransportBytes)
     : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
 
+public readonly record struct PlayerPositionSnapshot(float X, float Y, float Z)
+{
+    public static PlayerPositionSnapshot CreateSynthetic()
+    {
+        return new PlayerPositionSnapshot(123.45f, 200.67f, -50.12f);
+    }
+}
+
+public sealed record PlayerPositionFrame(
+    TelemetryFrameHeader Header,
+    PlayerPositionSnapshot Payload,
+    uint PayloadCrc32C,
+    byte[] TransportBytes)
+    : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
+
 public sealed record TransportParseResult(
     bool IsAccepted,
     string Reason,
@@ -108,6 +124,8 @@ public static class TransportConstants
     public const byte CoreSchemaId = 1;
     public const byte PlayerVitalsFrameType = 2;
     public const byte PlayerVitalsSchemaId = 1;
+    public const byte PlayerPositionFrameType = 3;
+    public const byte PlayerPositionSchemaId = 1;
     public const int TransportBytes = 24;
     public const int HeaderBytes = 8;
     public const int PayloadBytes = 12;
@@ -143,6 +161,15 @@ public static class FrameProtocol
         WriteUInt16BigEndian(payload, 8, snapshot.ResourceCurrent);
         WriteUInt16BigEndian(payload, 10, snapshot.ResourceMax);
         return BuildFrameBytes(profileId, sequence, FrameType.PlayerVitals, TransportConstants.PlayerVitalsSchemaId, payload);
+    }
+
+    public static byte[] BuildPlayerPositionFrameBytes(byte profileId, byte sequence, PlayerPositionSnapshot snapshot)
+    {
+        Span<byte> payload = stackalloc byte[TransportConstants.PayloadBytes];
+        WriteInt32BigEndian(payload, 0, FloatToFixed(snapshot.X));
+        WriteInt32BigEndian(payload, 4, FloatToFixed(snapshot.Y));
+        WriteInt32BigEndian(payload, 8, FloatToFixed(snapshot.Z));
+        return BuildFrameBytes(profileId, sequence, FrameType.PlayerPosition, TransportConstants.PlayerPositionSchemaId, payload);
     }
 
     public static byte[] EncodeBytesToPayloadSymbols(ReadOnlySpan<byte> bytes)
@@ -326,6 +353,14 @@ public static class FrameProtocol
                     ReadUInt16BigEndian(payload, 10)),
                 actualPayloadCrc,
                 bytes.ToArray()),
+            FrameType.PlayerPosition => new PlayerPositionFrame(
+                header,
+                new PlayerPositionSnapshot(
+                    FixedToFloat(ReadInt32BigEndian(payload, 0)),
+                    FixedToFloat(ReadInt32BigEndian(payload, 4)),
+                    FixedToFloat(ReadInt32BigEndian(payload, 8))),
+                actualPayloadCrc,
+                bytes.ToArray()),
             _ => null
         };
 
@@ -402,6 +437,7 @@ public static class FrameProtocol
         {
             FrameType.CoreStatus => schemaId == TransportConstants.CoreSchemaId,
             FrameType.PlayerVitals => schemaId == TransportConstants.PlayerVitalsSchemaId,
+            FrameType.PlayerPosition => schemaId == TransportConstants.PlayerPositionSchemaId,
             _ => false
         };
     }
@@ -420,6 +456,15 @@ public static class FrameProtocol
         payload[offset + 3] = (byte)(value & 0xFF);
     }
 
+    private static void WriteInt32BigEndian(Span<byte> payload, int offset, int value)
+    {
+        var u = unchecked((uint)value);
+        payload[offset] = (byte)(u >> 24);
+        payload[offset + 1] = (byte)((u >> 16) & 0xFF);
+        payload[offset + 2] = (byte)((u >> 8) & 0xFF);
+        payload[offset + 3] = (byte)(u & 0xFF);
+    }
+
     private static ushort ReadUInt16BigEndian(ReadOnlySpan<byte> payload, int offset)
     {
         return (ushort)((payload[offset] << 8) | payload[offset + 1]);
@@ -432,4 +477,18 @@ public static class FrameProtocol
              | ((uint)payload[offset + 2] << 8)
              | payload[offset + 3];
     }
+
+    private static int ReadInt32BigEndian(ReadOnlySpan<byte> payload, int offset)
+    {
+        var u = ((uint)payload[offset] << 24)
+              | ((uint)payload[offset + 1] << 16)
+              | ((uint)payload[offset + 2] << 8)
+              | payload[offset + 3];
+        return unchecked((int)u);
+    }
+
+    private static int FloatToFixed(float value) =>
+        (int)Math.Round(value * 100.0f, MidpointRounding.AwayFromZero);
+
+    private static float FixedToFloat(int value) => value / 100.0f;
 }

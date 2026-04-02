@@ -221,6 +221,12 @@ internal sealed class InspectorForm : Form
                     builder.AppendLine($"  ResourceCurrent: {vitals.Payload.ResourceCurrent}");
                     builder.AppendLine($"  ResourceMax: {vitals.Payload.ResourceMax}");
                     break;
+
+                case PlayerPositionFrame position:
+                    builder.AppendLine($"  PositionX: {position.Payload.X:F2}");
+                    builder.AppendLine($"  PositionY: {position.Payload.Y:F2}");
+                    builder.AppendLine($"  PositionZ: {position.Payload.Z:F2}");
+                    break;
             }
         }
 

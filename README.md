@@ -23,6 +23,7 @@ ChromaLink is intentionally narrow right now. The active baseline is:
 - fixed control markers on both edges
 - fast heartbeat frame: `coreStatus`
 - proven rotating expansion: `playerVitals`
+- next rotating expansion in code: `playerPosition`
 
 Current live proof:
 
@@ -116,6 +117,8 @@ dotnet run --project .\DesktopDotNet\ChromaLink.Inspector\ChromaLink.Inspector.c
 - `capture-dump`
 - `prepare-window [left] [top]`
 
+`live` and `watch` now report per-frame-type counts for accepted samples, which makes rotating telemetry easier to verify.
+
 Capture backend flag:
 
 - `--backend desktopdup|screen|printwindow`
@@ -187,8 +190,10 @@ The current strip carries `24` transport bytes per frame and now supports more t
 - `PlayerVitals`
   - health current/max
   - resource current/max
+- `PlayerPosition`
+  - x/y/z world coordinates encoded as fixed-point integers
 
-The current addon rotation keeps `coreStatus` as the dominant heartbeat and periodically inserts `playerVitals` to increase throughput over time instead of widening the strip.
+The current addon rotation keeps `coreStatus` as the dominant heartbeat and periodically inserts `playerVitals` and `playerPosition` to increase throughput over time instead of widening the strip.
 
 ## Wrapper Scripts
 
@@ -217,6 +222,8 @@ Examples:
 `Reload-RiftUi.cmd` sends the normal RIFT `/reloadui` command to the active game window.
 
 `Send-RiftSlash.cmd` can send other ChromaLink slash commands when we explicitly want scripted in-game control.
+
+The slash-sender helpers now abort if RIFT does not actually become the foreground window, which is safer than typing into another app by mistake.
 
 ## Project Structure
 

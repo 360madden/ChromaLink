@@ -101,6 +101,7 @@ public sealed class LiveMetrics
 {
     private readonly List<double> _captureMs = new();
     private readonly List<double> _decodeMs = new();
+    private readonly Dictionary<string, int> _frameTypeCounts = new(StringComparer.Ordinal);
 
     public int AcceptedCount { get; private set; }
 
@@ -116,7 +117,9 @@ public sealed class LiveMetrics
 
     public double P95DecodeMs => Percentile(_decodeMs, 0.95);
 
-    public void Add(bool accepted, double captureMs, double decodeMs, string reason)
+    public IReadOnlyDictionary<string, int> FrameTypeCounts => _frameTypeCounts;
+
+    public void Add(bool accepted, double captureMs, double decodeMs, string reason, TelemetryFrame? frame = null)
     {
         if (accepted)
         {
@@ -130,6 +133,12 @@ public sealed class LiveMetrics
         _captureMs.Add(captureMs);
         _decodeMs.Add(decodeMs);
         LastReason = reason;
+
+        if (frame is not null)
+        {
+            var key = $"{frame.Header.FrameType}/schema-{frame.Header.SchemaId}";
+            _frameTypeCounts[key] = _frameTypeCounts.TryGetValue(key, out var count) ? count + 1 : 1;
+        }
     }
 
     private static double Percentile(List<double> values, double percentile)

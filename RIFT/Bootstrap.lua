@@ -161,6 +161,9 @@ function ChromaLink.Bootstrap.Refresh(forceRefresh, reason)
     if frameKind == "playerVitals" then
       snapshot = ChromaLink.Gather.BuildSyntheticPlayerVitalsSnapshot()
       _, symbols = ChromaLink.Protocol.BuildPlayerVitalsFrame(snapshot, state.sequence)
+    elseif frameKind == "playerPosition" then
+      snapshot = ChromaLink.Gather.BuildSyntheticPlayerPositionSnapshot()
+      _, symbols = ChromaLink.Protocol.BuildPlayerPositionFrame(snapshot, state.sequence)
     else
       snapshot = ChromaLink.Gather.BuildSyntheticCoreStatusSnapshot()
       _, symbols = ChromaLink.Protocol.BuildCoreFrame(snapshot, state.sequence)
@@ -170,6 +173,9 @@ function ChromaLink.Bootstrap.Refresh(forceRefresh, reason)
     if frameKind == "playerVitals" then
       snapshot = ChromaLink.Gather.BuildPlayerVitalsSnapshot()
       _, symbols = ChromaLink.Protocol.BuildPlayerVitalsFrame(snapshot, state.sequence)
+    elseif frameKind == "playerPosition" then
+      snapshot = ChromaLink.Gather.BuildPlayerPositionSnapshot()
+      _, symbols = ChromaLink.Protocol.BuildPlayerPositionFrame(snapshot, state.sequence)
     else
       snapshot = ChromaLink.Gather.BuildCoreStatusSnapshot()
       _, symbols = ChromaLink.Protocol.BuildCoreFrame(snapshot, state.sequence)
@@ -201,6 +207,7 @@ function ChromaLink.Bootstrap.LogStatus(includeNativeFrames)
   local observerConfig = ChromaLink.Config.observerLane or {}
   local compensationConfig = ChromaLink.Config.displayCompensation or {}
   local compensationSummary
+  local rotation = ChromaLink.Config.frameRotation or {}
   local nativeFrames
   local entry
 
@@ -217,6 +224,7 @@ function ChromaLink.Bootstrap.LogStatus(includeNativeFrames)
     diagnosticsConfig.enabled and "on" or "off",
     diagnosticsConfig.logEvents and "on" or "off",
     observerConfig.enabled and "on" or "off"))
+  ChromaLink.Diagnostics.Log("Rotation: " .. table.concat(rotation, " -> ") .. ".")
   ChromaLink.Diagnostics.Log(string.format(
     "Anchor=%s strata=%s.",
     tostring(state.layoutAnchorReason or "context"),

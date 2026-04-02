@@ -16,6 +16,7 @@ Current project direction:
 - color alphabet size: `8`
 - heartbeat frame: `coreStatus`
 - first throughput expansion: `playerVitals`
+- second throughput expansion: `playerPosition`
 
 Working rules:
 - optimize for the fastest proven vertical slice
@@ -59,10 +60,14 @@ Current throughput expansion payload:
   - health max (`uint32`)
   - resource current (`uint16`)
   - resource max (`uint16`)
+- `playerPosition-v1`
+  - x (`int32`, fixed-point `*100`)
+  - y (`int32`, fixed-point `*100`)
+  - z (`int32`, fixed-point `*100`)
 
 Current rotation strategy:
 - keep `coreStatus` as the dominant heartbeat
-- rotate in `playerVitals` periodically to increase throughput without changing strip geometry
+- rotate in `playerVitals` and `playerPosition` periodically to increase throughput without changing strip geometry
 
 Desktop requirements:
 - `smoke`
