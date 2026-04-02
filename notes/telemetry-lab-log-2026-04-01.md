@@ -858,7 +858,7 @@ dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- smo
 - `smoke` passed
 - CLI frame summaries now print `ReservedFlags: 0x03 (multi-frame, player-position)`
 - the local reader path can now prove build capability directly from decoded strip bytes
-- live RIFT proof is still pending a safe `/reloadui`
+- live RIFT proof was completed in the next session after a safe `/reloadui`
 
 ### Decision
 
@@ -867,3 +867,49 @@ Keep if tests and smoke pass.
 ### Saved Checkpoint
 
 - pending commit for header capability proof flags
+
+---
+
+## 2026-04-02 - Session Q - live proof of header flags and player position
+
+### Goal
+
+Use one safe reload plus live capture to prove whether the running addon loaded the new build and whether `playerPosition` is actually present on the strip.
+
+### Change
+
+- reload the live addon with `/reloadui`
+- capture a live sample set and inspect both frame counts and header capability flags
+
+### Why
+
+The local code path was already proven, but we needed the strip itself to tell us whether the running RIFT client had really loaded the new telemetry build.
+
+### Verification
+
+```powershell
+.\scripts\Reload-RiftUi.cmd
+```
+
+```powershell
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- live 60 50 --backend screen
+```
+
+### Result
+
+- live decode accepted `60/60` samples
+- live frame counts were:
+  - `CoreStatus`: `35`
+  - `PlayerVitals`: `12`
+  - `PlayerPosition`: `13`
+- the last decoded frame was `PlayerPosition`
+- the live frame summary printed `ReservedFlags: 0x03 (multi-frame, player-position)`
+- this proves the running addon loaded the newer build and that `playerPosition` is now decoding live
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for live proof of header flags and player position

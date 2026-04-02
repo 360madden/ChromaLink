@@ -22,8 +22,7 @@ ChromaLink is intentionally narrow right now. The active baseline is:
 - fixed `8-color` alphabet
 - fixed control markers on both edges
 - fast heartbeat frame: `coreStatus`
-- proven rotating expansion: `playerVitals`
-- next rotating expansion in code: `playerPosition`
+- proven rotating expansions: `playerVitals`, `playerPosition`
 
 Current live proof:
 
@@ -34,7 +33,7 @@ Current live proof:
   - `origin 0,0`
   - `pitch 2.8`
   - `scale 0.35`
-- live captures now decode both `CoreStatus` and `PlayerVitals` on the running client
+- live captures now decode `CoreStatus`, `PlayerVitals`, and `PlayerPosition` on the running client
 - capture sessions emit raw BMP, annotated BMP, and JSON sidecars under `%LOCALAPPDATA%\ChromaLink\DesktopDotNet\out`
 
 ## How It Works
@@ -193,7 +192,12 @@ The current strip carries `24` transport bytes per frame and now supports more t
 - `PlayerPosition`
   - x/y/z world coordinates encoded as fixed-point integers
 
-The current addon rotation keeps `coreStatus` as the dominant heartbeat and periodically inserts `playerVitals` and `playerPosition` to increase throughput over time instead of widening the strip.
+The current addon rotation keeps `coreStatus` as the dominant heartbeat and periodically inserts `playerVitals` and `playerPosition` to increase throughput over time instead of widening the strip. A recent live sample after `/reloadui` produced:
+
+- `35` accepted `CoreStatus` frames
+- `12` accepted `PlayerVitals` frames
+- `13` accepted `PlayerPosition` frames
+- `ReservedFlags: 0x03`, confirming the live addon loaded the newer multi-frame build
 
 The header `ReservedFlags` byte is now used as a live build-capability marker. Current expected value is `0x03`, which means:
 
