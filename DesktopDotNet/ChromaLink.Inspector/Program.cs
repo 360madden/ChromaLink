@@ -22,6 +22,16 @@ internal static class Program
 internal sealed class InspectorForm : Form
 {
     private readonly StripPreviewControl _preview = new();
+    private readonly TextBox _liveBridgeSummary = new()
+    {
+        Dock = DockStyle.Fill,
+        Multiline = true,
+        ReadOnly = true,
+        ScrollBars = ScrollBars.None,
+        BorderStyle = BorderStyle.None,
+        Font = new Font("Consolas", 9.0f),
+        BackColor = SystemColors.Window
+    };
     private readonly TextBox _details = new()
     {
         Dock = DockStyle.Fill,
@@ -61,6 +71,15 @@ internal sealed class InspectorForm : Form
         topBar.Controls.Add(_autoRefreshCheckBox);
         topBar.Controls.Add(_pathLabel);
 
+        var liveBridgeGroup = new GroupBox
+        {
+            Dock = DockStyle.Top,
+            Height = 112,
+            Text = "Live Bridge",
+            Padding = new Padding(8, 20, 8, 8)
+        };
+        liveBridgeGroup.Controls.Add(_liveBridgeSummary);
+
         var previewHost = new Panel
         {
             Dock = DockStyle.Fill,
@@ -78,10 +97,12 @@ internal sealed class InspectorForm : Form
         split.Panel2.Controls.Add(_details);
 
         Controls.Add(split);
+        Controls.Add(liveBridgeGroup);
         Controls.Add(topBar);
 
         _refreshTimer.Tick += (_, _) =>
         {
+            UpdateLiveBridgeSummary();
             if (RefreshLiveSnapshotIfChanged())
             {
                 return;
@@ -102,6 +123,8 @@ internal sealed class InspectorForm : Form
         {
             LoadLatestCapture(force: true);
         }
+
+        UpdateLiveBridgeSummary();
     }
 
     private void OpenBmp()
@@ -144,6 +167,7 @@ internal sealed class InspectorForm : Form
         _pathLabel.Text = path;
         _currentPath = path;
         _currentWriteTimeUtc = File.GetLastWriteTimeUtc(path);
+        UpdateLiveBridgeSummary();
     }
 
     private bool RefreshLiveSnapshotIfChanged()
@@ -161,14 +185,109 @@ internal sealed class InspectorForm : Form
         }
 
         _currentLiveSnapshotWriteTimeUtc = writeTime;
+        UpdateLiveBridgeSummary();
         if (!string.IsNullOrWhiteSpace(_currentPath) && File.Exists(_currentPath))
         {
             LoadFromPath(_currentPath);
             return true;
         }
 
-        LoadLatestCapture(force: true);
+        _details.Text = BuildLiveBridgeOnlySummary(snapshotPath);
+        _pathLabel.Text = $"Live snapshot: {snapshotPath}";
         return true;
+    }
+
+    private void UpdateLiveBridgeSummary()
+    {
+        _liveBridgeSummary.Text = BuildLiveBridgeSummary();
+    }
+
+    private static string BuildLiveBridgeOnlySummary(string snapshotPath)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("ChromaLink Live Bridge");
+        builder.AppendLine($"Snapshot: {snapshotPath}");
+        AppendLiveSnapshotSummary(builder);
+        return builder.ToString();
+    }
+
+    private static string BuildLiveBridgeSummary()
+    {
+        var snapshotPath = GetLiveTelemetrySnapshotPath();
+        if (string.IsNullOrWhiteSpace(snapshotPath) || !File.Exists(snapshotPath))
+        {
+            return "Live bridge snapshot: not available yet.";
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(snapshotPath));
+            var root = document.RootElement;
+            var lines = new List<string>
+            {
+                $"Contract: {root.GetProperty("contract").GetProperty("name").GetString()}/v{root.GetProperty("contract").GetProperty("schemaVersion").GetInt32()}",
+                $"Snapshot: {snapshotPath}"
+            };
+
+            if (root.TryGetProperty("generatedAtUtc", out var generatedAtUtc))
+            {
+                var generated = generatedAtUtc.GetDateTimeOffset();
+                var age = DateTimeOffset.UtcNow - generated;
+                if (age < TimeSpan.Zero)
+                {
+                    age = TimeSpan.Zero;
+                }
+
+                lines.Add($"Freshness: {age.TotalSeconds:F1}s old");
+            }
+
+            if (root.TryGetProperty("aggregate", out var aggregate))
+            {
+                lines.Add($"Ready: {aggregate.GetProperty("ready").GetBoolean()} | AcceptedFrames: {aggregate.GetProperty("acceptedFrames").GetInt32()}");
+                lines.Add($"Frames: {SummarizeSnapshotFrame(aggregate, "coreStatus")} | {SummarizeSnapshotFrame(aggregate, "playerVitals")} | {SummarizeSnapshotFrame(aggregate, "playerPosition")}");
+            }
+
+            if (root.TryGetProperty("metrics", out var metrics))
+            {
+                lines.Add($"Samples: +{metrics.GetProperty("acceptedSamples").GetInt32()} / -{metrics.GetProperty("rejectedSamples").GetInt32()}");
+            }
+
+            if (root.TryGetProperty("lastBackend", out var lastBackend))
+            {
+                lines.Add($"LastBackend: {lastBackend.GetString()}");
+            }
+
+            if (root.TryGetProperty("lastDetection", out var lastDetection) && lastDetection.ValueKind == JsonValueKind.Object)
+            {
+                lines.Add(
+                    $"Detection: origin {lastDetection.GetProperty("originX").GetInt32()},{lastDetection.GetProperty("originY").GetInt32()} pitch {lastDetection.GetProperty("pitch").GetDouble():F3} scale {lastDetection.GetProperty("scale").GetDouble():F3}");
+            }
+
+            return string.Join(Environment.NewLine, lines);
+        }
+        catch (Exception ex)
+        {
+            return $"Live bridge snapshot error: {ex.GetType().Name}: {ex.Message}";
+        }
+    }
+
+    private static string SummarizeSnapshotFrame(JsonElement aggregate, string propertyName)
+    {
+        if (!aggregate.TryGetProperty(propertyName, out var frame) || frame.ValueKind != JsonValueKind.Object)
+        {
+            return $"{propertyName}: missing";
+        }
+
+        var sequence = frame.TryGetProperty("sequence", out var sequenceProperty) ? sequenceProperty.GetInt32() : -1;
+        var reservedFlags = frame.TryGetProperty("reservedFlags", out var flagsProperty) ? flagsProperty.GetInt32() : -1;
+        var observedAt = frame.TryGetProperty("observedAtUtc", out var observedProperty) ? observedProperty.GetDateTimeOffset() : default;
+        var age = DateTimeOffset.UtcNow - observedAt;
+        if (age < TimeSpan.Zero)
+        {
+            age = TimeSpan.Zero;
+        }
+
+        return $"{propertyName}: seq={sequence} flags=0x{reservedFlags:X2} age={age.TotalSeconds:F1}s";
     }
 
     private static string BuildSummary(string path, Bgr24Frame frame, FrameValidationResult analysis)
