@@ -249,6 +249,58 @@ Keep.
 
 ---
 
+## 2026-04-01 - Session E - scale-aware observer diagnostics
+
+### Goal
+
+Make observer-lane reporting useful on the real live baseline instead of only on full-size synthetic canvases.
+
+### Change
+
+- add a shared reader-layer observer analyzer so multiple tools can reuse the same logic
+- extend capture sidecars and annotated BMP overlays with observer-lane summary fields
+- extend the inspector sidecar summary with observer-lane visibility details
+- make observer-lane sampling scale-aware by following the live detected strip origin and scale
+- add tests for:
+  - full-size observer lane sampling
+  - scaled live `0.35` observer lane sampling
+
+### Why
+
+The first observer report sampled marker positions as if the lane were full-size. That was wrong for the real `640x360` baseline because the live addon still lands at `scale 0.35`, so the analyzer was looking in the wrong places.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- replay "$env:LOCALAPPDATA\ChromaLink\DesktopDotNet\out\resolution-sweep-640-observer-verified\640x360\capture.bmp"
+```
+
+```powershell
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- capture-dump
+```
+
+### Result
+
+- tests passed: `9/9`
+- the observer analyzer is now shared instead of CLI-only
+- observer diagnostics no longer assume full-size marker positions
+- the `640x360` baseline remained accepted after the change
+- current sidecars and overlays are now able to report observer-lane diagnostics in a structured way
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for scale-aware observer diagnostics
+
+---
+
 ## Current Stable Baseline At End Of Log
 
 - target client: `640x360`

@@ -93,7 +93,8 @@ internal static class DiagnosticsArtifacts
             }
         }
 
-        var summaryLines = BuildOverlayLines(profile, capture, validation);
+        var observerReport = ObserverLaneAnalyzer.Analyze(capture.Image, profile, validation.Detection);
+        var summaryLines = BuildOverlayLines(profile, capture, validation, observerReport);
         var overlayWidth = 430;
         var overlayHeight = (summaryLines.Count * 11) + 8;
         graphics.FillRectangle(bgBrush, 4, 4, overlayWidth, overlayHeight);
@@ -112,6 +113,7 @@ internal static class DiagnosticsArtifacts
         FrameValidationResult validation,
         IReadOnlyList<string> attemptSummaries)
     {
+        var observerReport = ObserverLaneAnalyzer.Analyze(capture.Image, profile, validation.Detection);
         var payload = new
         {
             artifactKind = Path.GetFileNameWithoutExtension(rawBmpPath),
@@ -167,6 +169,36 @@ internal static class DiagnosticsArtifacts
                     validation.ParseResult.PayloadCrcValid,
                     transportBytesHex = BitConverter.ToString(validation.ParseResult.TransportBytes).Replace("-", string.Empty)
                 },
+            observerLane = observerReport.IsConfigured
+                ? new
+                {
+                    configured = observerReport.IsConfigured,
+                    probablyVisible = observerReport.IsProbablyVisible,
+                    matchedMarkers = observerReport.MatchedMarkers,
+                    totalMarkers = observerReport.TotalMarkers,
+                    averageConfidence = observerReport.AverageConfidence,
+                    expectedPattern = observerReport.ExpectedPattern,
+                    observedPattern = observerReport.ObservedPattern,
+                    markers = observerReport.Markers.Select(marker => new
+                    {
+                        markerIndex = marker.MarkerIndex,
+                        expectedSymbol = marker.ExpectedSymbol,
+                        observedSymbol = marker.ObservedSymbol,
+                        confidence = marker.Confidence,
+                        distance = marker.Distance,
+                        secondChoiceSymbol = marker.SecondChoiceSymbol,
+                        secondChoiceDistance = marker.SecondChoiceDistance,
+                        centerX = marker.CenterX,
+                        centerY = marker.CenterY,
+                        sampleColor = new
+                        {
+                            r = marker.SampleColor.R,
+                            g = marker.SampleColor.G,
+                            b = marker.SampleColor.B
+                        }
+                    }).ToArray()
+                }
+                : null,
             samples = validation.Samples.Select(sample => new
             {
                 segmentIndex = sample.SegmentIndex,
@@ -205,7 +237,11 @@ internal static class DiagnosticsArtifacts
             }));
     }
 
-    private static List<string> BuildOverlayLines(StripProfile profile, CaptureResult capture, FrameValidationResult validation)
+    private static List<string> BuildOverlayLines(
+        StripProfile profile,
+        CaptureResult capture,
+        FrameValidationResult validation,
+        ObserverLaneReport observerReport)
     {
         var lines = new List<string>
         {
@@ -225,6 +261,13 @@ internal static class DiagnosticsArtifacts
         lines.Add($"Left': {FormatObservedPattern(validation.Samples, 0, profile.LeftControl.Length)}");
         lines.Add($"Right: {FormatPattern(profile.RightControl)}");
         lines.Add($"Right':{FormatObservedPattern(validation.Samples, profile.SegmentCount - profile.RightControl.Length, profile.RightControl.Length)}");
+
+        if (observerReport.IsConfigured)
+        {
+            lines.Add($"Obs:   {observerReport.ExpectedPattern}");
+            lines.Add($"Obs':  {observerReport.ObservedPattern}");
+            lines.Add($"ObsOk: {observerReport.MatchedMarkers}/{observerReport.TotalMarkers} vis={observerReport.IsProbablyVisible} conf={observerReport.AverageConfidence:F3}");
+        }
 
         if (validation.ParseResult is not null)
         {

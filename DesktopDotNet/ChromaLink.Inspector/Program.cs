@@ -246,6 +246,14 @@ internal sealed class InspectorForm : Form
             builder.AppendLine(
                 $"CaptureRect: {captureRect.GetProperty("left").GetInt32()},{captureRect.GetProperty("top").GetInt32()} {captureRect.GetProperty("width").GetInt32()}x{captureRect.GetProperty("height").GetInt32()}");
         }
+
+        if (root.TryGetProperty("observerLane", out var observerLane) && observerLane.ValueKind == JsonValueKind.Object)
+        {
+            builder.AppendLine(
+                $"ObserverLane: visible={observerLane.GetProperty("probablyVisible").GetBoolean()} matched={observerLane.GetProperty("matchedMarkers").GetInt32()}/{observerLane.GetProperty("totalMarkers").GetInt32()} conf={observerLane.GetProperty("averageConfidence").GetDouble():F3}");
+            builder.AppendLine($"ObserverExpected: {observerLane.GetProperty("expectedPattern").GetString()}");
+            builder.AppendLine($"ObserverObserved: {observerLane.GetProperty("observedPattern").GetString()}");
+        }
     }
 
     private static string FormatPattern(IEnumerable<byte> symbols)

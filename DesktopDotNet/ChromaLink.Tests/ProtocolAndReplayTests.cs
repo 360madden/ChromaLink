@@ -115,4 +115,56 @@ public class ProtocolAndReplayTests
         Assert.NotNull(validation.Frame);
         Assert.Equal(FrameType.CoreStatus, validation.Frame!.Header.FrameType);
     }
+
+    [Fact]
+    public void ObserverLaneAnalyzer_Detects_ConfiguredMarkers_OnSyntheticCanvas()
+    {
+        var canvas = Bgr24Frame.CreateSolid(_profile.WindowWidth, _profile.CaptureHeight, _profile.GetPaletteColor(0), "observer-canvas");
+        var observer = _profile.ObserverLane!;
+
+        for (var index = 0; index < observer.MarkerSymbols.Length; index++)
+        {
+            var fraction = observer.MarkerSymbols.Length > 1
+                ? index / (double)(observer.MarkerSymbols.Length - 1)
+                : 0.0;
+            var left = (int)Math.Round(fraction * Math.Max(0, _profile.BandWidth - observer.MarkerWidth));
+            canvas.FillRect(left, observer.OffsetY, observer.MarkerWidth, observer.Height, _profile.GetPaletteColor(observer.MarkerSymbols[index]));
+        }
+
+        var report = ObserverLaneAnalyzer.Analyze(canvas, _profile);
+
+        Assert.True(report.IsConfigured);
+        Assert.True(report.IsProbablyVisible);
+        Assert.Equal(observer.MarkerSymbols.Length, report.MatchedMarkers);
+        Assert.Equal("0 1 2 3 4 5 6 7", report.ObservedPattern);
+    }
+
+    [Fact]
+    public void ObserverLaneAnalyzer_Detects_ConfiguredMarkers_OnScaledLiveCanvas()
+    {
+        var observer = _profile.ObserverLane!;
+        var scale = 0.35;
+        var canvas = Bgr24Frame.CreateSolid(_profile.WindowWidth, _profile.CaptureHeight, _profile.GetPaletteColor(0), "observer-live-canvas");
+        var detection = new DetectionResult(0, 0, 2.8, scale, 0, 0, 0, 229, "fixed-profile", Bgr24Color.Black, Bgr24Color.White);
+
+        for (var index = 0; index < observer.MarkerSymbols.Length; index++)
+        {
+            var fraction = observer.MarkerSymbols.Length > 1
+                ? index / (double)(observer.MarkerSymbols.Length - 1)
+                : 0.0;
+            var left = fraction * Math.Max(0, _profile.BandWidth - observer.MarkerWidth);
+            var scaledLeft = (int)Math.Round(left * scale);
+            var scaledTop = (int)Math.Round(observer.OffsetY * scale);
+            var scaledWidth = Math.Max(1, (int)Math.Round(observer.MarkerWidth * scale));
+            var scaledHeight = Math.Max(1, (int)Math.Round(observer.Height * scale));
+            canvas.FillRect(scaledLeft, scaledTop, scaledWidth, scaledHeight, _profile.GetPaletteColor(observer.MarkerSymbols[index]));
+        }
+
+        var report = ObserverLaneAnalyzer.Analyze(canvas, _profile, detection);
+
+        Assert.True(report.IsConfigured);
+        Assert.True(report.IsProbablyVisible);
+        Assert.Equal(observer.MarkerSymbols.Length, report.MatchedMarkers);
+        Assert.Equal("0 1 2 3 4 5 6 7", report.ObservedPattern);
+    }
 }

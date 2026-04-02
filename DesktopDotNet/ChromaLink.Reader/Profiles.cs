@@ -2,6 +2,12 @@ namespace ChromaLink.Reader;
 
 public sealed record PaletteEntry(byte Symbol, string Name, Bgr24Color Color);
 
+public sealed record ObserverLaneProfile(
+    int OffsetY,
+    int Height,
+    int MarkerWidth,
+    byte[] MarkerSymbols);
+
 public sealed record StripProfile(
     string Id,
     byte NumericId,
@@ -17,7 +23,8 @@ public sealed record StripProfile(
     int PayloadSymbolCount,
     PaletteEntry[] Palette,
     byte[] LeftControl,
-    byte[] RightControl)
+    byte[] RightControl,
+    ObserverLaneProfile? ObserverLane = null)
 {
     public int PayloadStartIndex => PayloadStartSegment - 1;
 
@@ -80,7 +87,12 @@ public static class StripProfiles
         64,
         Alphabet,
         new byte[] { 0, 1, 0, 1, 2, 3, 4, 5 },
-        new byte[] { 5, 4, 3, 2, 1, 0, 1, 0 });
+        new byte[] { 5, 4, 3, 2, 1, 0, 1, 0 },
+        new ObserverLaneProfile(
+            32,
+            12,
+            20,
+            new byte[] { 0, 1, 2, 3, 4, 5, 6, 7 }));
 
     public static StripProfile Default => P360C;
 }

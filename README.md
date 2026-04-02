@@ -85,6 +85,10 @@ In-game slash commands:
 - `/cl observer on|off|status` toggles an optional calibration lane below the strip for extra capture diagnostics
 - `/cl traces on|off` arms or disables verbose layout tracing for the next `/reloadui`
 
+Observer lane diagnostics:
+- capture sidecars now include an `observerLane` section when the profile defines one
+- observer sampling follows the live detected strip scale/origin, so the report remains meaningful on the current `scale 0.35` baseline
+
 ## Wrapper Scripts
 
 - [Prepare-ChromaLink-640x360.cmd](scripts/Prepare-ChromaLink-640x360.cmd)
