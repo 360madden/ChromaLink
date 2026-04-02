@@ -22,8 +22,26 @@ local function SetTraceMode(enabled)
   diagnosticsConfig.logEvents = enabled and true or false
 end
 
+local function PrintBuildStatus()
+  if ChromaLink.Bootstrap ~= nil and ChromaLink.Bootstrap.LogBuildStatus ~= nil then
+    ChromaLink.Bootstrap.LogBuildStatus()
+    return
+  end
+
+  ChromaLink.Diagnostics.Log("Build status is unavailable until bootstrap initialization completes.")
+end
+
+local function PrintRotationStatus()
+  if ChromaLink.Bootstrap ~= nil and ChromaLink.Bootstrap.LogRotationStatus ~= nil then
+    ChromaLink.Bootstrap.LogRotationStatus()
+    return
+  end
+
+  ChromaLink.Diagnostics.Log("Rotation status is unavailable until bootstrap initialization completes.")
+end
+
 local function PrintHelp()
-  ChromaLink.Diagnostics.Log("Commands: /cl status | /cl diag | /cl refresh | /cl observer on|off|status | /cl compensate on|off|status | /cl traces on|off")
+  ChromaLink.Diagnostics.Log("Commands: /cl status | /cl build | /cl rotation | /cl diag | /cl refresh | /cl observer on|off|status | /cl compensate on|off|status | /cl traces on|off")
 end
 
 function ChromaLink.Commands.OnSlashCommand(_, commandText)
@@ -33,6 +51,16 @@ function ChromaLink.Commands.OnSlashCommand(_, commandText)
 
   if command == "status" then
     ChromaLink.Bootstrap.LogStatus(false)
+    return
+  end
+
+  if command == "build" or command == "version" or command == "caps" then
+    PrintBuildStatus()
+    return
+  end
+
+  if command == "rotation" or command == "rotate" then
+    PrintRotationStatus()
     return
   end
 

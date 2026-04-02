@@ -135,6 +135,28 @@ local function LogFrameStatus(label, frame, reason)
   ChromaLink.Diagnostics.LogLayout(label, frame, reason)
 end
 
+local function FormatHeaderFlags(headerFlags)
+  local labels = {}
+
+  if headerFlags == nil then
+    return "none"
+  end
+
+  if headerFlags.multiFrameRotation ~= nil and headerFlags.multiFrameRotation ~= 0 then
+    table.insert(labels, "multi-frame")
+  end
+
+  if headerFlags.playerPosition ~= nil and headerFlags.playerPosition ~= 0 then
+    table.insert(labels, "player-position")
+  end
+
+  if #labels == 0 then
+    return "none"
+  end
+
+  return table.concat(labels, ", ")
+end
+
 function ChromaLink.Bootstrap.Refresh(forceRefresh, reason)
   local state = ChromaLink.Bootstrap.state
   local now
@@ -267,6 +289,51 @@ function ChromaLink.Bootstrap.LogStatus(includeNativeFrames)
   for _, entry in ipairs(nativeFrames) do
     LogFrameStatus(entry.label, entry.frame, "status")
   end
+end
+
+function ChromaLink.Bootstrap.LogBuildStatus()
+  local version = ChromaLink.Config.addonVersion or "unknown"
+  local identifier = ChromaLink.Config.addonIdentifier or "ChromaLink"
+  local protocolVersion = ChromaLink.Config.protocolVersion or 0
+  local profile = ChromaLink.Config.profile or {}
+  local frameTypes = ChromaLink.Config.frameTypes or {}
+  local headerFlags = ChromaLink.Config.headerFlags or {}
+
+  ChromaLink.Diagnostics.Log(string.format("%s build: version=%s protocol=%s profile=%s.", identifier, tostring(version), tostring(protocolVersion), tostring(profile.id or "unknown")))
+  ChromaLink.Diagnostics.Log(string.format(
+    "Frame types: coreStatus=%s playerVitals=%s playerPosition=%s.",
+    tostring(frameTypes.coreStatus or "n/a"),
+    tostring(frameTypes.playerVitals or "n/a"),
+    tostring(frameTypes.playerPosition or "n/a")))
+  ChromaLink.Diagnostics.Log(string.format(
+    "Header flags: 0x%02X (%s).",
+    tonumber(headerFlags.multiFrameRotation or 0) + tonumber(headerFlags.playerPosition or 0),
+    FormatHeaderFlags(headerFlags)))
+  ChromaLink.Diagnostics.Log(string.format(
+    "Strip profile: %s %dx%d band=%dx%d segments=%d x %d.",
+    tostring(profile.id or "unknown"),
+    tonumber(profile.windowWidth or 0),
+    tonumber(profile.windowHeight or 0),
+    tonumber(profile.bandWidth or 0),
+    tonumber(profile.bandHeight or 0),
+    tonumber(profile.segmentCount or 0),
+    tonumber(profile.segmentWidth or 0)))
+end
+
+function ChromaLink.Bootstrap.LogRotationStatus()
+  local rotation = ChromaLink.Config.frameRotation or {}
+  local frameTypes = ChromaLink.Config.frameTypes or {}
+  local parts = {}
+  local index
+  local frameKind
+
+  for index = 1, #rotation do
+    frameKind = rotation[index]
+    parts[index] = string.format("%02d:%s(%s)", index, tostring(frameKind), tostring(frameTypes[frameKind] or "n/a"))
+  end
+
+  ChromaLink.Diagnostics.Log("Rotation sequence: " .. (#parts > 0 and table.concat(parts, " -> ") or "none") .. ".")
+  ChromaLink.Diagnostics.Log("Heartbeat priority: coreStatus is the dominant frame; playerVitals and playerPosition are rotated in for throughput.")
 end
 
 function ChromaLink.Bootstrap.SetObserverEnabled(enabled)
