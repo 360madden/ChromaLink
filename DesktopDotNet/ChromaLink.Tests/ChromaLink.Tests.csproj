@@ -15,6 +15,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ChromaLink.Reader\ChromaLink.Reader.csproj" />
+    <ProjectReference Include="..\ChromaLink.HttpBridge\ChromaLink.HttpBridge.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Fixtures\*.bmp">
