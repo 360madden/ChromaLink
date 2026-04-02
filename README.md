@@ -1,71 +1,108 @@
 # ChromaLink
 
-ChromaLink is a reliability-first optical telemetry project for RIFT with three active parts:
-- a Lua addon that renders a segmented color strip in game
-- a `.NET 9` reader and CLI under `DesktopDotNet/`
-- small Windows helpers for window prep, capture inspection, and replay/debugging
+[![.NET 9](https://img.shields.io/badge/.NET-9-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
+[![Lua 5.1](https://img.shields.io/badge/Lua-5.1-blue?logo=lua)](https://www.lua.org/)
+[![RIFT MMO](https://img.shields.io/badge/RIFT-MMO-FF6B35)](https://www.riftgame.com/)
 
-The active transport is now a reader-first encoded color strip. The older barcode/matrix baseline is archived for reference only.
+ChromaLink is a reliability-first optical telemetry project for RIFT. A Lua addon renders a structured color strip inside the game client, and a `.NET 9` desktop reader captures that strip from the window, decodes it, and turns it into usable telemetry plus diagnostics.
 
-## Current Baseline
+The important constraint is also the point of the project: the game-to-desktop bridge is the on-screen strip itself. If live capture or replay fails, that failure is visible and debuggable in pixels rather than hidden behind an opaque integration.
 
-This repo now targets a single live profile:
+## Current Scope
+
+ChromaLink is intentionally narrow right now. The active baseline is:
+
 - profile `P360C`
 - client `640x360`
-- top band `640x24`
+- strip `640x24`
 - `80` vertical segments at `8x24`
 - fixed `8-color` alphabet
 - fixed control markers on both edges
-- one `coreStatus` frame only for the first live slice
+- one proven live frame slice: `coreStatus`
 
-Current proof level:
+Current live proof:
+
 - offline smoke, replay, bench, build, and tests are passing
-- live capture works against the running client and currently prefers `PrintWindow` for the most reliable `640x360` baseline, with `DesktopDuplication` and `ScreenBitBlt` still available for comparison
-- live decode is proven on the current client and currently locks the real strip at `origin 0,0`, `pitch 2.8`, `scale 0.35`
-- capture runs emit raw BMP, annotated BMP, and JSON sidecar diagnostics under `AppData\\Local\\ChromaLink\\DesktopDotNet\\out`
+- default live capture now prefers `PrintWindow` for the most reliable `640x360` path
+- `DesktopDuplication` and `ScreenBitBlt` are still available for comparison
+- live decode is currently proven at:
+  - `origin 0,0`
+  - `pitch 2.8`
+  - `scale 0.35`
+- capture sessions emit raw BMP, annotated BMP, and JSON sidecars under `%LOCALAPPDATA%\ChromaLink\DesktopDotNet\out`
+
+## How It Works
+
+```text
+[RIFT Client]
+   ↓
+[Lua Addon]
+   ├─ gathers in-game state
+   ├─ encodes transport bytes
+   └─ renders 640x24 color strip at the top of the client
+         ↓ (visible pixels only)
+[ChromaLink.Reader]
+   ├─ captures the game window
+   ├─ finds strip geometry
+   ├─ samples symbols
+   ├─ validates control markers + CRC
+   └─ produces telemetry + diagnostics
+         ↓
+[CLI / Inspector / Future tools]
+```
+
+The older barcode or matrix work is archived for reference only. The active transport is the current reader-first segmented color strip.
+
+## Requirements
+
+- RIFT game client
+- Windows 10 or 11
+- `.NET 9 SDK`
+- a windowed RIFT client that can be prepared to the current baseline
 
 ## Quick Start
 
-### 1) Build once
+### Build
 
 ```powershell
 dotnet build .\DesktopDotNet\ChromaLink.sln
 ```
 
-### 2) Prepare the RIFT window
+### Prepare The RIFT Window
 
 ```powershell
 dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- prepare-window 32 32
 ```
 
-### 3) Generate + verify synthetic fixture
+### Generate A Synthetic Fixture
 
 ```powershell
 dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- smoke
 ```
 
-### 4) Replay a saved capture
+### Replay A Saved Capture
 
 ```powershell
 dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- replay "$env:LOCALAPPDATA\ChromaLink\DesktopDotNet\fixtures\chromalink-color-core.bmp"
 ```
 
-### 5) Capture + decode live strip
+### Capture And Decode Live
 
 ```powershell
 dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- capture-dump
 dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- live 5 100
 ```
 
-### 6) Open inspector
+### Open The Inspector
 
 ```powershell
 dotnet run --project .\DesktopDotNet\ChromaLink.Inspector\ChromaLink.Inspector.csproj
 ```
 
-## CLI Command Surface
+## CLI Commands
 
 `ChromaLink.Cli` currently supports:
+
 - `smoke`
 - `replay <bmpPath>`
 - `live [sampleCount] [sleepMs]`
@@ -74,77 +111,164 @@ dotnet run --project .\DesktopDotNet\ChromaLink.Inspector\ChromaLink.Inspector.c
 - `capture-dump`
 - `prepare-window [left] [top]`
 
-Capture command backend flag:
+Capture backend flag:
+
 - `--backend desktopdup|screen|printwindow`
-- default live backend order: `PrintWindow`, then `DesktopDuplication`, then `ScreenBitBlt`
+- default backend order for live work:
+  - `PrintWindow`
+  - `DesktopDuplication`
+  - `ScreenBitBlt`
 
-In-game slash commands:
-- `/cl status` prints the current ChromaLink layout summary
-- `/cl diag` adds nearby native RIFT frame summaries for overlap/debug checks
-- `/cl refresh` forces an immediate strip refresh
-- `/cl observer on|off|status` toggles an optional calibration lane below the strip for extra capture diagnostics
-- `/cl traces on|off` arms or disables verbose layout tracing for the next `/reloadui`
+## In-Game Commands
 
-Observer lane diagnostics:
-- capture sidecars now include an `observerLane` section when the profile defines one
-- observer sampling follows the live detected strip scale/origin, so the report remains meaningful on the current `scale 0.35` baseline
-- annotated BMP artifacts now draw observer marker boxes and sample centers, so saved captures are easier to inspect without opening the JSON first
-- the inspector preview now draws the same observer marker boxes and centers directly on the zoomed capture
+ChromaLink exposes a small slash-command surface inside RIFT:
+
+- `/cl status`
+- `/cl diag`
+- `/cl refresh`
+- `/cl observer on`
+- `/cl observer off`
+- `/cl observer status`
+- `/cl traces on`
+- `/cl traces off`
+
+What they are for:
+
+- `status` prints the current strip/layout summary
+- `diag` adds nearby native RIFT frame summaries for overlap and layout checks
+- `refresh` forces an immediate strip redraw
+- `observer` toggles the optional observer lane below the strip
+- `traces` arms or disables verbose layout tracing for the next `/reloadui`
+
+## Observer Lane
+
+ChromaLink now includes an optional observer lane for low-risk capture research. It is off by default and does not change the main strip payload contract.
+
+What it helps with:
+
+- clipping checks
+- scale drift checks
+- color drift checks
+- future capture experiments
+
+Observer diagnostics are now visible in all major tooling layers:
+
+- capture sidecars include an `observerLane` section
+- annotated BMP artifacts draw observer marker boxes and sample centers
+- the inspector preview draws the same observer geometry directly on the zoomed capture
+
+## Protocol Snapshot
+
+The current transport is a segmented strip with fixed edge controls:
+
+- `80` total segments
+- left edge control markers in segments `1-8`
+- payload symbols in segments `9-72`
+- right edge control markers in segments `73-80`
+- `8-color` alphabet for `3` bits per segment
+
+The live path currently proves one frame slice, `coreStatus`. Broader payload coverage is still future work, but the transport and diagnostics are already structured to grow beyond that first slice.
 
 ## Wrapper Scripts
 
-- [Prepare-ChromaLink-640x360.cmd](scripts/Prepare-ChromaLink-640x360.cmd)
-- [Smoke-ChromaLink.cmd](scripts/Smoke-ChromaLink.cmd)
-- [Bench-ChromaLink.cmd](scripts/Bench-ChromaLink.cmd)
-- [Live-ChromaLink.cmd](scripts/Live-ChromaLink.cmd)
-- [Open-ChromaLink-Inspector.cmd](scripts/Open-ChromaLink-Inspector.cmd)
-- [Reload-RiftUi.cmd](scripts/Reload-RiftUi.cmd)
-- [Send-RiftSlash.cmd](scripts/Send-RiftSlash.cmd)
-- [Resize-RiftClient-640x360.cmd](scripts/Resize-RiftClient-640x360.cmd)
+Useful helper scripts:
 
-`Reload-RiftUi.cmd` sends the official RIFT `/reloadui` command to the active game window so addon changes can be refreshed without restarting the client.
-`Send-RiftSlash.cmd` can send other slash commands such as `/cl observer on`.
+- [scripts/Prepare-ChromaLink-640x360.cmd](scripts/Prepare-ChromaLink-640x360.cmd)
+- [scripts/Smoke-ChromaLink.cmd](scripts/Smoke-ChromaLink.cmd)
+- [scripts/Bench-ChromaLink.cmd](scripts/Bench-ChromaLink.cmd)
+- [scripts/Live-ChromaLink.cmd](scripts/Live-ChromaLink.cmd)
+- [scripts/Open-ChromaLink-Inspector.cmd](scripts/Open-ChromaLink-Inspector.cmd)
+- [scripts/Reload-RiftUi.cmd](scripts/Reload-RiftUi.cmd)
+- [scripts/Send-RiftSlash.cmd](scripts/Send-RiftSlash.cmd)
+- [scripts/Resize-RiftClient-640x360.cmd](scripts/Resize-RiftClient-640x360.cmd)
+- [scripts/Sweep-RiftResolutions.ps1](scripts/Sweep-RiftResolutions.ps1)
 
-Resolution sweeps can now control the observer lane directly:
+Examples:
+
+```powershell
+.\scripts\Sweep-RiftResolutions.ps1 -Resolutions @('640x360') -ReloadUi
+```
 
 ```powershell
 .\scripts\Sweep-RiftResolutions.ps1 -Resolutions @('640x360') -ReloadUi -ObserverLane on
 ```
 
+`Reload-RiftUi.cmd` sends the normal RIFT `/reloadui` command to the active game window.
+
+`Send-RiftSlash.cmd` can send other ChromaLink slash commands when we explicitly want scripted in-game control.
+
+## Project Structure
+
+```text
+ChromaLink/
+├── Core/                         # Lua config and shared addon-side definitions
+├── RIFT/                         # Addon bootstrap, rendering, commands, diagnostics
+├── DesktopDotNet/                # .NET 9 solution
+│   ├── ChromaLink.Reader/        # capture, geometry lock, decode, shared diagnostics
+│   ├── ChromaLink.Cli/           # smoke, replay, live, watch, bench, dump, prep
+│   ├── ChromaLink.Inspector/     # visual frame inspection and overlays
+│   ├── ChromaLink.Tests/         # protocol, replay, synthetic, observer tests
+│   └── ChromaLink.sln
+├── scripts/                      # helper scripts for window prep and capture flows
+├── notes/                        # lab log and investigation notes
+├── PROJECT_PROMPT.md             # active product and research direction
+└── README.md
+```
+
 ## Outputs
 
 Reader artifacts are written under:
+
 - `%LOCALAPPDATA%\ChromaLink\DesktopDotNet`
 
 Useful locations:
+
 - `fixtures\chromalink-color-core.bmp`
 - `out\chromalink-color-capture-dump.bmp`
 - `out\chromalink-color-capture-dump-annotated.bmp`
 - `out\chromalink-color-capture-dump.json`
 - `out\chromalink-color-first-reject.bmp`
 
-## What Still Needs Development
+## Validation
 
-The project is stable for the first vertical slice, but still intentionally narrow. High-impact next work:
+After addon-side Lua changes:
 
-1. **Broader payload coverage**
-   - add additional frame schemas beyond `coreStatus`
-   - formalize schema versioning and negotiation plan
+```text
+/reloadui
+```
 
-2. **Live robustness and calibration**
-   - reduce sensitivity to UI scaling drift and color/gamma shifts
-   - improve auto-lock and recovery after temporary decode loss
+Useful validation commands:
 
-3. **Diagnostics quality**
-   - richer reject reason reporting grouped by capture, geometry, and symbol decode phases
-   - easier side-by-side replay tools for "good vs bad" frame comparisons
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
 
-4. **Operational ergonomics**
-   - single command for end-to-end local validation (`build + test + smoke + replay + bench`)
-   - documented tuning profiles for common monitor/resolution setups
+```powershell
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- smoke
+```
 
-## Source Of Truth
+```powershell
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- capture-dump
+```
 
-- Product direction: [PROJECT_PROMPT.md](PROJECT_PROMPT.md)
-- Active desktop solution: [DesktopDotNet/ChromaLink.sln](DesktopDotNet/ChromaLink.sln)
-- Barcode-style and archive branches are reference-only
+Live capture is still the gold standard. If `capture-dump`, `live`, or replay rejects a frame with a clear reason, the observability path is doing its job.
+
+## Notes And Source Of Truth
+
+- product direction: [PROJECT_PROMPT.md](PROJECT_PROMPT.md)
+- active desktop solution: [DesktopDotNet/ChromaLink.sln](DesktopDotNet/ChromaLink.sln)
+- running lab log: [notes/telemetry-lab-log-2026-04-01.md](notes/telemetry-lab-log-2026-04-01.md)
+- focused investigation notes: [notes/ui-resolution-investigation-2026-04-01.md](notes/ui-resolution-investigation-2026-04-01.md)
+
+## Next Major Work
+
+The most important remaining work is still practical, not cosmetic:
+
+1. broaden payload coverage beyond `coreStatus`
+2. improve live robustness under scaling drift and imperfect capture
+3. tighten reject diagnostics by phase and failure type
+4. keep the `640x360` baseline solid while wider-resolution support becomes its own mode
+
+---
+
+**ChromaLink** is still early, but the current project already has a real live baseline, reproducible tooling, and a much clearer path for growing telemetry without losing observability.

@@ -390,6 +390,52 @@ Keep.
 
 ---
 
+## 2026-04-01 - Session H - README refresh
+
+### Goal
+
+Make the project front page read like a real operational overview instead of a narrow scratchpad.
+
+### Change
+
+- rewrite `README.md` into a clearer project front door
+- add:
+  - system overview
+  - explicit current scope
+  - quick start
+  - command surface
+  - observer lane overview
+  - protocol snapshot
+  - project structure
+  - validation guidance
+  - direct pointers to the lab log and investigation notes
+
+### Why
+
+The earlier README had the right facts, but it did not present the project as clearly as it deserved. A stronger README helps future work, onboarding, and comparison against adjacent telemetry projects without changing any runtime behavior.
+
+### Verification
+
+```powershell
+Get-Content -Raw .\README.md
+```
+
+### Result
+
+- the README now explains ChromaLink as a full telemetry workflow instead of only a list of commands
+- the current `640x360` baseline and proven live lock are still stated explicitly
+- the observer lane and diagnostics tooling now have a proper documented place in the project front page
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for README refresh
+
+---
+
 ## Current Stable Baseline At End Of Log
 
 - target client: `640x360`
