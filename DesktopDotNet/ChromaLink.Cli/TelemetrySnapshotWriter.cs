@@ -5,6 +5,7 @@ internal static class TelemetrySnapshotWriter
 {
     public const int ContractSchemaVersion = 1;
     public const string ContractName = "chromalink-live-telemetry";
+    private const double FreshnessWindowMilliseconds = 2000.0;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -17,8 +18,10 @@ internal static class TelemetrySnapshotWriter
         CaptureBackend? lastBackend,
         FrameValidationResult? lastValidation)
     {
+        var nowUtc = DateTimeOffset.UtcNow;
         var outDirectory = PathProvider.EnsureOutDirectory();
         var path = Path.Combine(outDirectory, $"{ContractName}.json");
+        var aggregateFreshness = BuildAggregateFreshness(nowUtc, aggregate);
         var payload = new
         {
             artifactKind = "live-telemetry",
@@ -56,9 +59,23 @@ internal static class TelemetrySnapshotWriter
                 acceptedFrames = aggregate.AcceptedFrames,
                 ready = aggregate.HasCompleteState,
                 lastUpdatedUtc = aggregate.LastUpdatedUtc,
+                healthy = aggregateFreshness.Healthy,
+                stale = aggregateFreshness.Stale,
+                freshness = new
+                {
+                    windowMs = FreshnessWindowMilliseconds,
+                    lastUpdatedAgeMs = aggregateFreshness.LastUpdatedAgeMs,
+                    oldestFrameAgeMs = aggregateFreshness.OldestFrameAgeMs,
+                    newestFrameAgeMs = aggregateFreshness.NewestFrameAgeMs,
+                    freshFrameCount = aggregateFreshness.FreshFrameCount,
+                    staleFrameCount = aggregateFreshness.StaleFrameCount
+                },
                 coreStatus = aggregate.CoreStatus is null ? null : new
                 {
                     observedAtUtc = aggregate.CoreStatus.ObservedAtUtc,
+                    ageMs = AgeMs(nowUtc, aggregate.CoreStatus.ObservedAtUtc),
+                    fresh = IsFresh(AgeMs(nowUtc, aggregate.CoreStatus.ObservedAtUtc)),
+                    stale = !IsFresh(AgeMs(nowUtc, aggregate.CoreStatus.ObservedAtUtc)),
                     frameType = aggregate.CoreStatus.Frame.Header.FrameType.ToString(),
                     schemaId = aggregate.CoreStatus.Frame.Header.SchemaId,
                     sequence = aggregate.CoreStatus.Frame.Header.Sequence,
@@ -81,6 +98,9 @@ internal static class TelemetrySnapshotWriter
                 playerVitals = aggregate.PlayerVitals is null ? null : new
                 {
                     observedAtUtc = aggregate.PlayerVitals.ObservedAtUtc,
+                    ageMs = AgeMs(nowUtc, aggregate.PlayerVitals.ObservedAtUtc),
+                    fresh = IsFresh(AgeMs(nowUtc, aggregate.PlayerVitals.ObservedAtUtc)),
+                    stale = !IsFresh(AgeMs(nowUtc, aggregate.PlayerVitals.ObservedAtUtc)),
                     frameType = aggregate.PlayerVitals.Frame.Header.FrameType.ToString(),
                     schemaId = aggregate.PlayerVitals.Frame.Header.SchemaId,
                     sequence = aggregate.PlayerVitals.Frame.Header.Sequence,
@@ -93,6 +113,9 @@ internal static class TelemetrySnapshotWriter
                 playerPosition = aggregate.PlayerPosition is null ? null : new
                 {
                     observedAtUtc = aggregate.PlayerPosition.ObservedAtUtc,
+                    ageMs = AgeMs(nowUtc, aggregate.PlayerPosition.ObservedAtUtc),
+                    fresh = IsFresh(AgeMs(nowUtc, aggregate.PlayerPosition.ObservedAtUtc)),
+                    stale = !IsFresh(AgeMs(nowUtc, aggregate.PlayerPosition.ObservedAtUtc)),
                     frameType = aggregate.PlayerPosition.Frame.Header.FrameType.ToString(),
                     schemaId = aggregate.PlayerPosition.Frame.Header.SchemaId,
                     sequence = aggregate.PlayerPosition.Frame.Header.Sequence,
@@ -140,4 +163,57 @@ internal static class TelemetrySnapshotWriter
         File.WriteAllText(path, JsonSerializer.Serialize(payload, JsonOptions));
         return path;
     }
+
+    private static AggregateFreshness BuildAggregateFreshness(DateTimeOffset nowUtc, TelemetryAggregateSnapshot aggregate)
+    {
+        var ages = new List<double?>(3)
+        {
+            AgeMs(nowUtc, aggregate.CoreStatus?.ObservedAtUtc),
+            AgeMs(nowUtc, aggregate.PlayerVitals?.ObservedAtUtc),
+            AgeMs(nowUtc, aggregate.PlayerPosition?.ObservedAtUtc)
+        };
+
+        var presentAges = ages.Where(static age => age.HasValue).Select(static age => age!.Value).ToArray();
+        var freshFrameCount = presentAges.Count(static age => age <= FreshnessWindowMilliseconds);
+        var staleFrameCount = presentAges.Length - freshFrameCount;
+
+        return new AggregateFreshness(
+            Healthy: aggregate.HasCompleteState && staleFrameCount == 0,
+            Stale: !aggregate.HasCompleteState || staleFrameCount > 0,
+            LastUpdatedAgeMs: AgeMs(nowUtc, aggregate.LastUpdatedUtc),
+            OldestFrameAgeMs: presentAges.Length == 0 ? null : presentAges.Max(),
+            NewestFrameAgeMs: presentAges.Length == 0 ? null : presentAges.Min(),
+            FreshFrameCount: freshFrameCount,
+            StaleFrameCount: staleFrameCount);
+    }
+
+    private static double? AgeMs(DateTimeOffset nowUtc, DateTimeOffset? observedAtUtc)
+    {
+        if (observedAtUtc is null)
+        {
+            return null;
+        }
+
+        var age = nowUtc - observedAtUtc.Value;
+        if (age < TimeSpan.Zero)
+        {
+            age = TimeSpan.Zero;
+        }
+
+        return Math.Round(age.TotalMilliseconds, 2);
+    }
+
+    private static bool IsFresh(double? ageMs)
+    {
+        return ageMs.HasValue && ageMs.Value <= FreshnessWindowMilliseconds;
+    }
+
+    private sealed record AggregateFreshness(
+        bool Healthy,
+        bool Stale,
+        double? LastUpdatedAgeMs,
+        double? OldestFrameAgeMs,
+        double? NewestFrameAgeMs,
+        int FreshFrameCount,
+        int StaleFrameCount);
 }
