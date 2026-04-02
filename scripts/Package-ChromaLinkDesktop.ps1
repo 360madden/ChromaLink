@@ -14,6 +14,17 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
 
 $desktopRoot = Join-Path $OutputRoot "desktop"
 
+$sourceCommit = "unknown"
+try {
+  $commitResult = (& git -C $repoRoot rev-parse --short HEAD 2>$null)
+  if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($commitResult)) {
+    $sourceCommit = ($commitResult | Select-Object -First 1).Trim()
+  }
+} catch {
+}
+
+$packageVersion = if ($sourceCommit -eq "unknown") { "0.1.0-dev" } else { "0.1.0-dev+$sourceCommit" }
+
 $projects = @(
   [pscustomobject]@{
     Name = "ChromaLink.Cli"
@@ -100,7 +111,10 @@ foreach ($project in $projects) {
 }
 
 $manifest = [pscustomobject]@{
+  PackageName = "ChromaLink Desktop Package"
+  PackageVersion = $packageVersion
   GeneratedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
+  SourceCommit = $sourceCommit
   RepoRoot = $repoRoot
   OutputRoot = $OutputRoot
   DesktopRoot = $desktopRoot
@@ -109,6 +123,7 @@ $manifest = [pscustomobject]@{
   SelfContained = [bool]$SelfContained
   PackageLayout = "desktop/<ProjectName>"
   Launchers = @(
+    "Open-ChromaLink-Product.cmd",
     "Bridge-ChromaLink.cmd",
     "Start-ChromaLinkStack.cmd",
     "Open-ChromaLink-Monitor.cmd",
@@ -137,6 +152,7 @@ Layout:
 
 Common launchers:
 
+- `Open-ChromaLink-Product.cmd`
 - `Bridge-ChromaLink.cmd`
 - `Start-ChromaLinkStack.cmd`
 - `Open-ChromaLink-Monitor.cmd`
@@ -146,15 +162,108 @@ Common launchers:
 
 Notes:
 
+- Package version: `__PACKAGE_VERSION__`
+- Source commit: `__SOURCE_COMMIT__`
 - The package is framework-dependent unless `-SelfContained` is used.
 - launcher windows start minimized by default to reduce the chance of covering the RIFT client during live capture
+- `Open-ChromaLink-Product.cmd` is the fastest first-run path. It starts the background stack, waits for readiness, and then opens the monitor.
 - `Bridge-ChromaLink.cmd` starts the packaged CLI in `watch` mode so it can keep the rolling snapshot fresh.
 - `Start-ChromaLinkStack.cmd` starts the packaged CLI watch loop plus HTTP bridge without opening UI.
 - `Open-ChromaLink-Monitor.cmd` opens the packaged monitor explicitly.
 - `Status-ChromaLinkStack.cmd` reports bridge endpoint health, snapshot freshness, and package-local process counts.
 - `Stop-ChromaLinkStack.cmd` stops only the packaged CLI, HTTP bridge, and monitor processes from this package folder.
 - Each project folder keeps the published executable and its supporting DLLs together.
+
+First-run workflow:
+
+1. Double-click `Open-ChromaLink-Product.cmd` for the normal product path.
+2. If you want background-only startup, use `Start-ChromaLinkStack.cmd`.
+3. If something looks wrong, run `Status-ChromaLinkStack.cmd`.
+4. Use `Open-ChromaLinkDashboard.cmd` if you prefer the browser view.
+5. Use `Stop-ChromaLinkStack.cmd` when you are done.
 '@ | Set-Content -LiteralPath $readmePath -Encoding utf8
+
+(Get-Content -LiteralPath $readmePath -Raw).
+  Replace('__PACKAGE_VERSION__', $packageVersion).
+  Replace('__SOURCE_COMMIT__', $sourceCommit) |
+  Set-Content -LiteralPath $readmePath -Encoding utf8
+
+$openProductPs1 = Join-Path $OutputRoot "Open-ChromaLink-Product.ps1"
+@'
+param(
+  [int]$TimeoutSeconds = 20,
+  [string]$BaseUrl = "http://127.0.0.1:7337/"
+)
+
+$ErrorActionPreference = "Stop"
+$packageRoot = $PSScriptRoot
+$startScript = Join-Path $packageRoot "Start-ChromaLinkStack.cmd"
+$monitorScript = Join-Path $packageRoot "Open-ChromaLink-Monitor.cmd"
+$statusScript = Join-Path $packageRoot "Status-ChromaLinkStack.cmd"
+
+function Normalize-BaseUrl {
+  param([string]$Value)
+
+  if ([string]::IsNullOrWhiteSpace($Value)) {
+    return "http://127.0.0.1:7337/"
+  }
+
+  if ($Value.EndsWith('/')) {
+    return $Value
+  }
+
+  return "$Value/"
+}
+
+function Test-Ready {
+  param([string]$Url)
+
+  try {
+    $response = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 2
+    return [int]$response.StatusCode -eq 200
+  } catch {
+    $httpResponse = $_.Exception.Response
+    if ($null -ne $httpResponse) {
+      return [int]$httpResponse.StatusCode -eq 200
+    }
+
+    return $false
+  }
+}
+
+$BaseUrl = Normalize-BaseUrl $BaseUrl
+$readyUrl = "{0}ready" -f $BaseUrl
+
+Start-Process -WindowStyle Minimized -FilePath $startScript | Out-Null
+
+$deadline = [DateTimeOffset]::UtcNow.AddSeconds([math]::Max(1, $TimeoutSeconds))
+$ready = $false
+while ([DateTimeOffset]::UtcNow -lt $deadline) {
+  if (Test-Ready -Url $readyUrl) {
+    $ready = $true
+    break
+  }
+
+  Start-Sleep -Milliseconds 500
+}
+
+if ($ready) {
+  Start-Process -WindowStyle Minimized -FilePath $monitorScript | Out-Null
+  exit 0
+}
+
+Start-Process -WindowStyle Minimized -FilePath $statusScript | Out-Null
+exit 1
+'@ | Set-Content -LiteralPath $openProductPs1 -Encoding utf8
+
+$openProductCmd = Join-Path $OutputRoot "Open-ChromaLink-Product.cmd"
+@'
+@echo off
+setlocal
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Open-ChromaLink-Product.ps1" %*
+exit /b %ERRORLEVEL%
+'@ | Set-Content -LiteralPath $openProductCmd -Encoding ascii
 
 $bridgeScript = Join-Path $OutputRoot "Bridge-ChromaLink.cmd"
 @'
@@ -393,4 +502,4 @@ exit /b 0
 Write-Host ""
 Write-Host "ChromaLink desktop package written to $OutputRoot" -ForegroundColor Green
 Write-Host "Manifest: $manifestPath" -ForegroundColor Green
-Write-Host "Launchers: Bridge-ChromaLink.cmd, Start-ChromaLinkStack.cmd, Open-ChromaLink-Monitor.cmd, Status-ChromaLinkStack.cmd, Stop-ChromaLinkStack.cmd, Open-ChromaLinkDashboard.cmd" -ForegroundColor Green
+Write-Host "Launchers: Open-ChromaLink-Product.cmd, Bridge-ChromaLink.cmd, Start-ChromaLinkStack.cmd, Open-ChromaLink-Monitor.cmd, Status-ChromaLinkStack.cmd, Stop-ChromaLinkStack.cmd, Open-ChromaLinkDashboard.cmd" -ForegroundColor Green

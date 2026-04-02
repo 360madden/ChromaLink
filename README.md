@@ -455,6 +455,7 @@ The default package layout is:
 
 ```text
 artifacts\package\
+├── Open-ChromaLink-Product.cmd
 ├── Bridge-ChromaLink.cmd
 ├── README.md
 ├── package-manifest.json
@@ -490,6 +491,7 @@ Practical difference:
 
 Package-emitted launchers are intentionally narrow:
 
+- `Open-ChromaLink-Product.cmd`
 - `Bridge-ChromaLink.cmd`
 - `Start-ChromaLinkStack.cmd`
 - `Open-ChromaLink-Monitor.cmd`
@@ -499,6 +501,7 @@ Package-emitted launchers are intentionally narrow:
 
 Packaged launcher roles:
 
+- `Open-ChromaLink-Product.cmd` is the fastest first-run path: start the stack, wait for readiness, then open the monitor
 - `Bridge-ChromaLink.cmd` starts the packaged CLI in `watch` mode so the rolling snapshot stays fresh
 - `Start-ChromaLinkStack.cmd` starts the packaged CLI watch loop plus HTTP bridge without opening UI
 - `Open-ChromaLink-Monitor.cmd` opens the packaged monitor explicitly
@@ -507,6 +510,14 @@ Packaged launcher roles:
 - `Open-ChromaLinkDashboard.cmd` opens the local dashboard URL
 
 The broader helper surface in `scripts/` stays repo-native. That includes launchers such as `Open-ChromaLink-LiveStack.cmd`, `Open-ChromaLink-Monitor.cmd`, status helpers, stop helpers, and the probe/readiness scripts.
+
+Packaged workflow:
+
+1. Build the package with `.\scripts\Package-ChromaLinkDesktop.ps1`
+2. Open `artifacts\package\README.md`
+3. Run `Open-ChromaLink-Product.cmd` for the normal first-run path
+4. If you want to inspect health directly, run `Status-ChromaLinkStack.cmd`
+5. Stop with `Stop-ChromaLinkStack.cmd`
 
 ## Project Structure
 

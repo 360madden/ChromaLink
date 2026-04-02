@@ -423,6 +423,71 @@ Keep.
 
 ---
 
+## 2026-04-02 - Session AJ - release identity and first-run launcher
+
+### Goal
+
+Make the package feel more like a handoff product by giving it explicit build identity and a canonical first-run launcher.
+
+### Change
+
+- extend `scripts/Package-ChromaLinkDesktop.ps1` to emit:
+  - `Open-ChromaLink-Product.cmd`
+  - `Open-ChromaLink-Product.ps1`
+- make the package-first launcher:
+  - start the packaged background stack
+  - wait for `/ready`
+  - open the packaged monitor on success
+  - open package status on timeout
+- add package identity metadata to `package-manifest.json`:
+  - `PackageName`
+  - `PackageVersion`
+  - `SourceCommit`
+- upgrade the generated package README into a true first-run handoff guide
+
+### Why
+
+The package was already functional, but it still felt too much like a publish folder. A final-product push needs one obvious first-run action and enough build identity to distinguish one bundle from another after handoff.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+.\scripts\Package-ChromaLinkDesktop.ps1
+```
+
+```powershell
+Get-Content .\artifacts\package\package-manifest.json
+```
+
+```powershell
+cmd /c .\artifacts\package\Open-ChromaLink-Product.cmd
+```
+
+### Result
+
+- package manifest now carries release identity fields
+- package README now reads as a first-run handoff guide instead of only a layout note
+- package launcher surface now has one canonical first-run entry point
+- the package now exposes a clearer product story for another Windows machine or user
+- sequential validation confirmed:
+  - `Open-ChromaLink-Product.cmd` started the packaged stack
+  - `Status-ChromaLinkStack.cmd` reported `ready=true`, `healthy=true`, `stale=false`
+  - package-local process counts showed:
+    - `CLI Watch: 1`
+    - `HttpBridge: 1`
+    - `Monitor: 1`
+  - `Stop-ChromaLinkStack.cmd` stopped the packaged stack cleanly
+
+### Decision
+
+Keep.
+
+---
+
 ## 2026-04-01 - Session B - quiet default diagnostics
 
 ### Goal
