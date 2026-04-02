@@ -48,10 +48,14 @@ $results = @()
 foreach ($url in $healthUrls) {
   $response = Invoke-BridgeEndpoint -Url $url -TimeoutSeconds $TimeoutSeconds
   if ($null -ne $response) {
+    $contentType = $response.Headers['Content-Type']
+    if ($contentType -is [Array]) {
+      $contentType = $contentType -join ', '
+    }
     $results += [pscustomobject]@{
       Url = $url
       StatusCode = [int]$response.StatusCode
-      ContentType = $response.Headers['Content-Type']
+      ContentType = $contentType
       Length = if ($response.Content) { $response.Content.Length } else { 0 }
     }
   } else {

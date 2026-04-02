@@ -1175,6 +1175,66 @@ Keep.
 
 ---
 
+## 2026-04-04 - Session W - local HTTP bridge
+
+### Goal
+
+Expose the rolling live snapshot through a tiny local HTTP surface so other tools can integrate without parsing files directly.
+
+### Change
+
+- add a new `ChromaLink.HttpBridge` project
+- serve the rolling snapshot over localhost
+- expose endpoints for:
+  - `/latest-snapshot`
+  - `/snapshot`
+  - `/health`
+  - `/ready`
+- wire the new project into the solution
+- update the probe script to check `/latest-snapshot` as well as the older aliases
+- document the local HTTP bridge and its launch/probe helpers in the README
+
+### Why
+
+The bridge snapshot was already the source of truth. An HTTP layer is the cleanest next integration point for other tools that do not want to tail files.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+dotnet build .\DesktopDotNet\ChromaLink.HttpBridge\ChromaLink.HttpBridge.csproj
+```
+
+```powershell
+dotnet build .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+$bridge = Start-Process -FilePath dotnet -ArgumentList @('run','--no-build','--project','.\\DesktopDotNet\\ChromaLink.HttpBridge\\ChromaLink.HttpBridge.csproj') -PassThru; try { Start-Sleep -Seconds 4; .\\scripts\\Probe-ChromaLinkHttpBridge.cmd } finally { Stop-Process -Id $bridge.Id -Force -ErrorAction SilentlyContinue }
+```
+
+### Result
+
+- solution build succeeded
+- HTTP bridge project build succeeded
+- the probe reached all four endpoints successfully
+- `/latest-snapshot` returned the rolling JSON snapshot
+- `/health`, `/ready`, and `/snapshot` also responded successfully
+- the probe output now reports readable content types
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for local HTTP bridge
+
+---
+
 ## 2026-04-03 - Session V - live monitor launch and discovery
 
 ### Goal

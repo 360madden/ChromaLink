@@ -239,6 +239,8 @@ Use the live monitor when you want a product-style view of the rolling bridge sn
 - the inspector is still the artifact and BMP analyzer
 - `Bridge-ChromaLink.cmd` keeps the snapshot fresh in the background
 - `Open-ChromaLink-Monitor.cmd` launches the live monitor directly
+- `Open-ChromaLinkHttpBridge.cmd` opens the local HTTP bridge
+- `Probe-ChromaLinkHttpBridge.cmd` checks the local HTTP bridge endpoints
 - `Watch-ChromaLinkTelemetry.cmd` opens the console snapshot view if you want something lighter than the GUI
 - `Test-ChromaLinkTelemetryReady.cmd` is the automation-friendly gate for readiness and freshness
 
@@ -270,6 +272,9 @@ Recommended workflow:
 Useful helper scripts:
 
 - [scripts/Bridge-ChromaLink.cmd](scripts/Bridge-ChromaLink.cmd)
+- [scripts/Launch-ChromaLinkHttpBridge.cmd](scripts/Launch-ChromaLinkHttpBridge.cmd)
+- [scripts/Open-ChromaLinkHttpBridge.cmd](scripts/Open-ChromaLinkHttpBridge.cmd)
+- [scripts/Probe-ChromaLinkHttpBridge.cmd](scripts/Probe-ChromaLinkHttpBridge.cmd)
 - [scripts/Prepare-ChromaLink-640x360.cmd](scripts/Prepare-ChromaLink-640x360.cmd)
 - [scripts/Smoke-ChromaLink.cmd](scripts/Smoke-ChromaLink.cmd)
 - [scripts/Bench-ChromaLink.cmd](scripts/Bench-ChromaLink.cmd)
@@ -314,6 +319,23 @@ That runs the CLI in continuous watch mode and keeps `%LOCALAPPDATA%\ChromaLink\
 - reserved build flags
 - bridge contract metadata for downstream consumers
 - the `ChromaLink.Monitor` UI is the primary live viewer for that snapshot
+
+## HTTP Bridge
+
+For local API access on top of the rolling snapshot, run:
+
+```powershell
+.\scripts\Launch-ChromaLinkHttpBridge.cmd
+```
+
+The HTTP bridge is local-only and reads `chromalink-live-telemetry.json` directly. It exposes:
+
+- `/latest-snapshot`
+- `/snapshot`
+- `/health`
+- `/ready`
+
+Use `Probe-ChromaLinkHttpBridge.cmd` to sanity-check those endpoints from scripts, or `Open-ChromaLinkHttpBridge.cmd` to jump to the base URL in a browser.
 
 To read the latest merged telemetry snapshot from the console without opening the inspector:
 
