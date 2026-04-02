@@ -218,20 +218,24 @@ internal sealed class CliApp
             var bestAttempt = ChooseBestAttempt(CaptureAndAnalyze(hwnd, invocation.Backends));
             if (bestAttempt is not null)
             {
-                metrics.Add(
-                    bestAttempt.Validation!.IsAccepted,
-                    bestAttempt.CaptureElapsedMs,
-                    bestAttempt.DecodeElapsedMs,
-                    bestAttempt.Validation.Reason,
-                    bestAttempt.Validation.Frame);
-                if (bestAttempt.Validation.IsAccepted && bestAttempt.Validation.Frame is not null)
+                var primaryValidation = bestAttempt.Validation!;
+                foreach (var validation in bestAttempt.Validations)
                 {
-                    aggregate.Update(bestAttempt.Validation.Frame);
+                    metrics.Add(
+                        validation.IsAccepted,
+                        bestAttempt.CaptureElapsedMs,
+                        bestAttempt.DecodeElapsedMs,
+                        validation.Reason,
+                        validation.Frame);
+                    if (validation.IsAccepted && validation.Frame is not null)
+                    {
+                        aggregate.Update(validation.Frame);
+                    }
                 }
-                lastValidation = bestAttempt.Validation;
+                lastValidation = primaryValidation;
                 lastBackend = bestAttempt.Backend;
 
-                if (!bestAttempt.Validation.IsAccepted && firstRejectPath is null)
+                if (!primaryValidation.IsAccepted && firstRejectPath is null)
                 {
                     firstRejectPath = Path.Combine(PathProvider.EnsureOutDirectory(), "chromalink-color-first-reject.bmp");
                     BmpIO.Save(firstRejectPath, bestAttempt.Capture!.Image);
@@ -239,10 +243,10 @@ internal sealed class CliApp
                         firstRejectPath,
                         _profile,
                         bestAttempt.Capture,
-                        bestAttempt.Validation,
+                        primaryValidation,
                         new[]
                         {
-                            $"{bestAttempt.Backend} | {(bestAttempt.Validation.IsAccepted ? "accepted" : "rejected")} | {bestAttempt.Validation.Reason} | AvgLuma {(bestAttempt.Signal?.AverageLuma ?? 0):F2} | LumaRange {(bestAttempt.Signal?.LumaRange ?? 0):F2}"
+                            $"{bestAttempt.Backend} | {(primaryValidation.IsAccepted ? "accepted" : "rejected")} | {primaryValidation.Reason} | AvgLuma {(bestAttempt.Signal?.AverageLuma ?? 0):F2} | LumaRange {(bestAttempt.Signal?.LumaRange ?? 0):F2}"
                         });
                 }
             }
@@ -691,13 +695,19 @@ internal sealed class CliApp
                 captureTimer.Stop();
 
                 var decodeTimer = Stopwatch.StartNew();
-                var validation = ColorStripAnalyzer.Analyze(capture.Image, _profile);
+                var validations = ColorStripAnalyzer.AnalyzeStacked(capture.Image, _profile);
+                var validation = validations
+                    .OrderByDescending(static candidate => candidate.IsAccepted)
+                    .ThenBy(static candidate => candidate.Detection is null ? 1 : 0)
+                    .ThenBy(static candidate => candidate.Detection?.ControlError ?? double.MaxValue)
+                    .First();
                 decodeTimer.Stop();
 
                 attempts.Add(new CaptureAttempt(
                     backend,
                     capture,
                     validation,
+                    validations,
                     capture.Image.MeasureSignal(),
                     captureTimer.Elapsed.TotalMilliseconds,
                     decodeTimer.Elapsed.TotalMilliseconds,
@@ -705,7 +715,7 @@ internal sealed class CliApp
             }
             catch (Exception ex)
             {
-                attempts.Add(new CaptureAttempt(backend, null, null, null, 0, 0, ex.Message));
+                attempts.Add(new CaptureAttempt(backend, null, null, Array.Empty<FrameValidationResult>(), null, 0, 0, ex.Message));
             }
         }
 
@@ -716,7 +726,8 @@ internal sealed class CliApp
     {
         return attempts
             .Where(static attempt => attempt.Capture is not null && attempt.Validation is not null)
-            .OrderByDescending(static attempt => attempt.Validation!.IsAccepted)
+            .OrderByDescending(static attempt => attempt.Validations.Count(static validation => validation.IsAccepted))
+            .ThenByDescending(static attempt => attempt.Validation!.IsAccepted)
             .ThenBy(static attempt => attempt.Validation!.Detection is null ? 1 : 0)
             .ThenBy(static attempt => attempt.Validation!.Detection?.ControlError ?? double.MaxValue)
             .ThenByDescending(static attempt => attempt.Signal?.LumaRange ?? 0)
@@ -835,6 +846,7 @@ internal sealed class CliApp
         CaptureBackend Backend,
         CaptureResult? Capture,
         FrameValidationResult? Validation,
+        IReadOnlyList<FrameValidationResult> Validations,
         FrameSignalStats? Signal,
         double CaptureElapsedMs,
         double DecodeElapsedMs,

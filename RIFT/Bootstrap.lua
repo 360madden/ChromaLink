@@ -3,6 +3,10 @@ ChromaLink.Bootstrap = {}
 
 local addonIdentifier = ChromaLink.Config.addonIdentifier
 
+local function ResolveStripCount()
+  return math.max(1, math.floor(tonumber((ChromaLink.Config.profile or {}).stripCount) or 1))
+end
+
 local function GetRealtimeNow()
   if Inspect ~= nil and Inspect.Time ~= nil and Inspect.Time.Real ~= nil then
     return Inspect.Time.Real()
@@ -402,14 +406,20 @@ local function BuildLiveFrame(frameKind, sequence)
   return frameKind, snapshot, symbols
 end
 
+local function ResolveRotationFrameKind(sequence)
+  local rotation = ChromaLink.Config.frameRotation or { "coreStatus" }
+  local rotationIndex = math.fmod(sequence, #rotation) + 1
+  return rotation[rotationIndex] or "coreStatus"
+end
+
 function ChromaLink.Bootstrap.Refresh(forceRefresh, reason)
   local state = ChromaLink.Bootstrap.state
   local now
-  local snapshot
-  local frameKind
-  local rotation
-  local rotationIndex
-  local _, symbols
+  local stripCount
+  local stripIndex
+  local symbolRows = {}
+  local snapshots = {}
+  local frameKinds = {}
 
   if state == nil then
     return
@@ -420,22 +430,32 @@ function ChromaLink.Bootstrap.Refresh(forceRefresh, reason)
     return
   end
 
-  rotation = ChromaLink.Config.frameRotation or { "coreStatus" }
-  rotationIndex = math.fmod(state.sequence, #rotation) + 1
-  frameKind = rotation[rotationIndex] or "coreStatus"
+  stripCount = ResolveStripCount()
+  for stripIndex = 1, stripCount do
+    local sequence = math.fmod(state.sequence + (stripIndex - 1), 256)
+    local frameKind = ResolveRotationFrameKind(sequence)
+    local snapshot
+    local symbols
 
-  if ChromaLink.Config.syntheticMode ~= nil and ChromaLink.Config.syntheticMode.enabled then
-    frameKind, snapshot, symbols = BuildSyntheticFrame(frameKind, state.sequence)
-  else
-    frameKind, snapshot, symbols = BuildLiveFrame(frameKind, state.sequence)
+    if ChromaLink.Config.syntheticMode ~= nil and ChromaLink.Config.syntheticMode.enabled then
+      frameKind, snapshot, symbols = BuildSyntheticFrame(frameKind, sequence)
+    else
+      frameKind, snapshot, symbols = BuildLiveFrame(frameKind, sequence)
+    end
+
+    symbolRows[stripIndex] = symbols
+    snapshots[stripIndex] = snapshot
+    frameKinds[stripIndex] = frameKind
   end
-  ChromaLink.Render.Update(state.render, symbols)
+  ChromaLink.Render.Update(state.render, symbolRows)
 
   state.lastRefreshAt = now
   state.lastReason = reason
-  state.lastFrameKind = frameKind
-  state.lastSnapshot = snapshot
-  state.sequence = math.fmod(state.sequence + 1, 256)
+  state.lastFrameKind = frameKinds[1]
+  state.lastFrameKinds = frameKinds
+  state.lastSnapshot = snapshots[1]
+  state.lastSnapshots = snapshots
+  state.sequence = math.fmod(state.sequence + stripCount, 256)
 end
 
 function ChromaLink.Bootstrap.SafeRefresh(forceRefresh, reason)
@@ -464,9 +484,10 @@ function ChromaLink.Bootstrap.LogStatus(includeNativeFrames)
   end
 
   ChromaLink.Diagnostics.Log(string.format(
-    "Status: seq=%d frame=%s lastReason=%s diag=%s traces=%s observer=%s.",
+    "Status: seq=%d frame=%s strips=%d lastReason=%s diag=%s traces=%s observer=%s.",
     tonumber(state.sequence) or 0,
     tostring(state.lastFrameKind or "unknown"),
+    ResolveStripCount(),
     tostring(state.lastReason or "unknown"),
     diagnosticsConfig.enabled and "on" or "off",
     diagnosticsConfig.logEvents and "on" or "off",
@@ -553,12 +574,13 @@ function ChromaLink.Bootstrap.LogBuildStatus()
       + tonumber(headerFlags.textAndAuras or 0),
     FormatHeaderFlags(headerFlags)))
   ChromaLink.Diagnostics.Log(string.format(
-    "Strip profile: %s %dx%d band=%dx%d segments=%d x %d.",
+    "Strip profile: %s %dx%d band=%dx%d strips=%d segments=%d x %d.",
     tostring(profile.id or "unknown"),
     tonumber(profile.windowWidth or 0),
     tonumber(profile.windowHeight or 0),
     tonumber(profile.bandWidth or 0),
     tonumber(profile.bandHeight or 0),
+    ResolveStripCount(),
     tonumber(profile.segmentCount or 0),
     tonumber(profile.segmentWidth or 0)))
 end
@@ -664,6 +686,7 @@ function ChromaLink.Bootstrap.Initialize()
     ChromaLink.Diagnostics.Log("Available stratas: " .. table.concat(strataList, ", ") .. ".")
   end
   ChromaLink.Diagnostics.Log("Using strata: " .. tostring(resolvedStrata or ChromaLink.Config.requestedStrata or "default") .. ".")
+  ChromaLink.Diagnostics.Log("Using stacked strips: " .. tostring(ResolveStripCount()) .. ".")
   if ChromaLink.Config.syntheticMode ~= nil and ChromaLink.Config.syntheticMode.enabled then
     ChromaLink.Diagnostics.Log("Synthetic strip mode is enabled.")
   end

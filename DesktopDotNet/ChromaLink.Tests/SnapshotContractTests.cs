@@ -28,6 +28,7 @@ public class SnapshotContractTests
         Assert.Equal(360, profile.GetProperty("windowHeight").GetInt32());
         Assert.Equal(80, profile.GetProperty("segmentCount").GetInt32());
         Assert.Equal(64, profile.GetProperty("payloadSymbolCount").GetInt32());
+        Assert.Equal(2, profile.GetProperty("stripCount").GetInt32());
 
         var transport = root.GetProperty("transport");
         Assert.Equal(1, transport.GetProperty("protocolVersion").GetInt32());
@@ -322,6 +323,7 @@ public class SnapshotContractTests
                 windowHeight = 360,
                 bandWidth = 640,
                 bandHeight = 24,
+                stripCount = 2,
                 segmentCount = 80,
                 segmentWidth = 8,
                 segmentHeight = 24,

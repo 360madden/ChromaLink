@@ -342,6 +342,50 @@ public class ProtocolAndReplayTests
     }
 
     [Fact]
+    public void AnalyzeStacked_AcceptsTwoScaledSyntheticStrips()
+    {
+        var firstBytes = FrameProtocol.BuildCoreFrameBytes(_profile.NumericId, 41, CoreStatusSnapshot.CreateSynthetic());
+        var secondBytes = FrameProtocol.BuildPlayerVitalsFrameBytes(_profile.NumericId, 42, PlayerVitalsSnapshot.CreateSynthetic());
+        var firstStrip = ColorStripRenderer.Render(_profile, firstBytes).ScaleNearest(0.35, "stacked-strip-1");
+        var secondStrip = ColorStripRenderer.Render(_profile, secondBytes).ScaleNearest(0.35, "stacked-strip-2");
+        var canvas = Bgr24Frame.CreateSolid(_profile.WindowWidth, _profile.CaptureHeight, _profile.GetPaletteColor(0), "stacked-live-canvas");
+        var stripGapTop = (int)Math.Round(_profile.BandHeight * 0.35);
+
+        canvas.Paste(firstStrip, 0, 0);
+        canvas.Paste(secondStrip, 0, stripGapTop);
+
+        var validations = ColorStripAnalyzer.AnalyzeStacked(canvas, _profile);
+
+        Assert.Equal(2, validations.Count);
+        Assert.All(validations, static validation => Assert.True(validation.IsAccepted, validation.Reason));
+        Assert.Equal("fixed-profile-stacked-1", validations[0].Detection!.SearchMode);
+        Assert.Equal("fixed-profile-stacked-2", validations[1].Detection!.SearchMode);
+        Assert.Equal(41, validations[0].Frame!.Header.Sequence);
+        Assert.Equal(42, validations[1].Frame!.Header.Sequence);
+        Assert.IsType<CoreStatusFrame>(validations[0].Frame);
+        Assert.IsType<PlayerVitalsFrame>(validations[1].Frame);
+        Assert.True(validations[1].Detection!.OriginY > validations[0].Detection!.OriginY);
+    }
+
+    [Fact]
+    public void AnalyzeStacked_StillReturnsPrimaryAcceptedValidation_WhenOnlyOneStripIsPresent()
+    {
+        var bytes = FrameProtocol.BuildCoreFrameBytes(_profile.NumericId, 51, CoreStatusSnapshot.CreateSynthetic());
+        var strip = ColorStripRenderer.Render(_profile, bytes).ScaleNearest(0.35, "single-stacked-strip");
+        var canvas = Bgr24Frame.CreateSolid(_profile.WindowWidth, _profile.CaptureHeight, _profile.GetPaletteColor(0), "single-stacked-canvas");
+
+        canvas.Paste(strip, 0, 0);
+
+        var validations = ColorStripAnalyzer.AnalyzeStacked(canvas, _profile);
+
+        Assert.Equal(2, validations.Count);
+        Assert.True(validations[0].IsAccepted, validations[0].Reason);
+        Assert.Equal("fixed-profile-stacked-1", validations[0].Detection!.SearchMode);
+        Assert.Equal(51, validations[0].Frame!.Header.Sequence);
+        Assert.False(validations[1].IsAccepted);
+    }
+
+    [Fact]
     public void ObserverLaneAnalyzer_Detects_ConfiguredMarkers_OnSyntheticCanvas()
     {
         var canvas = Bgr24Frame.CreateSolid(_profile.WindowWidth, _profile.CaptureHeight, _profile.GetPaletteColor(0), "observer-canvas");

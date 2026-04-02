@@ -97,56 +97,75 @@ public static class ColorStripAnalyzer
         return new FrameValidationResult(false, candidate.Reason, candidate.Detection, candidate.Samples, null, candidate.ParseResult);
     }
 
-    private static bool TryFindBestCandidate(Bgr24Frame image, StripProfile profile, out Candidate? candidate)
+    public static IReadOnlyList<FrameValidationResult> AnalyzeStacked(Bgr24Frame image, StripProfile? profile = null)
     {
-        candidate = null;
-        Candidate? bestAccepted = null;
-        Candidate? bestRejected = null;
+        profile ??= StripProfiles.Default;
 
-        foreach (var scale in EnumerateScales())
+        var targetCount = Math.Max(1, profile.StripCount);
+        var selected = new List<Candidate>(targetCount);
+        var candidates = EnumerateCandidates(image, profile).ToArray();
+
+        foreach (var candidate in candidates
+            .Where(static candidate => candidate.Frame is not null)
+            .OrderBy(static candidate => candidate.Detection.OriginY)
+            .ThenBy(static candidate => candidate.Detection.LeftControlScore)
+            .ThenBy(static candidate => candidate.Detection.RightControlScore))
         {
-            var pitch = profile.SegmentWidth * scale;
-            var bandWidth = (int)Math.Ceiling(profile.SegmentCount * pitch);
-            var bandHeight = (int)Math.Ceiling(profile.SegmentHeight * scale);
-            if (bandWidth > image.Width || bandHeight > image.Height)
+            if (OverlapsSelected(candidate, selected, profile))
             {
                 continue;
             }
 
-            var maxX = Math.Min(Math.Max(0, image.Width - bandWidth), ResolveSearchMaxOffsetX(image, profile));
-            var maxY = Math.Min(Math.Max(0, image.Height - bandHeight), DefaultSearchMaxOffsetY);
-            for (var originY = 0; originY <= maxY; originY++)
+            selected.Add(candidate);
+            if (selected.Count >= targetCount)
             {
-                for (var originX = 0; originX <= maxX; originX++)
-                {
-                    var current = EvaluateCandidate(image, profile, originX, originY, scale);
-                    if (current is null)
-                    {
-                        continue;
-                    }
+                break;
+            }
+        }
 
-                    if (current.Frame is not null)
-                    {
-                        if (bestAccepted is null
-                            || current.Detection.LeftControlScore < bestAccepted.Detection.LeftControlScore
-                            || (Math.Abs(current.Detection.LeftControlScore - bestAccepted.Detection.LeftControlScore) < 0.0001
-                                && current.Detection.RightControlScore < bestAccepted.Detection.RightControlScore))
-                        {
-                            bestAccepted = current;
-                        }
-                    }
-                    else if (bestRejected is null
-                             || current.Detection.LeftControlScore < bestRejected.Detection.LeftControlScore
-                             || (Math.Abs(current.Detection.LeftControlScore - bestRejected.Detection.LeftControlScore) < 0.0001
-                                 && current.Detection.RightControlScore < bestRejected.Detection.RightControlScore))
-                    {
-                        bestRejected = current;
-                    }
+        if (selected.Count < targetCount)
+        {
+            foreach (var candidate in candidates
+                .Where(static candidate => candidate.Frame is null)
+                .OrderBy(static candidate => candidate.Detection.OriginY)
+                .ThenBy(static candidate => candidate.Detection.LeftControlScore)
+                .ThenBy(static candidate => candidate.Detection.RightControlScore))
+            {
+                if (OverlapsSelected(candidate, selected, profile))
+                {
+                    continue;
+                }
+
+                selected.Add(candidate);
+                if (selected.Count >= targetCount)
+                {
+                    break;
                 }
             }
         }
 
-        candidate = bestAccepted ?? bestRejected;
+        if (selected.Count == 0)
+        {
+            return new[] { Analyze(image, profile) };
+        }
+
+        var validations = new List<FrameValidationResult>(selected.Count);
+        for (var index = 0; index < selected.Count; index++)
+        {
+            validations.Add(ToValidationResult(selected[index], index + 1));
+        }
+
+        return validations;
+    }
+
+    private static bool TryFindBestCandidate(Bgr24Frame image, StripProfile profile, out Candidate? candidate)
+    {
+        candidate = EnumerateCandidates(image, profile)
+            .OrderByDescending(static candidate => candidate.Frame is not null)
+            .ThenBy(static candidate => candidate.Detection.LeftControlScore)
+            .ThenBy(static candidate => candidate.Detection.RightControlScore)
+            .FirstOrDefault();
+
         return candidate is not null;
     }
 
@@ -173,6 +192,79 @@ public static class ColorStripAnalyzer
         }
 
         return DefaultSearchMaxOffsetX;
+    }
+
+    private static int ResolveSearchMaxOffsetY(Bgr24Frame image, StripProfile profile, int bandHeight)
+    {
+        if (image.Height > profile.BandHeight)
+        {
+            return Math.Max(0, image.Height - bandHeight);
+        }
+
+        return Math.Min(Math.Max(0, image.Height - bandHeight), DefaultSearchMaxOffsetY);
+    }
+
+    private static IEnumerable<Candidate> EnumerateCandidates(Bgr24Frame image, StripProfile profile)
+    {
+        foreach (var scale in EnumerateScales())
+        {
+            var pitch = profile.SegmentWidth * scale;
+            var bandWidth = (int)Math.Ceiling(profile.SegmentCount * pitch);
+            var bandHeight = (int)Math.Ceiling(profile.SegmentHeight * scale);
+            if (bandWidth > image.Width || bandHeight > image.Height)
+            {
+                continue;
+            }
+
+            var maxX = Math.Min(Math.Max(0, image.Width - bandWidth), ResolveSearchMaxOffsetX(image, profile));
+            var maxY = ResolveSearchMaxOffsetY(image, profile, bandHeight);
+            for (var originY = 0; originY <= maxY; originY++)
+            {
+                for (var originX = 0; originX <= maxX; originX++)
+                {
+                    var current = EvaluateCandidate(image, profile, originX, originY, scale);
+                    if (current is not null)
+                    {
+                        yield return current;
+                    }
+                }
+            }
+        }
+    }
+
+    private static bool OverlapsSelected(Candidate candidate, IReadOnlyList<Candidate> selected, StripProfile profile)
+    {
+        var candidateTop = candidate.Detection.OriginY;
+        var candidateHeight = Math.Max(1.0, profile.BandHeight * candidate.Detection.Scale);
+
+        foreach (var existing in selected)
+        {
+            var existingTop = existing.Detection.OriginY;
+            var existingHeight = Math.Max(1.0, profile.BandHeight * existing.Detection.Scale);
+            var minimumSeparation = Math.Max(2.0, Math.Min(candidateHeight, existingHeight) * 0.75);
+            if (Math.Abs(candidateTop - existingTop) < minimumSeparation)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static FrameValidationResult ToValidationResult(Candidate candidate, int stripIndex)
+    {
+        var detection = candidate.Detection with
+        {
+            SearchMode = $"{candidate.Detection.SearchMode}-stacked-{stripIndex}"
+        };
+
+        return new FrameValidationResult(
+            candidate.Frame is not null,
+            candidate.Frame is not null ? "Accepted" : candidate.Reason,
+            detection,
+            candidate.Samples,
+            candidate.Frame,
+            candidate.ParseResult);
     }
 
     private static Candidate? EvaluateCandidate(Bgr24Frame image, StripProfile profile, int originX, int originY, double scale)

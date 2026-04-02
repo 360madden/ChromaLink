@@ -23,6 +23,22 @@ local function ReadDimension(frame, methodName, fallback)
   return value
 end
 
+local function ResolveStripCount(profile)
+  return math.max(1, math.floor(tonumber(profile and profile.stripCount) or 1))
+end
+
+local function ResolveTotalBandHeight(profile, layoutScaleY)
+  return ResolveStripCount(profile) * profile.bandHeight * layoutScaleY
+end
+
+local function ResolveObserverLaneTop(profile)
+  local observerConfig = config.observerLane or {}
+  local requestedTop = tonumber(observerConfig.offsetY) or 32
+  local stripBase = tonumber(profile.bandHeight) or 0
+  local carryForward = math.max(0, requestedTop - stripBase)
+  return ResolveStripCount(profile) * stripBase + carryForward
+end
+
 local function CreateObserverLane(rootFrame, profile)
   local observerConfig = config.observerLane
   if observerConfig == nil then
@@ -39,7 +55,7 @@ local function CreateObserverLane(rootFrame, profile)
     rootFrame,
     "TOPLEFT",
     0,
-    observerConfig.offsetY or 32)
+    ResolveObserverLaneTop(profile))
   probeBar:SetWidth(profile.bandWidth)
   probeBar:SetHeight(observerConfig.height or 8)
   probeBar:SetLayer(config.requestedLayer + 2)
@@ -153,7 +169,8 @@ local function ComputeLayout(renderState)
   local bandWidth = profile.bandWidth * effectiveScaleX
   local bandHeight = profile.bandHeight * effectiveScaleY
   local rootWidth = bandWidth
-  local rootHeight = bandHeight
+  local totalBandHeight = ResolveTotalBandHeight(profile, effectiveScaleY)
+  local rootHeight = totalBandHeight
   local requestedLeft = tonumber(config.stripOffsetX) or 0
   local requestedTop = tonumber(config.stripOffsetY) or 0
 
@@ -163,12 +180,12 @@ local function ComputeLayout(renderState)
   end
 
   if quietZoneConfig.enabled then
-    rootHeight = math.max(rootHeight, tonumber(quietZoneConfig.height) or profile.bandHeight)
+    rootHeight = math.max(rootHeight, tonumber(quietZoneConfig.height) or totalBandHeight)
   end
 
   if renderState.observerLane ~= nil and renderState.observerLane.enabled then
     local probeBarHeight = tonumber(observerConfig.height) or 12
-    local probeBarBottom = (tonumber(observerConfig.offsetY) or 32) + probeBarHeight
+    local probeBarBottom = ResolveObserverLaneTop(profile) + probeBarHeight
     if probeBarBottom > rootHeight then
       rootHeight = probeBarBottom
     end
@@ -189,6 +206,7 @@ local function ComputeLayout(renderState)
     rootHeight = rootHeight,
     bandWidth = bandWidth,
     bandHeight = bandHeight,
+    totalBandHeight = totalBandHeight,
     displayScaleX = effectiveScaleX,
     displayScaleY = effectiveScaleY,
     displayCompensation = compensation
@@ -226,9 +244,15 @@ local function ApplyLayout(renderState)
   if renderState.band.ClearAllPoints ~= nil then
     renderState.band:ClearAllPoints()
   end
-  renderState.band:SetPoint("TOPLEFT", renderState.rootFrame, "TOPLEFT", 0, 0)
-  renderState.band:SetWidth(bandWidth)
-  renderState.band:SetHeight(bandHeight)
+  for index = 1, #renderState.bands do
+    local band = renderState.bands[index]
+    if band.ClearAllPoints ~= nil then
+      band:ClearAllPoints()
+    end
+    band:SetPoint("TOPLEFT", renderState.rootFrame, "TOPLEFT", 0, (index - 1) * bandHeight)
+    band:SetWidth(bandWidth)
+    band:SetHeight(bandHeight)
+  end
 
   if renderState.quietZone ~= nil then
     if renderState.quietZone.ClearAllPoints ~= nil then
@@ -239,19 +263,24 @@ local function ApplyLayout(renderState)
     renderState.quietZone:SetHeight(layout.rootHeight)
   end
 
-  for index = 1, profile.segmentCount do
-    local segment = renderState.segments[index]
-    if segment.ClearAllPoints ~= nil then
-      segment:ClearAllPoints()
+  for index = 1, #renderState.bands do
+    local segments = renderState.segmentRows[index]
+    local band = renderState.bands[index]
+    local segmentIndex
+    for segmentIndex = 1, profile.segmentCount do
+      local segment = segments[segmentIndex]
+      if segment.ClearAllPoints ~= nil then
+        segment:ClearAllPoints()
+      end
+      segment:SetPoint("TOPLEFT", band, "TOPLEFT", (segmentIndex - 1) * profile.segmentWidth * displayScaleX, 0)
+      segment:SetWidth(profile.segmentWidth * displayScaleX)
+      segment:SetHeight(profile.segmentHeight * displayScaleY)
     end
-    segment:SetPoint("TOPLEFT", renderState.band, "TOPLEFT", (index - 1) * profile.segmentWidth * displayScaleX, 0)
-    segment:SetWidth(profile.segmentWidth * displayScaleX)
-    segment:SetHeight(profile.segmentHeight * displayScaleY)
   end
 
   if renderState.observerLane ~= nil then
     local probeBarLeft = 0
-    local probeBarTop = observerConfig.offsetY or 32
+    local probeBarTop = ResolveObserverLaneTop(profile)
     local probeBarWidth = bandWidth
     local probeBarHeight = observerConfig.height or 12
     local markerWidth = observerConfig.markerWidth or 20
@@ -297,32 +326,46 @@ function ChromaLink.Render.Initialize(rootFrame, anchorFrame)
   local defaultScaleX = tonumber(profile.displayScaleX) or tonumber(profile.displayScale) or 1
   local defaultScaleY = tonumber(profile.displayScaleY) or tonumber(profile.displayScale) or 1
   local quietZone = CreateQuietZone(rootFrame)
-  local band = UI.CreateFrame("Frame", "ChromaLinkBand", rootFrame)
   local observerLane = CreateObserverLane(rootFrame, profile)
-  local segments = {}
-  local lastSymbols = {}
+  local bands = {}
+  local segmentRows = {}
+  local lastSymbolRows = {}
+  local stripCount = ResolveStripCount(profile)
+  local bandIndex
   local index
 
-  band:SetPoint("TOPLEFT", rootFrame, "TOPLEFT", 0, 0)
-  band:SetWidth(profile.bandWidth * defaultScaleX)
-  band:SetHeight(profile.bandHeight * defaultScaleY)
-  band:SetLayer(config.requestedLayer)
-  ApplyColor(band, config.GetPaletteColor(0))
+  for bandIndex = 1, stripCount do
+    local bandNameSuffix = (bandIndex == 1) and "" or tostring(bandIndex)
+    local band = UI.CreateFrame("Frame", "ChromaLinkBand" .. bandNameSuffix, rootFrame)
+    local segments = {}
+    local lastSymbols = {}
 
-  for index = 1, profile.segmentCount do
-    local segment = UI.CreateFrame("Frame", "ChromaLinkSegment" .. tostring(index), band)
-    segment:SetPoint(
-      "TOPLEFT",
-      band,
-      "TOPLEFT",
-      (index - 1) * profile.segmentWidth * defaultScaleX,
-      0)
-    segment:SetWidth(profile.segmentWidth * defaultScaleX)
-    segment:SetHeight(profile.segmentHeight * defaultScaleY)
-    segment:SetLayer(config.requestedLayer + 1)
-    ApplyColor(segment, config.GetPaletteColor(0))
-    segments[index] = segment
-    lastSymbols[index] = -1
+    band:SetPoint("TOPLEFT", rootFrame, "TOPLEFT", 0, (bandIndex - 1) * profile.bandHeight * defaultScaleY)
+    band:SetWidth(profile.bandWidth * defaultScaleX)
+    band:SetHeight(profile.bandHeight * defaultScaleY)
+    band:SetLayer(config.requestedLayer)
+    ApplyColor(band, config.GetPaletteColor(0))
+
+    for index = 1, profile.segmentCount do
+      local segmentName = string.format("ChromaLinkSegment%s_%d", bandNameSuffix, index)
+      local segment = UI.CreateFrame("Frame", segmentName, band)
+      segment:SetPoint(
+        "TOPLEFT",
+        band,
+        "TOPLEFT",
+        (index - 1) * profile.segmentWidth * defaultScaleX,
+        0)
+      segment:SetWidth(profile.segmentWidth * defaultScaleX)
+      segment:SetHeight(profile.segmentHeight * defaultScaleY)
+      segment:SetLayer(config.requestedLayer + 1)
+      ApplyColor(segment, config.GetPaletteColor(0))
+      segments[index] = segment
+      lastSymbols[index] = -1
+    end
+
+    bands[bandIndex] = band
+    segmentRows[bandIndex] = segments
+    lastSymbolRows[bandIndex] = lastSymbols
   end
 
   return {
@@ -330,10 +373,13 @@ function ChromaLink.Render.Initialize(rootFrame, anchorFrame)
     rootFrame = rootFrame,
     anchorFrame = anchorFrame,
     quietZone = quietZone,
-    band = band,
+    band = bands[1],
+    bands = bands,
     observerLane = observerLane,
-    segments = segments,
-    lastSymbols = lastSymbols,
+    segments = segmentRows[1],
+    segmentRows = segmentRows,
+    lastSymbols = lastSymbolRows[1],
+    lastSymbolRows = lastSymbolRows,
     lastRootLeft = nil,
     lastRootTop = nil,
     lastRootWidth = nil,
@@ -374,18 +420,32 @@ end
 
 function ChromaLink.Render.Update(renderState, symbols)
   local changed = false
+  local symbolRows
+  local rowIndex
   local index
 
   if ApplyLayout(renderState) then
     changed = true
   end
 
-  for index = 1, renderState.profile.segmentCount do
-    local symbol = symbols[index] or 0
-    if renderState.lastSymbols[index] ~= symbol then
-      ApplyColor(renderState.segments[index], config.GetPaletteColor(symbol))
-      renderState.lastSymbols[index] = symbol
-      changed = true
+  if type(symbols[1]) == "table" then
+    symbolRows = symbols
+  else
+    symbolRows = { symbols }
+  end
+
+  for rowIndex = 1, #renderState.bands do
+    local rowSymbols = symbolRows[rowIndex] or {}
+    local segments = renderState.segmentRows[rowIndex]
+    local lastSymbols = renderState.lastSymbolRows[rowIndex]
+
+    for index = 1, renderState.profile.segmentCount do
+      local symbol = rowSymbols[index] or 0
+      if lastSymbols[index] ~= symbol then
+        ApplyColor(segments[index], config.GetPaletteColor(symbol))
+        lastSymbols[index] = symbol
+        changed = true
+      end
     end
   end
 

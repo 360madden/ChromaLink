@@ -39,6 +39,7 @@ internal static class TelemetrySnapshotWriter
                 windowHeight = 360,
                 bandWidth = 640,
                 bandHeight = 24,
+                stripCount = 2,
                 segmentCount = 80,
                 segmentWidth = 8,
                 segmentHeight = 24,
