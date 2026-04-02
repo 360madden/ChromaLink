@@ -295,24 +295,38 @@ internal sealed class CliApp
         Console.WriteLine($"SearchMode: {detection.SearchMode}");
     }
 
-    private static void WriteFrameSummary(CoreStatusFrame frame)
+    private static void WriteFrameSummary(TelemetryFrame frame)
     {
         Console.WriteLine($"FrameType: {frame.Header.FrameType}");
+        Console.WriteLine($"Schema: {frame.Header.SchemaId}");
         Console.WriteLine($"Sequence: {frame.Header.Sequence}");
-        Console.WriteLine($"PlayerFlags: {frame.Payload.PlayerStateFlags}");
-        Console.WriteLine($"PlayerHealthPctQ8: {frame.Payload.PlayerHealthPctQ8}");
-        Console.WriteLine($"PlayerResourceKind: {frame.Payload.PlayerResourceKind}");
-        Console.WriteLine($"PlayerResourcePctQ8: {frame.Payload.PlayerResourcePctQ8}");
-        Console.WriteLine($"TargetFlags: {frame.Payload.TargetStateFlags}");
-        Console.WriteLine($"TargetHealthPctQ8: {frame.Payload.TargetHealthPctQ8}");
-        Console.WriteLine($"TargetResourceKind: {frame.Payload.TargetResourceKind}");
-        Console.WriteLine($"TargetResourcePctQ8: {frame.Payload.TargetResourcePctQ8}");
-        Console.WriteLine($"PlayerLevel: {frame.Payload.PlayerLevel}");
-        Console.WriteLine($"TargetLevel: {frame.Payload.TargetLevel}");
-        Console.WriteLine($"PlayerCalling: {frame.Payload.PlayerCallingRolePacked >> 4}");
-        Console.WriteLine($"PlayerRole: {frame.Payload.PlayerCallingRolePacked & 0x0F}");
-        Console.WriteLine($"TargetCalling: {frame.Payload.TargetCallingRelationPacked >> 4}");
-        Console.WriteLine($"TargetRelation: {frame.Payload.TargetCallingRelationPacked & 0x0F}");
+
+        switch (frame)
+        {
+            case CoreStatusFrame core:
+                Console.WriteLine($"PlayerFlags: {core.Payload.PlayerStateFlags}");
+                Console.WriteLine($"PlayerHealthPctQ8: {core.Payload.PlayerHealthPctQ8}");
+                Console.WriteLine($"PlayerResourceKind: {core.Payload.PlayerResourceKind}");
+                Console.WriteLine($"PlayerResourcePctQ8: {core.Payload.PlayerResourcePctQ8}");
+                Console.WriteLine($"TargetFlags: {core.Payload.TargetStateFlags}");
+                Console.WriteLine($"TargetHealthPctQ8: {core.Payload.TargetHealthPctQ8}");
+                Console.WriteLine($"TargetResourceKind: {core.Payload.TargetResourceKind}");
+                Console.WriteLine($"TargetResourcePctQ8: {core.Payload.TargetResourcePctQ8}");
+                Console.WriteLine($"PlayerLevel: {core.Payload.PlayerLevel}");
+                Console.WriteLine($"TargetLevel: {core.Payload.TargetLevel}");
+                Console.WriteLine($"PlayerCalling: {core.Payload.PlayerCallingRolePacked >> 4}");
+                Console.WriteLine($"PlayerRole: {core.Payload.PlayerCallingRolePacked & 0x0F}");
+                Console.WriteLine($"TargetCalling: {core.Payload.TargetCallingRelationPacked >> 4}");
+                Console.WriteLine($"TargetRelation: {core.Payload.TargetCallingRelationPacked & 0x0F}");
+                break;
+
+            case PlayerVitalsFrame vitals:
+                Console.WriteLine($"HealthCurrent: {vitals.Payload.HealthCurrent}");
+                Console.WriteLine($"HealthMax: {vitals.Payload.HealthMax}");
+                Console.WriteLine($"ResourceCurrent: {vitals.Payload.ResourceCurrent}");
+                Console.WriteLine($"ResourceMax: {vitals.Payload.ResourceMax}");
+                break;
+        }
     }
 
     private List<CaptureAttempt> CaptureAndAnalyze(nint hwnd, IReadOnlyList<CaptureBackend> backends)

@@ -2,7 +2,8 @@ namespace ChromaLink.Reader;
 
 public enum FrameType : byte
 {
-    CoreStatus = 1
+    CoreStatus = 1,
+    PlayerVitals = 2
 }
 
 public enum ResourceKind : byte
@@ -23,6 +24,11 @@ public sealed record TelemetryFrameHeader(
     byte Sequence,
     byte ReservedFlags,
     ushort HeaderCrc16);
+
+public abstract record TelemetryFrame(
+    TelemetryFrameHeader Header,
+    uint PayloadCrc32C,
+    byte[] TransportBytes);
 
 public readonly record struct CoreStatusSnapshot(
     byte PlayerStateFlags,
@@ -56,11 +62,31 @@ public readonly record struct CoreStatusSnapshot(
     }
 }
 
+public readonly record struct PlayerVitalsSnapshot(
+    uint HealthCurrent,
+    uint HealthMax,
+    ushort ResourceCurrent,
+    ushort ResourceMax)
+{
+    public static PlayerVitalsSnapshot CreateSynthetic()
+    {
+        return new PlayerVitalsSnapshot(3260, 3260, 100, 100);
+    }
+}
+
 public sealed record CoreStatusFrame(
     TelemetryFrameHeader Header,
     CoreStatusSnapshot Payload,
     uint PayloadCrc32C,
-    byte[] TransportBytes);
+    byte[] TransportBytes)
+    : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
+
+public sealed record PlayerVitalsFrame(
+    TelemetryFrameHeader Header,
+    PlayerVitalsSnapshot Payload,
+    uint PayloadCrc32C,
+    byte[] TransportBytes)
+    : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
 
 public sealed record TransportParseResult(
     bool IsAccepted,
@@ -71,7 +97,7 @@ public sealed record TransportParseResult(
     bool HeaderCrcValid,
     bool PayloadCrcValid,
     byte[] TransportBytes,
-    CoreStatusFrame? Frame);
+    TelemetryFrame? Frame);
 
 public static class TransportConstants
 {
@@ -80,6 +106,8 @@ public static class TransportConstants
     public const byte ProtocolVersion = 1;
     public const byte CoreFrameType = 1;
     public const byte CoreSchemaId = 1;
+    public const byte PlayerVitalsFrameType = 2;
+    public const byte PlayerVitalsSchemaId = 1;
     public const int TransportBytes = 24;
     public const int HeaderBytes = 8;
     public const int PayloadBytes = 12;
@@ -91,37 +119,30 @@ public static class FrameProtocol
 {
     public static byte[] BuildCoreFrameBytes(byte profileId, byte sequence, CoreStatusSnapshot snapshot)
     {
-        var bytes = new byte[TransportConstants.TransportBytes];
-        bytes[0] = TransportConstants.MagicC;
-        bytes[1] = TransportConstants.MagicL;
-        bytes[2] = (byte)((TransportConstants.ProtocolVersion << 4) | (profileId & 0x0F));
-        bytes[3] = (byte)((TransportConstants.CoreFrameType << 4) | TransportConstants.CoreSchemaId);
-        bytes[4] = sequence;
-        bytes[5] = 0;
+        Span<byte> payload = stackalloc byte[TransportConstants.PayloadBytes];
+        payload[0] = snapshot.PlayerStateFlags;
+        payload[1] = snapshot.PlayerHealthPctQ8;
+        payload[2] = snapshot.PlayerResourceKind;
+        payload[3] = snapshot.PlayerResourcePctQ8;
+        payload[4] = snapshot.TargetStateFlags;
+        payload[5] = snapshot.TargetHealthPctQ8;
+        payload[6] = snapshot.TargetResourceKind;
+        payload[7] = snapshot.TargetResourcePctQ8;
+        payload[8] = snapshot.PlayerLevel;
+        payload[9] = snapshot.TargetLevel;
+        payload[10] = snapshot.PlayerCallingRolePacked;
+        payload[11] = snapshot.TargetCallingRelationPacked;
+        return BuildFrameBytes(profileId, sequence, FrameType.CoreStatus, TransportConstants.CoreSchemaId, payload);
+    }
 
-        var headerCrc = ComputeCrc16(bytes.AsSpan(0, 6));
-        bytes[6] = (byte)(headerCrc >> 8);
-        bytes[7] = (byte)(headerCrc & 0xFF);
-
-        bytes[8] = snapshot.PlayerStateFlags;
-        bytes[9] = snapshot.PlayerHealthPctQ8;
-        bytes[10] = snapshot.PlayerResourceKind;
-        bytes[11] = snapshot.PlayerResourcePctQ8;
-        bytes[12] = snapshot.TargetStateFlags;
-        bytes[13] = snapshot.TargetHealthPctQ8;
-        bytes[14] = snapshot.TargetResourceKind;
-        bytes[15] = snapshot.TargetResourcePctQ8;
-        bytes[16] = snapshot.PlayerLevel;
-        bytes[17] = snapshot.TargetLevel;
-        bytes[18] = snapshot.PlayerCallingRolePacked;
-        bytes[19] = snapshot.TargetCallingRelationPacked;
-
-        var payloadCrc = ComputeCrc32C(bytes.AsSpan(8, TransportConstants.PayloadBytes));
-        bytes[20] = (byte)(payloadCrc >> 24);
-        bytes[21] = (byte)(payloadCrc >> 16);
-        bytes[22] = (byte)(payloadCrc >> 8);
-        bytes[23] = (byte)(payloadCrc & 0xFF);
-        return bytes;
+    public static byte[] BuildPlayerVitalsFrameBytes(byte profileId, byte sequence, PlayerVitalsSnapshot snapshot)
+    {
+        Span<byte> payload = stackalloc byte[TransportConstants.PayloadBytes];
+        WriteUInt32BigEndian(payload, 0, snapshot.HealthCurrent);
+        WriteUInt32BigEndian(payload, 4, snapshot.HealthMax);
+        WriteUInt16BigEndian(payload, 8, snapshot.ResourceCurrent);
+        WriteUInt16BigEndian(payload, 10, snapshot.ResourceMax);
+        return BuildFrameBytes(profileId, sequence, FrameType.PlayerVitals, TransportConstants.PlayerVitalsSchemaId, payload);
     }
 
     public static byte[] EncodeBytesToPayloadSymbols(ReadOnlySpan<byte> bytes)
@@ -181,15 +202,37 @@ public static class FrameProtocol
 
     public static bool TryParseCoreFrameBytes(ReadOnlySpan<byte> bytes, out CoreStatusFrame? frame, out string reason)
     {
-        var result = AnalyzeCoreFrameBytes(bytes);
-        frame = result.Frame;
+        var result = AnalyzeFrameBytes(bytes);
+        frame = result.Frame as CoreStatusFrame;
         reason = result.Reason;
-        return result.IsAccepted;
+        return result.IsAccepted && frame is not null;
     }
 
     public static TransportParseResult AnalyzeCoreFrameBytes(ReadOnlySpan<byte> bytes)
     {
-        CoreStatusFrame? frame = null;
+        var result = AnalyzeFrameBytes(bytes);
+        if (result.IsAccepted && result.Frame is CoreStatusFrame)
+        {
+            return result;
+        }
+
+        if (!result.IsAccepted)
+        {
+            return result;
+        }
+
+        return result with
+        {
+            IsAccepted = false,
+            Reason = "Decoded frame was not a core-status frame.",
+            FrameSchemaValid = false,
+            Frame = null
+        };
+    }
+
+    public static TransportParseResult AnalyzeFrameBytes(ReadOnlySpan<byte> bytes)
+    {
+        TelemetryFrame? frame = null;
         var transportBytes = bytes.ToArray();
 
         if (bytes.Length != TransportConstants.TransportBytes)
@@ -214,7 +257,7 @@ public static class FrameProtocol
 
         var protocolVersion = (byte)(bytes[2] >> 4);
         var profileId = (byte)(bytes[2] & 0x0F);
-        var frameType = (byte)(bytes[3] >> 4);
+        var rawFrameType = (byte)(bytes[3] >> 4);
         var schemaId = (byte)(bytes[3] & 0x0F);
         var protocolProfileValid = protocolVersion == TransportConstants.ProtocolVersion && profileId == StripProfiles.Default.NumericId;
         if (!protocolProfileValid)
@@ -222,10 +265,11 @@ public static class FrameProtocol
             return new TransportParseResult(false, "Invalid magic/version.", true, false, false, false, false, transportBytes, null);
         }
 
-        var frameSchemaValid = frameType == TransportConstants.CoreFrameType && schemaId == TransportConstants.CoreSchemaId;
+        var frameType = Enum.IsDefined(typeof(FrameType), rawFrameType) ? (FrameType)rawFrameType : 0;
+        var frameSchemaValid = IsSupportedFrameSchema(frameType, schemaId);
         if (!frameSchemaValid)
         {
-            return new TransportParseResult(false, "Invalid magic/version.", true, true, false, false, false, transportBytes, null);
+            return new TransportParseResult(false, "Invalid frame type/schema.", true, true, false, false, false, transportBytes, null);
         }
 
         var expectedHeaderCrc = ComputeCrc16(bytes[..6]);
@@ -245,32 +289,51 @@ public static class FrameProtocol
             return new TransportParseResult(false, "Payload CRC failure.", true, true, true, true, false, transportBytes, null);
         }
 
-        var parsedPayload = new CoreStatusSnapshot(
-            payload[0],
-            payload[1],
-            payload[2],
-            payload[3],
-            payload[4],
-            payload[5],
-            payload[6],
-            payload[7],
-            payload[8],
-            payload[9],
-            payload[10],
-            payload[11]);
+        var header = new TelemetryFrameHeader(
+            protocolVersion,
+            profileId,
+            frameType,
+            schemaId,
+            bytes[4],
+            bytes[5],
+            actualHeaderCrc);
 
-        frame = new CoreStatusFrame(
-            new TelemetryFrameHeader(
-                protocolVersion,
-                profileId,
-                FrameType.CoreStatus,
-                schemaId,
-                bytes[4],
-                bytes[5],
-                actualHeaderCrc),
-            parsedPayload,
-            actualPayloadCrc,
-            bytes.ToArray());
+        frame = frameType switch
+        {
+            FrameType.CoreStatus => new CoreStatusFrame(
+                header,
+                new CoreStatusSnapshot(
+                    payload[0],
+                    payload[1],
+                    payload[2],
+                    payload[3],
+                    payload[4],
+                    payload[5],
+                    payload[6],
+                    payload[7],
+                    payload[8],
+                    payload[9],
+                    payload[10],
+                    payload[11]),
+                actualPayloadCrc,
+                bytes.ToArray()),
+            FrameType.PlayerVitals => new PlayerVitalsFrame(
+                header,
+                new PlayerVitalsSnapshot(
+                    ReadUInt32BigEndian(payload, 0),
+                    ReadUInt32BigEndian(payload, 4),
+                    ReadUInt16BigEndian(payload, 8),
+                    ReadUInt16BigEndian(payload, 10)),
+                actualPayloadCrc,
+                bytes.ToArray()),
+            _ => null
+        };
+
+        if (frame is null)
+        {
+            return new TransportParseResult(false, "Invalid frame type/schema.", true, true, false, true, true, transportBytes, null);
+        }
+
         return new TransportParseResult(true, "Accepted", true, true, true, true, true, transportBytes, frame);
     }
 
@@ -302,5 +365,71 @@ public static class FrameProtocol
         }
 
         return ~crc;
+    }
+
+    private static byte[] BuildFrameBytes(byte profileId, byte sequence, FrameType frameType, byte schemaId, ReadOnlySpan<byte> payload)
+    {
+        if (payload.Length != TransportConstants.PayloadBytes)
+        {
+            throw new ArgumentOutOfRangeException(nameof(payload));
+        }
+
+        var bytes = new byte[TransportConstants.TransportBytes];
+        bytes[0] = TransportConstants.MagicC;
+        bytes[1] = TransportConstants.MagicL;
+        bytes[2] = (byte)((TransportConstants.ProtocolVersion << 4) | (profileId & 0x0F));
+        bytes[3] = (byte)(((byte)frameType << 4) | (schemaId & 0x0F));
+        bytes[4] = sequence;
+        bytes[5] = 0;
+
+        var headerCrc = ComputeCrc16(bytes.AsSpan(0, 6));
+        bytes[6] = (byte)(headerCrc >> 8);
+        bytes[7] = (byte)(headerCrc & 0xFF);
+
+        payload.CopyTo(bytes.AsSpan(8, TransportConstants.PayloadBytes));
+
+        var payloadCrc = ComputeCrc32C(bytes.AsSpan(8, TransportConstants.PayloadBytes));
+        bytes[20] = (byte)(payloadCrc >> 24);
+        bytes[21] = (byte)(payloadCrc >> 16);
+        bytes[22] = (byte)(payloadCrc >> 8);
+        bytes[23] = (byte)(payloadCrc & 0xFF);
+        return bytes;
+    }
+
+    private static bool IsSupportedFrameSchema(FrameType frameType, byte schemaId)
+    {
+        return frameType switch
+        {
+            FrameType.CoreStatus => schemaId == TransportConstants.CoreSchemaId,
+            FrameType.PlayerVitals => schemaId == TransportConstants.PlayerVitalsSchemaId,
+            _ => false
+        };
+    }
+
+    private static void WriteUInt16BigEndian(Span<byte> payload, int offset, ushort value)
+    {
+        payload[offset] = (byte)(value >> 8);
+        payload[offset + 1] = (byte)(value & 0xFF);
+    }
+
+    private static void WriteUInt32BigEndian(Span<byte> payload, int offset, uint value)
+    {
+        payload[offset] = (byte)(value >> 24);
+        payload[offset + 1] = (byte)((value >> 16) & 0xFF);
+        payload[offset + 2] = (byte)((value >> 8) & 0xFF);
+        payload[offset + 3] = (byte)(value & 0xFF);
+    }
+
+    private static ushort ReadUInt16BigEndian(ReadOnlySpan<byte> payload, int offset)
+    {
+        return (ushort)((payload[offset] << 8) | payload[offset + 1]);
+    }
+
+    private static uint ReadUInt32BigEndian(ReadOnlySpan<byte> payload, int offset)
+    {
+        return ((uint)payload[offset] << 24)
+             | ((uint)payload[offset + 1] << 16)
+             | ((uint)payload[offset + 2] << 8)
+             | payload[offset + 3];
     }
 }

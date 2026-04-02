@@ -139,6 +139,9 @@ function ChromaLink.Bootstrap.Refresh(forceRefresh, reason)
   local state = ChromaLink.Bootstrap.state
   local now
   local snapshot
+  local frameKind
+  local rotation
+  local rotationIndex
   local _, symbols
 
   if state == nil then
@@ -150,16 +153,34 @@ function ChromaLink.Bootstrap.Refresh(forceRefresh, reason)
     return
   end
 
+  rotation = ChromaLink.Config.frameRotation or { "coreStatus" }
+  rotationIndex = math.fmod(state.sequence, #rotation) + 1
+  frameKind = rotation[rotationIndex] or "coreStatus"
+
   if ChromaLink.Config.syntheticMode ~= nil and ChromaLink.Config.syntheticMode.enabled then
-    snapshot = ChromaLink.Gather.BuildSyntheticCoreStatusSnapshot()
+    if frameKind == "playerVitals" then
+      snapshot = ChromaLink.Gather.BuildSyntheticPlayerVitalsSnapshot()
+      _, symbols = ChromaLink.Protocol.BuildPlayerVitalsFrame(snapshot, state.sequence)
+    else
+      snapshot = ChromaLink.Gather.BuildSyntheticCoreStatusSnapshot()
+      _, symbols = ChromaLink.Protocol.BuildCoreFrame(snapshot, state.sequence)
+      frameKind = "coreStatus"
+    end
   else
-    snapshot = ChromaLink.Gather.BuildCoreStatusSnapshot()
+    if frameKind == "playerVitals" then
+      snapshot = ChromaLink.Gather.BuildPlayerVitalsSnapshot()
+      _, symbols = ChromaLink.Protocol.BuildPlayerVitalsFrame(snapshot, state.sequence)
+    else
+      snapshot = ChromaLink.Gather.BuildCoreStatusSnapshot()
+      _, symbols = ChromaLink.Protocol.BuildCoreFrame(snapshot, state.sequence)
+      frameKind = "coreStatus"
+    end
   end
-  _, symbols = ChromaLink.Protocol.BuildCoreFrame(snapshot, state.sequence)
   ChromaLink.Render.Update(state.render, symbols)
 
   state.lastRefreshAt = now
   state.lastReason = reason
+  state.lastFrameKind = frameKind
   state.lastSnapshot = snapshot
   state.sequence = math.fmod(state.sequence + 1, 256)
 end
@@ -189,8 +210,9 @@ function ChromaLink.Bootstrap.LogStatus(includeNativeFrames)
   end
 
   ChromaLink.Diagnostics.Log(string.format(
-    "Status: seq=%d lastReason=%s diag=%s traces=%s observer=%s.",
+    "Status: seq=%d frame=%s lastReason=%s diag=%s traces=%s observer=%s.",
     tonumber(state.sequence) or 0,
+    tostring(state.lastFrameKind or "unknown"),
     tostring(state.lastReason or "unknown"),
     diagnosticsConfig.enabled and "on" or "off",
     diagnosticsConfig.logEvents and "on" or "off",
@@ -306,6 +328,7 @@ function ChromaLink.Bootstrap.Initialize()
     render = ChromaLink.Render.Initialize(root, renderAnchor),
     lastRefreshAt = 0,
     lastReason = "startup",
+    lastFrameKind = "coreStatus",
     lastSnapshot = nil,
     sequence = 0
   }

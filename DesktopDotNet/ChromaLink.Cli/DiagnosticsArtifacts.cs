@@ -177,6 +177,9 @@ internal static class DiagnosticsArtifacts
                     validation.ParseResult.FrameSchemaValid,
                     validation.ParseResult.HeaderCrcValid,
                     validation.ParseResult.PayloadCrcValid,
+                    frameType = validation.ParseResult.Frame?.Header.FrameType.ToString(),
+                    schemaId = validation.ParseResult.Frame?.Header.SchemaId,
+                    sequence = validation.ParseResult.Frame?.Header.Sequence,
                     transportBytesHex = BitConverter.ToString(validation.ParseResult.TransportBytes).Replace("-", string.Empty)
                 },
             observerLane = observerReport.IsConfigured
@@ -301,6 +304,11 @@ internal static class DiagnosticsArtifacts
                 $"Parse magic={validation.ParseResult.MagicValid} version={validation.ParseResult.ProtocolProfileValid} schema={validation.ParseResult.FrameSchemaValid}");
             lines.Add(
                 $"Parse headerCrc={validation.ParseResult.HeaderCrcValid} payloadCrc={validation.ParseResult.PayloadCrcValid}");
+            if (validation.ParseResult.Frame is not null)
+            {
+                lines.Add(
+                    $"Frame {validation.ParseResult.Frame.Header.FrameType} schema={validation.ParseResult.Frame.Header.SchemaId} seq={validation.ParseResult.Frame.Header.Sequence}");
+            }
         }
 
         return lines;

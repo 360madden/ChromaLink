@@ -14,6 +14,28 @@ local function ClampByte(value)
   return math.floor(number + 0.5)
 end
 
+local function ClampUInt16(value)
+  local number = tonumber(value) or 0
+  if number < 0 then
+    return 0
+  end
+  if number > 65535 then
+    return 65535
+  end
+  return math.floor(number + 0.5)
+end
+
+local function ClampUInt32(value)
+  local number = tonumber(value) or 0
+  if number < 0 then
+    return 0
+  end
+  if number > 4294967295 then
+    return 4294967295
+  end
+  return math.floor(number + 0.5)
+end
+
 local function Lower(value)
   if value == nil then
     return ""
@@ -115,7 +137,7 @@ end
 
 local function SelectPreferredResource(detail, callingCode)
   if detail == nil then
-    return config.resourceKinds.none, 0
+    return config.resourceKinds.none, 0, 0, 0
   end
 
   local candidates = {
@@ -139,18 +161,18 @@ local function SelectPreferredResource(detail, callingCode)
   for index = 1, #candidates do
     local candidate = candidates[index]
     if candidate.kind == preferredKind and tonumber(candidate.maximum) ~= nil and tonumber(candidate.maximum) > 0 then
-      return candidate.kind, QuantizePercent(candidate.current, candidate.maximum)
+      return candidate.kind, ClampUInt16(candidate.current), ClampUInt16(candidate.maximum), QuantizePercent(candidate.current, candidate.maximum)
     end
   end
 
   for index = 1, #candidates do
     local candidate = candidates[index]
     if tonumber(candidate.maximum) ~= nil and tonumber(candidate.maximum) > 0 then
-      return candidate.kind, QuantizePercent(candidate.current, candidate.maximum)
+      return candidate.kind, ClampUInt16(candidate.current), ClampUInt16(candidate.maximum), QuantizePercent(candidate.current, candidate.maximum)
     end
   end
 
-  return config.resourceKinds.none, 0
+  return config.resourceKinds.none, 0, 0, 0
 end
 
 local function BuildPlayerStateFlags(detail)
@@ -192,8 +214,8 @@ function ChromaLink.Gather.BuildCoreStatusSnapshot()
   local targetCallingCode = EncodeCallingCode(target and (target.calling or target.callingName))
   local playerRoleCode = EncodeRoleCode(player and (player.role or player.roleName or player.playstyle))
   local relationCode = EncodeRelationCode(target and target.relation, targetUnitId)
-  local playerResourceKind, playerResourcePct = SelectPreferredResource(player, playerCallingCode)
-  local targetResourceKind, targetResourcePct = SelectPreferredResource(target, targetCallingCode)
+  local playerResourceKind, _, _, playerResourcePct = SelectPreferredResource(player, playerCallingCode)
+  local targetResourceKind, _, _, targetResourcePct = SelectPreferredResource(target, targetCallingCode)
 
   return {
     playerStateFlags = ClampByte(BuildPlayerStateFlags(player)),
@@ -211,6 +233,20 @@ function ChromaLink.Gather.BuildCoreStatusSnapshot()
   }
 end
 
+function ChromaLink.Gather.BuildPlayerVitalsSnapshot()
+  local player = SafeUnitDetail("player")
+  local playerCallingCode = EncodeCallingCode(player and (player.calling or player.callingName))
+  local playerResourceKind, resourceCurrent, resourceMax, _ = SelectPreferredResource(player, playerCallingCode)
+
+  return {
+    resourceKind = ClampByte(playerResourceKind),
+    healthCurrent = ClampUInt32(player and player.health),
+    healthMax = ClampUInt32(player and player.healthMax),
+    resourceCurrent = ClampUInt16(resourceCurrent),
+    resourceMax = ClampUInt16(resourceMax)
+  }
+end
+
 function ChromaLink.Gather.BuildSyntheticCoreStatusSnapshot()
   return {
     playerStateFlags = 7,
@@ -225,5 +261,15 @@ function ChromaLink.Gather.BuildSyntheticCoreStatusSnapshot()
     targetLevel = 72,
     playerCallingRolePacked = 49,
     targetCallingRelationPacked = 66
+  }
+end
+
+function ChromaLink.Gather.BuildSyntheticPlayerVitalsSnapshot()
+  return {
+    resourceKind = config.resourceKinds.energy,
+    healthCurrent = 3260,
+    healthMax = 3260,
+    resourceCurrent = 100,
+    resourceMax = 100
   }
 end

@@ -196,20 +196,32 @@ internal sealed class InspectorForm : Form
             builder.AppendLine($"  Schema: {analysis.Frame.Header.SchemaId}");
             builder.AppendLine($"  Sequence: {analysis.Frame.Header.Sequence}");
             builder.AppendLine("Payload:");
-            builder.AppendLine($"  PlayerFlags: {analysis.Frame.Payload.PlayerStateFlags}");
-            builder.AppendLine($"  PlayerHealthPctQ8: {analysis.Frame.Payload.PlayerHealthPctQ8}");
-            builder.AppendLine($"  PlayerResourceKind: {analysis.Frame.Payload.PlayerResourceKind}");
-            builder.AppendLine($"  PlayerResourcePctQ8: {analysis.Frame.Payload.PlayerResourcePctQ8}");
-            builder.AppendLine($"  TargetFlags: {analysis.Frame.Payload.TargetStateFlags}");
-            builder.AppendLine($"  TargetHealthPctQ8: {analysis.Frame.Payload.TargetHealthPctQ8}");
-            builder.AppendLine($"  TargetResourceKind: {analysis.Frame.Payload.TargetResourceKind}");
-            builder.AppendLine($"  TargetResourcePctQ8: {analysis.Frame.Payload.TargetResourcePctQ8}");
-            builder.AppendLine($"  PlayerLevel: {analysis.Frame.Payload.PlayerLevel}");
-            builder.AppendLine($"  TargetLevel: {analysis.Frame.Payload.TargetLevel}");
-            builder.AppendLine($"  PlayerCalling: {analysis.Frame.Payload.PlayerCallingRolePacked >> 4}");
-            builder.AppendLine($"  PlayerRole: {analysis.Frame.Payload.PlayerCallingRolePacked & 0x0F}");
-            builder.AppendLine($"  TargetCalling: {analysis.Frame.Payload.TargetCallingRelationPacked >> 4}");
-            builder.AppendLine($"  TargetRelation: {analysis.Frame.Payload.TargetCallingRelationPacked & 0x0F}");
+            switch (analysis.Frame)
+            {
+                case CoreStatusFrame core:
+                    builder.AppendLine($"  PlayerFlags: {core.Payload.PlayerStateFlags}");
+                    builder.AppendLine($"  PlayerHealthPctQ8: {core.Payload.PlayerHealthPctQ8}");
+                    builder.AppendLine($"  PlayerResourceKind: {core.Payload.PlayerResourceKind}");
+                    builder.AppendLine($"  PlayerResourcePctQ8: {core.Payload.PlayerResourcePctQ8}");
+                    builder.AppendLine($"  TargetFlags: {core.Payload.TargetStateFlags}");
+                    builder.AppendLine($"  TargetHealthPctQ8: {core.Payload.TargetHealthPctQ8}");
+                    builder.AppendLine($"  TargetResourceKind: {core.Payload.TargetResourceKind}");
+                    builder.AppendLine($"  TargetResourcePctQ8: {core.Payload.TargetResourcePctQ8}");
+                    builder.AppendLine($"  PlayerLevel: {core.Payload.PlayerLevel}");
+                    builder.AppendLine($"  TargetLevel: {core.Payload.TargetLevel}");
+                    builder.AppendLine($"  PlayerCalling: {core.Payload.PlayerCallingRolePacked >> 4}");
+                    builder.AppendLine($"  PlayerRole: {core.Payload.PlayerCallingRolePacked & 0x0F}");
+                    builder.AppendLine($"  TargetCalling: {core.Payload.TargetCallingRelationPacked >> 4}");
+                    builder.AppendLine($"  TargetRelation: {core.Payload.TargetCallingRelationPacked & 0x0F}");
+                    break;
+
+                case PlayerVitalsFrame vitals:
+                    builder.AppendLine($"  HealthCurrent: {vitals.Payload.HealthCurrent}");
+                    builder.AppendLine($"  HealthMax: {vitals.Payload.HealthMax}");
+                    builder.AppendLine($"  ResourceCurrent: {vitals.Payload.ResourceCurrent}");
+                    builder.AppendLine($"  ResourceMax: {vitals.Payload.ResourceMax}");
+                    break;
+            }
         }
 
         builder.AppendLine("Segments:");

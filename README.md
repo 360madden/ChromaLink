@@ -21,7 +21,8 @@ ChromaLink is intentionally narrow right now. The active baseline is:
 - `80` vertical segments at `8x24`
 - fixed `8-color` alphabet
 - fixed control markers on both edges
-- one proven live frame slice: `coreStatus`
+- fast heartbeat frame: `coreStatus`
+- first throughput expansion in code: `playerVitals`
 
 Current live proof:
 
@@ -178,7 +179,15 @@ The current transport is a segmented strip with fixed edge controls:
 - right edge control markers in segments `73-80`
 - `8-color` alphabet for `3` bits per segment
 
-The live path currently proves one frame slice, `coreStatus`. Broader payload coverage is still future work, but the transport and diagnostics are already structured to grow beyond that first slice.
+The current strip carries `24` transport bytes per frame and now supports more than one frame type without changing strip geometry:
+
+- `CoreStatus`
+  - player and target summary state
+- `PlayerVitals`
+  - health current/max
+  - resource current/max
+
+The current addon rotation keeps `coreStatus` as the dominant heartbeat and periodically inserts `playerVitals` to increase throughput over time instead of widening the strip.
 
 ## Wrapper Scripts
 

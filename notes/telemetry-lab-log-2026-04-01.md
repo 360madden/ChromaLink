@@ -652,6 +652,62 @@ Keep as experimental.
 
 ---
 
+## 2026-04-01 - Session N - multi-frame throughput expansion
+
+### Goal
+
+Increase strip throughput without making the strip wider or shrinking the segment geometry.
+
+### Change
+
+- add a second transport frame type, `playerVitals`
+- keep the transport at the same fixed `24` bytes and `80` segments
+- add Lua-side frame rotation so the addon now sends:
+  - `coreStatus`
+  - `coreStatus`
+  - `coreStatus`
+  - `playerVitals`
+- expand the reader protocol to parse both frame types
+- update CLI and inspector summaries to show the decoded frame type and payload
+- extend diagnostics artifacts so captures report which frame type was decoded
+- add a synthetic round-trip test for `playerVitals`
+
+### Why
+
+Earlier discussion raised the idea of making the strip longer for more throughput. That would either break the `640x360` width budget or force thinner segments. Rotating multiple frame types through the same strip geometry is the safer throughput path because it preserves the current machine-readable baseline.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+dotnet build .\DesktopDotNet\ChromaLink.Inspector\ChromaLink.Inspector.csproj
+```
+
+```powershell
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- smoke
+```
+
+### Result
+
+- tests passed: `11/11`
+- inspector build succeeded
+- smoke remained accepted
+- the transport now supports more than one frame type while keeping the same strip size
+- live RIFT validation of the new rotation is still pending a `/reloadui`
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for multi-frame throughput expansion
+
+---
+
 ## Current Stable Baseline At End Of Log
 
 - target client: `640x360`

@@ -33,7 +33,7 @@ public sealed record FrameValidationResult(
     string Reason,
     DetectionResult? Detection,
     IReadOnlyList<SegmentSample> Samples,
-    CoreStatusFrame? Frame,
+    TelemetryFrame? Frame,
     TransportParseResult? ParseResult);
 
 internal readonly record struct NormalizedRgb(double R, double G, double B)
@@ -245,7 +245,7 @@ public static class ColorStripAnalyzer
             }
         }
 
-        var parseResult = FrameProtocol.AnalyzeCoreFrameBytes(FrameProtocol.DecodePayloadSymbolsToBytes(payloadSymbols));
+        var parseResult = FrameProtocol.AnalyzeFrameBytes(FrameProtocol.DecodePayloadSymbolsToBytes(payloadSymbols));
         if (parseResult.IsAccepted && parseResult.Frame is not null)
         {
             return new Candidate(detection, samples, parseResult.Frame, parseResult, "Accepted");
@@ -438,7 +438,7 @@ public static class ColorStripAnalyzer
     private sealed record Candidate(
         DetectionResult Detection,
         IReadOnlyList<SegmentSample> Samples,
-        CoreStatusFrame? Frame,
+        TelemetryFrame? Frame,
         TransportParseResult? ParseResult,
         string Reason);
 

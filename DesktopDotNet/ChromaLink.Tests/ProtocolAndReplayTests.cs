@@ -16,9 +16,24 @@ public class ProtocolAndReplayTests
 
         Assert.True(validation.IsAccepted, validation.Reason);
         Assert.NotNull(validation.Frame);
-        Assert.Equal(FrameType.CoreStatus, validation.Frame!.Header.FrameType);
-        Assert.Equal(198, validation.Frame.Payload.PlayerHealthPctQ8);
-        Assert.Equal(91, validation.Frame.Payload.TargetHealthPctQ8);
+        var frame = Assert.IsType<CoreStatusFrame>(validation.Frame);
+        Assert.Equal(FrameType.CoreStatus, frame.Header.FrameType);
+        Assert.Equal(198, frame.Payload.PlayerHealthPctQ8);
+        Assert.Equal(91, frame.Payload.TargetHealthPctQ8);
+    }
+
+    [Fact]
+    public void PlayerVitalsFrame_RoundTripsThroughRendererAndAnalyzer()
+    {
+        var bytes = FrameProtocol.BuildPlayerVitalsFrameBytes(_profile.NumericId, 11, PlayerVitalsSnapshot.CreateSynthetic());
+        var image = ColorStripRenderer.Render(_profile, bytes);
+        var validation = ColorStripAnalyzer.Analyze(image, _profile);
+
+        Assert.True(validation.IsAccepted, validation.Reason);
+        var frame = Assert.IsType<PlayerVitalsFrame>(validation.Frame);
+        Assert.Equal(FrameType.PlayerVitals, frame.Header.FrameType);
+        Assert.Equal((uint)3260, frame.Payload.HealthCurrent);
+        Assert.Equal((ushort)100, frame.Payload.ResourceCurrent);
     }
 
     [Fact]

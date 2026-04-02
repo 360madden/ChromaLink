@@ -14,7 +14,8 @@ Current project direction:
 - segment count: `80`
 - segment size: `8x24`
 - color alphabet size: `8`
-- first live slice: `coreStatus` only
+- heartbeat frame: `coreStatus`
+- first throughput expansion: `playerVitals`
 
 Working rules:
 - optimize for the fastest proven vertical slice
@@ -35,7 +36,7 @@ Current transport contract:
   - sequence
   - reserved flags
   - header CRC16
-  - `12` bytes of `core-status-v1`
+  - `12` bytes of frame payload
   - payload CRC32C
 
 Current first-slice payload:
@@ -51,6 +52,17 @@ Current first-slice payload:
 - target level
 - player calling/role packed byte
 - target calling/relation packed byte
+
+Current throughput expansion payload:
+- `playerVitals-v1`
+  - health current (`uint32`)
+  - health max (`uint32`)
+  - resource current (`uint16`)
+  - resource max (`uint16`)
+
+Current rotation strategy:
+- keep `coreStatus` as the dominant heartbeat
+- rotate in `playerVitals` periodically to increase throughput without changing strip geometry
 
 Desktop requirements:
 - `smoke`

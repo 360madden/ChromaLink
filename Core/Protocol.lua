@@ -2,6 +2,7 @@ ChromaLink = ChromaLink or {}
 ChromaLink.Protocol = {}
 
 local config = ChromaLink.Config
+local frameTypes = config.frameTypes or { coreStatus = 1, playerVitals = 2 }
 
 local function ClampByte(value)
   local number = tonumber(value) or 0
@@ -101,15 +102,17 @@ local function ComputeCrc32C(bytes)
 end
 
 local function AppendBigEndian16(bytes, offset, value)
-  bytes[offset] = math.floor(value / 256)
-  bytes[offset + 1] = math.fmod(value, 256)
+  local clamped = math.max(0, math.min(65535, math.floor((tonumber(value) or 0) + 0.5)))
+  bytes[offset] = math.floor(clamped / 256)
+  bytes[offset + 1] = math.fmod(clamped, 256)
 end
 
 local function AppendBigEndian32(bytes, offset, value)
-  bytes[offset] = math.floor(value / 16777216)
-  bytes[offset + 1] = math.floor(math.fmod(value, 16777216) / 65536)
-  bytes[offset + 2] = math.floor(math.fmod(value, 65536) / 256)
-  bytes[offset + 3] = math.fmod(value, 256)
+  local clamped = math.max(0, math.min(4294967295, math.floor((tonumber(value) or 0) + 0.5)))
+  bytes[offset] = math.floor(clamped / 16777216)
+  bytes[offset + 1] = math.floor(math.fmod(clamped, 16777216) / 65536)
+  bytes[offset + 2] = math.floor(math.fmod(clamped, 65536) / 256)
+  bytes[offset + 3] = math.fmod(clamped, 256)
 end
 
 function ChromaLink.Protocol.EncodeBytesToSymbols(bytes)
@@ -151,6 +154,34 @@ function ChromaLink.Protocol.ComposeSegmentSymbols(payloadSymbols)
   return symbols
 end
 
+local function BuildFrame(payload, frameType, schemaId, sequence)
+  local bytes = {}
+  local headerCrc
+  local payloadCrc
+  local payloadSymbols
+  local index
+
+  bytes[1] = string.byte("C")
+  bytes[2] = string.byte("L")
+  bytes[3] = (config.protocolVersion * 16) + config.profile.numericId
+  bytes[4] = (frameType * 16) + schemaId
+  bytes[5] = ClampByte(sequence)
+  bytes[6] = 0
+
+  headerCrc = ComputeCrc16(bytes, 1, 6)
+  AppendBigEndian16(bytes, 7, headerCrc)
+
+  for index = 1, 12 do
+    bytes[8 + index] = payload[index]
+  end
+
+  payloadCrc = ComputeCrc32C(payload)
+  AppendBigEndian32(bytes, 21, payloadCrc)
+  payloadSymbols = ChromaLink.Protocol.EncodeBytesToSymbols(bytes)
+
+  return bytes, ChromaLink.Protocol.ComposeSegmentSymbols(payloadSymbols)
+end
+
 function ChromaLink.Protocol.BuildCoreFrame(snapshot, sequence)
   local payload = {
     ClampByte(snapshot.playerStateFlags),
@@ -166,29 +197,15 @@ function ChromaLink.Protocol.BuildCoreFrame(snapshot, sequence)
     ClampByte(snapshot.playerCallingRolePacked),
     ClampByte(snapshot.targetCallingRelationPacked)
   }
-  local bytes = {}
-  local headerCrc
-  local payloadCrc
-  local payloadSymbols
-  local index
 
-  bytes[1] = string.byte("C")
-  bytes[2] = string.byte("L")
-  bytes[3] = (config.protocolVersion * 16) + config.profile.numericId
-  bytes[4] = (1 * 16) + 1
-  bytes[5] = ClampByte(sequence)
-  bytes[6] = 0
+  return BuildFrame(payload, frameTypes.coreStatus, 1, sequence)
+end
 
-  headerCrc = ComputeCrc16(bytes, 1, 6)
-  AppendBigEndian16(bytes, 7, headerCrc)
-
-  for index = 1, #payload do
-    bytes[8 + index] = payload[index]
-  end
-
-  payloadCrc = ComputeCrc32C(payload)
-  AppendBigEndian32(bytes, 21, payloadCrc)
-  payloadSymbols = ChromaLink.Protocol.EncodeBytesToSymbols(bytes)
-
-  return bytes, ChromaLink.Protocol.ComposeSegmentSymbols(payloadSymbols)
+function ChromaLink.Protocol.BuildPlayerVitalsFrame(snapshot, sequence)
+  local payload = {}
+  AppendBigEndian32(payload, 1, snapshot.healthCurrent)
+  AppendBigEndian32(payload, 5, snapshot.healthMax)
+  AppendBigEndian16(payload, 9, snapshot.resourceCurrent)
+  AppendBigEndian16(payload, 11, snapshot.resourceMax)
+  return BuildFrame(payload, frameTypes.playerVitals, 1, sequence)
 end

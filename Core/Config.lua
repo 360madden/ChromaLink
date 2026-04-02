@@ -48,6 +48,16 @@ ChromaLink.Config = {
   },
   preferHighestAvailableStrata = true,
   protocolVersion = 1,
+  frameTypes = {
+    coreStatus = 1,
+    playerVitals = 2
+  },
+  frameRotation = {
+    "coreStatus",
+    "coreStatus",
+    "coreStatus",
+    "playerVitals"
+  },
   syntheticMode = {
     enabled = false
   },
