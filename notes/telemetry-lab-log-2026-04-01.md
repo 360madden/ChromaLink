@@ -967,3 +967,111 @@ Keep.
 ### Saved Checkpoint
 
 - pending commit for reader-side telemetry aggregate
+
+---
+
+## 2026-04-02 - Session S - parallelized bridge assembly
+
+### Goal
+
+Use parallel work lanes to harden the bridge workflow without destabilizing the proven strip baseline.
+
+### Change
+
+- split the work into owned lanes for:
+  - CLI bridge contract
+  - inspector live snapshot support
+  - addon build and rotation status commands
+- harden the live telemetry JSON with:
+  - `contract.name = chromalink-live-telemetry`
+  - `contract.schemaVersion = 1`
+  - stable `profile` metadata
+  - stable `transport` metadata
+- make the inspector watch the rolling live snapshot and show aggregate state alongside capture analysis
+- add new read-only addon commands:
+  - `/cl build`
+  - `/cl version`
+  - `/cl caps`
+  - `/cl rotation`
+  - `/cl rotate`
+
+### Why
+
+At this stage the strip itself was already working. The best next move was to make the bridge easier to consume and easier to debug without changing transport geometry or decode behavior.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+dotnet build .\DesktopDotNet\ChromaLink.Inspector\ChromaLink.Inspector.csproj
+```
+
+```powershell
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- live 8 50 --backend screen
+```
+
+### Result
+
+- tests passed: `14/14`
+- inspector build succeeded
+- live sample stayed `Accepted` at `origin 0,0`, `pitch 2.8`, `scale 0.35`
+- CLI `live` now prints `TelemetryContract: chromalink-live-telemetry/v1`
+- the rolling JSON snapshot includes contract, profile, transport, aggregate, metrics, last detection, and last frame sections
+- the inspector now surfaces the live bridge snapshot details alongside artifact analysis
+- addon-side read-only commands now expose build flags and rotation info without changing the strip itself
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for parallelized bridge assembly
+
+---
+
+## 2026-04-02 - Session T - console telemetry consumer
+
+### Goal
+
+Add a minimal consumer on top of the live bridge so the latest merged telemetry state can be viewed without opening the inspector.
+
+### Change
+
+- add `scripts/Show-ChromaLinkTelemetry.ps1`
+- add `scripts/Show-ChromaLinkTelemetry.cmd`
+- support one-shot display and `-Watch` mode
+- read the rolling bridge snapshot instead of touching the decode path directly
+
+### Why
+
+Once the bridge contract was stable, the most practical finishing touch was a lightweight consumer that proves the snapshot is useful to downstream tools.
+
+### Verification
+
+```powershell
+.\scripts\Show-ChromaLinkTelemetry.cmd
+```
+
+### Result
+
+- the helper script read the rolling live snapshot successfully
+- one-shot output showed:
+  - contract version
+  - bridge readiness
+  - aggregate `CoreStatus`
+  - aggregate `PlayerVitals`
+  - aggregate `PlayerPosition`
+  - frame-type counts
+- the script needed one resilience fix so `Clear-Host` would not fail in non-interactive shells
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for console telemetry consumer

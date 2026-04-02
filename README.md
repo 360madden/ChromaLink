@@ -122,6 +122,13 @@ They also emit a compact aggregate summary showing the newest accepted `CoreStat
 
 While `live` or `watch` runs, the CLI also writes a rolling machine-readable snapshot to `%LOCALAPPDATA%\ChromaLink\DesktopDotNet\out\chromalink-live-telemetry.json`.
 
+The bridge snapshot now includes a small contract header:
+
+- `contract.name = chromalink-live-telemetry`
+- `contract.schemaVersion = 1`
+- stable `profile` metadata for the proven `P360C` baseline
+- stable `transport` metadata including reserved build-flag meanings
+
 Capture backend flag:
 
 - `--backend desktopdup|screen|printwindow`
@@ -135,6 +142,11 @@ Capture backend flag:
 ChromaLink exposes a small slash-command surface inside RIFT:
 
 - `/cl status`
+- `/cl build`
+- `/cl version`
+- `/cl caps`
+- `/cl rotation`
+- `/cl rotate`
 - `/cl diag`
 - `/cl refresh`
 - `/cl observer on`
@@ -149,6 +161,8 @@ ChromaLink exposes a small slash-command surface inside RIFT:
 What they are for:
 
 - `status` prints the current strip/layout summary
+- `build`, `version`, and `caps` print addon version, protocol/profile, frame types, and header capability flags
+- `rotation` and `rotate` print the active frame rotation sequence and heartbeat priority
 - `diag` adds nearby native RIFT frame summaries for overlap and layout checks
 - `refresh` forces an immediate strip redraw
 - `observer` toggles the optional observer lane below the strip
@@ -219,6 +233,7 @@ Useful helper scripts:
 - [scripts/Smoke-ChromaLink.cmd](scripts/Smoke-ChromaLink.cmd)
 - [scripts/Bench-ChromaLink.cmd](scripts/Bench-ChromaLink.cmd)
 - [scripts/Live-ChromaLink.cmd](scripts/Live-ChromaLink.cmd)
+- [scripts/Show-ChromaLinkTelemetry.cmd](scripts/Show-ChromaLinkTelemetry.cmd)
 - [scripts/Open-ChromaLink-Inspector.cmd](scripts/Open-ChromaLink-Inspector.cmd)
 - [scripts/Reload-RiftUi.cmd](scripts/Reload-RiftUi.cmd)
 - [scripts/Send-RiftSlash.cmd](scripts/Send-RiftSlash.cmd)
@@ -250,12 +265,27 @@ That runs the CLI in continuous watch mode and keeps `%LOCALAPPDATA%\ChromaLink\
 - most recent detection geometry
 - last decoded frame metadata
 - reserved build flags
+- bridge contract metadata for downstream consumers
+
+To read the latest merged telemetry snapshot from the console without opening the inspector:
+
+```powershell
+.\scripts\Show-ChromaLinkTelemetry.cmd
+```
+
+For a simple console watcher:
+
+```powershell
+.\scripts\Show-ChromaLinkTelemetry.cmd -Watch
+```
 
 `Reload-RiftUi.cmd` sends the normal RIFT `/reloadui` command to the active game window.
 
 `Send-RiftSlash.cmd` can send other ChromaLink slash commands when we explicitly want scripted in-game control.
 
 The slash-sender helpers now abort if RIFT does not actually become the foreground window, which is safer than typing into another app by mistake.
+
+The inspector also watches the live bridge snapshot now, so the details pane can show aggregate state, frame freshness, metrics, and last backend even when you are mainly inspecting BMP artifacts.
 
 ## Project Structure
 
