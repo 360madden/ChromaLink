@@ -1387,3 +1387,51 @@ Keep.
 ### Saved Checkpoint
 
 - pending commit for bridge contract hardening
+
+---
+
+## 2026-04-06 - Session Y - browser dashboard docs
+
+### Goal
+
+Document the browser dashboard as the browser-friendly companion to the local HTTP bridge.
+
+### Change
+
+- add a browser dashboard section to the README
+- name the browser dashboard launch helpers:
+  - `Open-ChromaLinkDashboard.cmd`
+  - `Open-ChromaLink-DashboardStack.cmd`
+- position it relative to:
+  - HTTP bridge
+  - live monitor
+  - inspector
+  - readiness script
+- keep the wording intentionally product-facing and non-committal about exact route names
+
+### Why
+
+The HTTP bridge was already the stable source of truth, so the next docs step was to explain where a browser-based view fits in the toolchain.
+
+### Verification
+
+- checked the updated README wording for consistency with the current HTTP bridge and live monitor sections
+- confirmed the docs still describe the inspector as the BMP/artifact tool and the readiness script as the automation gate
+
+### Result
+
+- the README now clearly distinguishes:
+  - HTTP bridge
+  - browser dashboard
+  - live monitor
+  - inspector
+  - readiness script
+- the browser dashboard now has explicit launch helpers documented in the wrapper list
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for browser dashboard docs
