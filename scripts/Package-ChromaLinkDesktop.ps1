@@ -9,24 +9,26 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
-  $OutputRoot = Join-Path $repoRoot "artifacts\desktop-stack\latest"
+  $OutputRoot = Join-Path $repoRoot "artifacts\package"
 }
+
+$desktopRoot = Join-Path $OutputRoot "desktop"
 
 $projects = @(
   [pscustomobject]@{
-    Name = "Cli"
+    Name = "ChromaLink.Cli"
     Project = Join-Path $repoRoot "DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj"
   },
   [pscustomobject]@{
-    Name = "HttpBridge"
+    Name = "ChromaLink.HttpBridge"
     Project = Join-Path $repoRoot "DesktopDotNet\ChromaLink.HttpBridge\ChromaLink.HttpBridge.csproj"
   },
   [pscustomobject]@{
-    Name = "Inspector"
+    Name = "ChromaLink.Inspector"
     Project = Join-Path $repoRoot "DesktopDotNet\ChromaLink.Inspector\ChromaLink.Inspector.csproj"
   },
   [pscustomobject]@{
-    Name = "Monitor"
+    Name = "ChromaLink.Monitor"
     Project = Join-Path $repoRoot "DesktopDotNet\ChromaLink.Monitor\ChromaLink.Monitor.csproj"
   }
 )
@@ -41,28 +43,41 @@ if (Test-Path $OutputRoot) {
   Remove-Item -LiteralPath $OutputRoot -Recurse -Force
 }
 
-New-Item -ItemType Directory -Path $OutputRoot | Out-Null
-
-$publishRoot = Join-Path $OutputRoot "publish"
-New-Item -ItemType Directory -Path $publishRoot | Out-Null
+New-Item -ItemType Directory -Path $desktopRoot -Force | Out-Null
 
 $published = @()
+$selfContainedValue = if ($SelfContained) { "true" } else { "false" }
 
 foreach ($project in $projects) {
-  $projectOutput = Join-Path $publishRoot $project.Name
-  New-Item -ItemType Directory -Path $projectOutput | Out-Null
+  $projectOutput = Join-Path $desktopRoot $project.Name
+  New-Item -ItemType Directory -Path $projectOutput -Force | Out-Null
+
+  $restoreArgs = @(
+    "restore",
+    $project.Project,
+    "--runtime", $Runtime
+  )
+
+  Write-Host "Restoring $($project.Name) for $Runtime" -ForegroundColor DarkCyan
+  & dotnet @restoreArgs
+  if ($LASTEXITCODE -ne 0) {
+    throw "dotnet restore failed for $($project.Name) with exit code $LASTEXITCODE"
+  }
 
   $args = @(
     "publish",
     $project.Project,
     "--configuration", $Configuration,
     "--runtime", $Runtime,
-    "--output", $projectOutput
+    "--self-contained", $selfContainedValue,
+    "--no-restore",
+    "--output", $projectOutput,
+    "-p:PublishSingleFile=false",
+    "-p:PublishTrimmed=false",
+    "-p:PublishReadyToRun=false",
+    "-p:DebugType=None",
+    "-p:UseAppHost=true"
   )
-
-  if ($SelfContained) {
-    $args += "-p:SelfContained=true"
-  }
 
   Write-Host "Publishing $($project.Name) -> $projectOutput" -ForegroundColor Cyan
   & dotnet @args
@@ -70,10 +85,16 @@ foreach ($project in $projects) {
     throw "dotnet publish failed for $($project.Name) with exit code $LASTEXITCODE"
   }
 
+  $entryPoint = Join-Path $projectOutput "$($project.Name).exe"
+  if (-not (Test-Path $entryPoint)) {
+    throw "Expected entry point not found: $entryPoint"
+  }
+
   $published += [pscustomobject]@{
     Name = $project.Name
     Project = $project.Project
     Output = $projectOutput
+    EntryPoint = $entryPoint
   }
 }
 
@@ -81,46 +102,50 @@ $manifest = [pscustomobject]@{
   GeneratedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
   RepoRoot = $repoRoot
   OutputRoot = $OutputRoot
+  DesktopRoot = $desktopRoot
   Configuration = $Configuration
   Runtime = $Runtime
   SelfContained = [bool]$SelfContained
-  PublishRoot = $publishRoot
+  PackageLayout = "desktop/<ProjectName>"
   Projects = $published
 }
 
 $manifestPath = Join-Path $OutputRoot "package-manifest.json"
 $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifestPath -Encoding utf8
 
-$readmePath = Join-Path $OutputRoot "README.txt"
-@"
-ChromaLink desktop package
+$readmePath = Join-Path $OutputRoot "README.md"
+@'
+# ChromaLink Desktop Package
 
-Output root:
-  $OutputRoot
+This folder is a predictable publish output assembled from the source repo.
 
-Published tools:
-  - Cli
-  - HttpBridge
-  - Inspector
-  - Monitor
+Layout:
 
-Launchers:
-  - Start-ChromaLinkStack.cmd
-  - Open-ChromaLinkDashboard.cmd
+- `desktop/ChromaLink.Cli/`
+- `desktop/ChromaLink.HttpBridge/`
+- `desktop/ChromaLink.Inspector/`
+- `desktop/ChromaLink.Monitor/`
+
+Common launchers:
+
+- `Start-ChromaLinkStack.cmd`
+- `Open-ChromaLinkDashboard.cmd`
 
 Notes:
-  - This package is framework-dependent unless -SelfContained is used.
-  - The HttpBridge should be started before opening the dashboard.
-  - The Monitor reads the live snapshot produced by the bridge/CLI.
-"@ | Set-Content -LiteralPath $readmePath -Encoding utf8
+
+- The package is framework-dependent unless `-SelfContained` is used.
+- The HTTP bridge should start before opening the dashboard.
+- The monitor reads the rolling snapshot produced by the bridge/CLI.
+- Each project folder keeps the published executable and its supporting DLLs together.
+'@ | Set-Content -LiteralPath $readmePath -Encoding utf8
 
 $startScript = Join-Path $OutputRoot "Start-ChromaLinkStack.cmd"
 @'
 @echo off
 setlocal
 
-start "" "%~dp0publish\HttpBridge\ChromaLink.HttpBridge.exe"
-start "" "%~dp0publish\Monitor\ChromaLink.Monitor.exe"
+start "" "%~dp0desktop\ChromaLink.HttpBridge\ChromaLink.HttpBridge.exe"
+start "" "%~dp0desktop\ChromaLink.Monitor\ChromaLink.Monitor.exe"
 
 exit /b 0
 '@ | Set-Content -LiteralPath $startScript -Encoding ascii

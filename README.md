@@ -436,6 +436,56 @@ The inspector also watches the live bridge snapshot now, so it can act as a live
 - the details pane shows aggregate state, frame freshness, metrics, and last backend
 - when no BMP is loaded, the inspector can still show useful live bridge state from the rolling snapshot
 
+## Packaged Output
+
+ChromaLink is still source-first in this repository. The packaged output is the assembled publish folder we want for handoff or run-from-folder use, not a replacement for the repo.
+
+Create it with:
+
+```powershell
+.\scripts\Package-ChromaLinkDesktop.ps1
+```
+
+The default package layout is:
+
+```text
+artifacts\package\
+├── README.md
+├── package-manifest.json
+├── Start-ChromaLinkStack.cmd
+├── Open-ChromaLinkDashboard.cmd
+└── desktop\
+    ├── ChromaLink.Cli\
+    ├── ChromaLink.HttpBridge\
+    ├── ChromaLink.Inspector\
+    └── ChromaLink.Monitor\
+```
+
+Use the packaged output when you want:
+
+- a predictable folder you can hand to another machine or workspace
+- the desktop tools assembled together without opening the source tree
+- the bridge, monitor, inspector, and dashboard to run from one stable layout
+
+Use the repo-native workflow when you want:
+
+- to edit Lua, reader, CLI, docs, or scripts directly
+- to run `dotnet build`, `dotnet test`, `smoke`, `capture-dump`, `live`, or `watch` from source
+- to keep the RIFT addon and desktop tools under active development
+
+Practical difference:
+
+- packaged output is the runnable product view
+- repo-native is the working view
+- both should keep the same bridge contract, live behavior, and validation results
+
+Package-emitted launchers are intentionally narrow:
+
+- `Start-ChromaLinkStack.cmd`
+- `Open-ChromaLinkDashboard.cmd`
+
+The broader helper surface in `scripts/` stays repo-native. That includes launchers such as `Open-ChromaLink-LiveStack.cmd`, `Open-ChromaLink-Monitor.cmd`, status helpers, stop helpers, and the probe/readiness scripts.
+
 ## Project Structure
 
 ```text

@@ -82,9 +82,112 @@ dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- cap
 
 Keep.
 
+---
+
+## 2026-04-02 - Session AD - packaged desktop output layout
+
+### Goal
+
+Define a predictable packaged output layout for the current desktop tools without changing telemetry behavior.
+
+### Change
+
+- add `scripts/Package-ChromaLinkDesktop.ps1`
+- add the `Package-ChromaLinkDesktop.cmd` wrapper
+- standardize the package root to `artifacts\package`
+- publish the desktop tools into `artifacts\package\desktop\<ProjectName>`
+- generate a package manifest and a small package README in the output folder
+
+### Why
+
+The desktop toolchain is now large enough that handoff and run-from-folder use need a repeatable layout instead of ad hoc publish output paths.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+.\scripts\Package-ChromaLinkDesktop.ps1
+```
+
+- reviewed the package script for the four desktop tools
+- confirmed the layout keeps the packaged output separate from source and source-first scripts
+- verified the publish tree under `artifacts\package\desktop\`
+
+### Result
+
+- the package output now has a clear, repeatable folder convention
+- the package layout is documented in the repo and generated in the output folder
+- the publish run completed successfully and wrote the expected four desktop tool folders
+
+### Decision
+
+Keep.
+
 ### Saved Checkpoint
 
 - commit `82a7d43` - `stabilize 640x360 capture baseline`
+
+---
+
+## 2026-04-02 - Session AE - packaged output validation and docs alignment
+
+### Goal
+
+Run the packaging path for real, confirm the output tree, and align the package docs with the script that actually ships the desktop bundle.
+
+### Change
+
+- run `scripts/Package-ChromaLinkDesktop.ps1` against the current worktree
+- verify the generated output root and manifest
+- align the README and plan note with the actual package layout
+- clarify that most helper scripts remain repo-native and are not copied into the packaged output
+
+### Why
+
+The packaging lane had landed in the worktree, but one plan note still described an older sample layout. The package story needed one authoritative shape before saving the milestone.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+.\scripts\Package-ChromaLinkDesktop.ps1
+```
+
+```powershell
+Get-Content .\artifacts\package\package-manifest.json
+```
+
+```powershell
+cmd /c .\artifacts\package\Start-ChromaLinkStack.cmd
+```
+
+### Result
+
+- tests passed: `20/20`
+- the package script completed successfully
+- the published output root is:
+  - `artifacts\package`
+- the package layout is:
+  - `desktop\ChromaLink.Cli`
+  - `desktop\ChromaLink.HttpBridge`
+  - `desktop\ChromaLink.Inspector`
+  - `desktop\ChromaLink.Monitor`
+  - `README.md`
+  - `package-manifest.json`
+  - `Start-ChromaLinkStack.cmd`
+  - `Open-ChromaLinkDashboard.cmd`
+- the emitted `Start-ChromaLinkStack.cmd` launcher successfully started the packaged HTTP bridge and monitor
+- the docs now explicitly distinguish package-emitted launchers from repo-native helper scripts
+
+### Decision
+
+Keep.
 
 ---
 
@@ -1557,3 +1660,35 @@ Keep.
 ### Saved Checkpoint
 
 - pending commit for lifecycle status and stop docs
+
+---
+
+## 2026-04-02 - Session AC - packaged output docs
+
+### Goal
+
+Document the difference between the source-first repo workflow and the packaged handoff output without changing behavior.
+
+### Change
+
+- add a concise packaged-output section to the README
+- describe when to use the packaged folder versus the repo-native workflow
+- keep the wording practical and product-facing
+
+### Why
+
+The project now has enough desktop tooling that the docs need to explain the handoff view separately from the active source tree view.
+
+### Verification
+
+- reread the new README section for consistency with the current helper names and live workflow
+- confirmed the docs describe the packaged output as a separate assembled folder rather than a replacement for the repo
+
+### Result
+
+- the README now distinguishes between packaged output and repo-native development
+- the docs stay aligned with the current source-first workflow
+
+### Decision
+
+Keep.

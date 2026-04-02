@@ -100,14 +100,15 @@ Assemble only if all of these remain healthy:
 
 Implemented with a lightweight publish helper that writes to:
 
-- `artifacts\desktop-stack\latest`
+- `artifacts\package`
 
 Package contents:
 
-- `publish\Cli`
-- `publish\HttpBridge`
-- `publish\Inspector`
-- `publish\Monitor`
+- `desktop\ChromaLink.Cli`
+- `desktop\ChromaLink.HttpBridge`
+- `desktop\ChromaLink.Inspector`
+- `desktop\ChromaLink.Monitor`
+- `README.md`
 - `Start-ChromaLinkStack.cmd`
 - `Open-ChromaLinkDashboard.cmd`
 - `package-manifest.json`
