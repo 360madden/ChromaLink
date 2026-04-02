@@ -1435,3 +1435,49 @@ Keep.
 ### Saved Checkpoint
 
 - pending commit for browser dashboard docs
+
+---
+
+## 2026-04-06 - Session Z - browser dashboard launch alignment
+
+### Goal
+
+Align the actual launcher scripts with the new browser dashboard workflow described in the docs.
+
+### Change
+
+- make `Open-ChromaLinkHttpBridge.cmd` open the bridge root by default instead of raw snapshot JSON
+- add `Open-ChromaLinkDashboard.cmd`
+- add `Open-ChromaLink-DashboardStack.cmd`
+
+### Why
+
+The dashboard pass introduced browser-oriented docs, so the launch scripts needed to match that product story instead of dropping users into raw JSON by default.
+
+### Verification
+
+```powershell
+cmd /c .\scripts\Open-ChromaLinkDashboard.cmd
+```
+
+```powershell
+cmd /c .\scripts\Open-ChromaLink-DashboardStack.cmd
+```
+
+```powershell
+cmd /c .\scripts\Open-ChromaLinkHttpBridge.cmd
+```
+
+### Result
+
+- the browser-oriented launchers all returned cleanly
+- the generic HTTP bridge opener now lands on the bridge root instead of raw JSON
+- the actual script set now matches the browser dashboard docs
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for browser dashboard launch alignment
