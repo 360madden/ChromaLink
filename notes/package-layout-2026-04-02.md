@@ -7,6 +7,8 @@ This note captures the package folder convention used by `scripts/Package-Chroma
 Default output root:
 
 - `artifacts\package`
+- self-contained release wrapper output:
+  - `artifacts\package-selfcontained`
 
 ## Layout
 

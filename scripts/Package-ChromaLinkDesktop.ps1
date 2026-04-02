@@ -67,6 +67,7 @@ foreach ($project in $projects) {
     "restore",
     $project.Project,
     "--runtime", $Runtime,
+    "-p:SelfContained=$selfContainedValue",
     "--force-evaluate"
   )
 

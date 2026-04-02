@@ -451,6 +451,12 @@ Create it with:
 .\scripts\Package-ChromaLinkDesktop.ps1
 ```
 
+Or build the self-contained release flavor with:
+
+```powershell
+.\scripts\Package-ChromaLinkDesktop-SelfContained.cmd
+```
+
 The default package layout is:
 
 ```text
@@ -469,6 +475,12 @@ artifacts\package\
     ├── ChromaLink.HttpBridge\
     ├── ChromaLink.Inspector\
     └── ChromaLink.Monitor\
+```
+
+Self-contained release output is written separately to:
+
+```text
+artifacts\package-selfcontained\
 ```
 
 Use the packaged output when you want:
@@ -518,6 +530,11 @@ Packaged workflow:
 3. Run `Open-ChromaLink-Product.cmd` for the normal first-run path
 4. If you want to inspect health directly, run `Status-ChromaLinkStack.cmd`
 5. Stop with `Stop-ChromaLinkStack.cmd`
+
+Package flavor guidance:
+
+- use `artifacts\package` when the target machine already has the matching .NET runtime
+- use `artifacts\package-selfcontained` when you want the safer handoff option for another Windows machine
 
 ## Project Structure
 

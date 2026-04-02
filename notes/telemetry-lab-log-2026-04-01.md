@@ -488,6 +488,56 @@ Keep.
 
 ---
 
+## 2026-04-02 - Session AK - self-contained release wrapper
+
+### Goal
+
+Make the self-contained package path easy enough to use as a normal release flow instead of a hidden optional switch.
+
+### Change
+
+- add `scripts/Package-ChromaLinkDesktop-SelfContained.cmd`
+- make it call `Package-ChromaLinkDesktop.ps1` with:
+  - `-SelfContained`
+  - `-OutputRoot artifacts\package-selfcontained`
+- update the README and package-layout note to distinguish:
+  - framework-dependent package
+  - self-contained package
+
+### Why
+
+The package had become a much better handoff product, but the self-contained path was still an implicit PowerShell option. Another Windows machine should not depend on remembering a hidden switch.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+.\scripts\Package-ChromaLinkDesktop-SelfContained.cmd
+```
+
+### Result
+
+- the self-contained release path is now explicit in the repo
+- the output location is clearly separated from the default package
+- the docs now explain when to use each package flavor
+- validation confirmed:
+  - `artifacts\package-selfcontained` was created successfully
+  - self-contained `package-manifest.json` reported `SelfContained = true`
+  - the self-contained package includes:
+    - `Open-ChromaLink-Product.cmd`
+    - `Start-ChromaLinkStack.cmd`
+    - `Status-ChromaLinkStack.cmd`
+    - `Stop-ChromaLinkStack.cmd`
+
+### Decision
+
+Keep.
+
+---
+
 ## 2026-04-01 - Session B - quiet default diagnostics
 
 ### Goal
