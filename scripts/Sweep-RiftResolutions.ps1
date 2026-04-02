@@ -9,6 +9,8 @@ param(
   [switch]$ReloadUi,
   [ValidateSet("desktopdup", "screen", "printwindow")]
   [string]$Backend = "printwindow",
+  [ValidateSet("leave", "off", "on")]
+  [string]$ObserverLane = "leave",
   [int]$Left = 40,
   [int]$Top = 40,
   [string]$OutputRoot = ""
@@ -19,6 +21,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $resizeScript = Join-Path $PSScriptRoot "Resize-RiftClient-640x360.ps1"
 $reloadScript = Join-Path $PSScriptRoot "Reload-RiftUi.ps1"
+$slashScript = Join-Path $PSScriptRoot "Send-RiftSlash.ps1"
 $projectPath = Join-Path $repoRoot "DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj"
 $captureRoot = Join-Path $env:LOCALAPPDATA "ChromaLink\DesktopDotNet\out"
 
@@ -28,6 +31,10 @@ if (-not (Test-Path $resizeScript)) {
 
 if (-not (Test-Path $reloadScript)) {
   throw "Reload script not found at $reloadScript"
+}
+
+if (-not (Test-Path $slashScript)) {
+  throw "Slash script not found at $slashScript"
 }
 
 if (-not (Test-Path $projectPath)) {
@@ -62,6 +69,11 @@ foreach ($resolution in $Resolutions) {
   if ($ReloadUi) {
     & powershell -NoProfile -ExecutionPolicy Bypass -File $reloadScript
     Start-Sleep -Milliseconds 1000
+  }
+
+  if ($ObserverLane -ne "leave") {
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $slashScript -CommandText "/cl observer $ObserverLane"
+    Start-Sleep -Milliseconds 500
   }
 
   & dotnet run --project $projectPath -- capture-dump --backend $Backend

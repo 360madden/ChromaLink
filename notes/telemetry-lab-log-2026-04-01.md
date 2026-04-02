@@ -191,6 +191,64 @@ Keep.
 
 ---
 
+## 2026-04-01 - Session D - observer lane automation
+
+### Goal
+
+Make the observer lane operational for scripted capture runs instead of relying on manual in-game toggles.
+
+### Change
+
+- add a generic slash-command helper script:
+  - `scripts/Send-RiftSlash.ps1`
+  - `scripts/Send-RiftSlash.cmd`
+- extend `Sweep-RiftResolutions.ps1` with:
+  - `-ObserverLane leave|off|on`
+- verify that `/cl observer on` can be sent automatically before a live capture
+
+### Why
+
+The observer lane only becomes truly useful for telemetry investigation if it can be enabled and disabled repeatably during scripted sweeps. That keeps future experiments reproducible and lowers the friction of capture collection.
+
+### Verification
+
+```powershell
+.\scripts\Send-RiftSlash.ps1 -CommandText '/cl observer on'
+```
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+.\scripts\Sweep-RiftResolutions.ps1 -Resolutions @('640x360') -ReloadUi -ObserverLane on -OutputRoot "$env:LOCALAPPDATA\ChromaLink\DesktopDotNet\out\resolution-sweep-640-observer-on"
+```
+
+```powershell
+.\scripts\Send-RiftSlash.ps1 -CommandText '/cl observer off'
+```
+
+### Result
+
+- tests passed: `7/7`
+- the scripted `/cl observer on` command reached the running client
+- the `640x360` live sweep still accepted with the observer lane enabled
+- live lock remained:
+  - `origin 0,0`
+  - `pitch 2.8`
+  - `scale 0.35`
+- the observer lane was then returned to `off` for normal play
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for observer automation milestone
+
+---
+
 ## Current Stable Baseline At End Of Log
 
 - target client: `640x360`

@@ -93,9 +93,17 @@ In-game slash commands:
 - [Live-ChromaLink.cmd](scripts/Live-ChromaLink.cmd)
 - [Open-ChromaLink-Inspector.cmd](scripts/Open-ChromaLink-Inspector.cmd)
 - [Reload-RiftUi.cmd](scripts/Reload-RiftUi.cmd)
+- [Send-RiftSlash.cmd](scripts/Send-RiftSlash.cmd)
 - [Resize-RiftClient-640x360.cmd](scripts/Resize-RiftClient-640x360.cmd)
 
 `Reload-RiftUi.cmd` sends the official RIFT `/reloadui` command to the active game window so addon changes can be refreshed without restarting the client.
+`Send-RiftSlash.cmd` can send other slash commands such as `/cl observer on`.
+
+Resolution sweeps can now control the observer lane directly:
+
+```powershell
+.\scripts\Sweep-RiftResolutions.ps1 -Resolutions @('640x360') -ReloadUi -ObserverLane on
+```
 
 ## Outputs
 
