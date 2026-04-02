@@ -159,12 +159,26 @@ if ($null -eq $snapshot) {
   if ($null -ne $aggregate) {
     Write-Host ("Ready: {0}" -f $aggregate.ready.ToString().ToLowerInvariant())
     Write-Host ("Healthy: {0}" -f $aggregate.healthy.ToString().ToLowerInvariant())
-    Write-Host ("Fresh: {0}" -f $aggregate.fresh.ToString().ToLowerInvariant())
     Write-Host ("Stale: {0}" -f $aggregate.stale.ToString().ToLowerInvariant())
     Write-Host ("AgeSeconds: {0:F2}" -f $ageSeconds)
     Write-Host ("AcceptedFrames: {0}" -f $aggregate.acceptedFrames)
-    if (-not [string]::IsNullOrWhiteSpace($frameCounts)) {
-      Write-Host ("FrameCounts: {0}" -f $frameCounts)
+    if ($null -ne $aggregate.freshness) {
+      Write-Host ("FreshWindowMs: {0}" -f $aggregate.freshness.windowMs)
+      Write-Host ("FreshFrames: {0}" -f $aggregate.freshness.freshFrameCount)
+      Write-Host ("StaleFrames: {0}" -f $aggregate.freshness.staleFrameCount)
+      Write-Host ("NewestFrameAgeMs: {0}" -f $aggregate.freshness.newestFrameAgeMs)
+      Write-Host ("OldestFrameAgeMs: {0}" -f $aggregate.freshness.oldestFrameAgeMs)
+      Write-Host ("LastUpdatedAgeMs: {0}" -f $aggregate.freshness.lastUpdatedAgeMs)
+    }
+    if ($null -ne $snapshot.metrics -and $null -ne $snapshot.metrics.frameTypeCounts) {
+      $frameCountParts = @()
+      foreach ($property in $snapshot.metrics.frameTypeCounts.PSObject.Properties) {
+        $frameName = $property.Name -replace '/schema-\d+$', ''
+        $frameCountParts += ("{0}={1}" -f $frameName, $property.Value)
+      }
+      if ($frameCountParts.Count -gt 0) {
+        Write-Host ("FrameCounts: {0}" -f ($frameCountParts -join ' '))
+      }
     }
   } else {
     Write-Host "Status: no aggregate"
@@ -174,7 +188,10 @@ if ($null -eq $snapshot) {
     Write-Host ("TelemetryContract: {0}/v{1}" -f $snapshot.contract.name, $snapshot.contract.schemaVersion)
   }
   if ($null -ne $snapshot.profile) {
-    Write-Host ("Profile: {0}" -f $snapshot.profile.name)
+    $profileLabel = if (-not [string]::IsNullOrWhiteSpace([string]$snapshot.profile.id)) { [string]$snapshot.profile.id } elseif (-not [string]::IsNullOrWhiteSpace([string]$snapshot.profile.name)) { [string]$snapshot.profile.name } else { '' }
+    if (-not [string]::IsNullOrWhiteSpace($profileLabel)) {
+      Write-Host ("Profile: {0}" -f $profileLabel)
+    }
   }
 }
 
