@@ -215,9 +215,47 @@
       gap: 16px;
     }
 
+    .dashboard-section {
+      display: grid;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .section-header {
+      display: grid;
+      gap: 4px;
+    }
+
+    .section-header h2 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: -0.03em;
+    }
+
+    .section-header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .cards-diagnostics {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .card-span-2 {
+      grid-column: span 2;
+    }
+
     .card {
       padding: 18px;
       background: var(--panel-strong);
+    }
+
+    .card-tools {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
     }
 
     .card-header {
@@ -325,12 +363,17 @@
 
     @media (max-width: 1180px) {
       .hero,
-      .cards {
+      .cards,
+      .cards-diagnostics {
         grid-template-columns: 1fr;
       }
 
       .summary-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .card-span-2 {
+        grid-column: auto;
       }
     }
 
@@ -409,82 +452,114 @@
           </div>
         </div>
 
-        <div class="actions">
-          <button id="refresh-button" type="button">Refresh</button>
-          <a class="button" href="/latest-snapshot" target="_blank" rel="noreferrer">Open JSON</a>
-          <a class="button" href="/health" target="_blank" rel="noreferrer">Health</a>
-          <a class="button" href="/ready" target="_blank" rel="noreferrer">Ready</a>
-        </div>
       </div>
     </section>
 
-    <section class="cards">
-      <article class="panel card">
-        <div class="card-header">
-          <div class="card-title">
-            <h2>Bridge Health</h2>
-            <span>Global readiness, freshness, and contract state</span>
+    <section class="dashboard-section">
+      <div class="section-header">
+        <h2>Primary Telemetry</h2>
+        <p>Player and target state you are most likely to check first during live play.</p>
+      </div>
+      <div class="cards">
+        <article class="panel card">
+          <div class="card-header">
+            <div class="card-title">
+              <h2>Player Overview</h2>
+              <span>Heartbeat, vitals, and coordinates</span>
+            </div>
+            <span class="pill warn" id="player-core-pill">waiting</span>
           </div>
-          <span class="pill warn" id="bridge-card-pill">waiting</span>
-        </div>
-        <div class="kv mono" id="bridge-kv"></div>
-      </article>
+          <div class="kv mono" id="player-core-kv"></div>
+        </article>
 
-      <article class="panel card">
-        <div class="card-header">
-          <div class="card-title">
-            <h2>Player Core</h2>
-            <span>Heartbeat, vitals, and coordinates</span>
+        <article class="panel card">
+          <div class="card-header">
+            <div class="card-title">
+              <h2>Target Overview</h2>
+              <span>Target vitals, resources, position, and aux cast</span>
+            </div>
+            <span class="pill warn" id="target-pill">waiting</span>
           </div>
-          <span class="pill warn" id="player-core-pill">waiting</span>
-        </div>
-        <div class="kv mono" id="player-core-kv"></div>
-      </article>
+          <div class="kv mono" id="target-kv"></div>
+        </article>
+      </div>
+    </section>
 
-      <article class="panel card">
-        <div class="card-header">
-          <div class="card-title">
-            <h2>Cast And Resources</h2>
-            <span>Cast state, mana, energy, and power lanes</span>
+    <section class="dashboard-section">
+      <div class="section-header">
+        <h2>Secondary Telemetry</h2>
+        <p>Cast state, resource lanes, combat pressure, and follow-unit context.</p>
+      </div>
+      <div class="cards">
+        <article class="panel card">
+          <div class="card-header">
+            <div class="card-title">
+              <h2>Cast And Resources</h2>
+              <span>Cast state, mana, energy, and power lanes</span>
+            </div>
+            <span class="pill warn" id="cast-pill">waiting</span>
           </div>
-          <span class="pill warn" id="cast-pill">waiting</span>
-        </div>
-        <div class="kv mono" id="cast-kv"></div>
-      </article>
+          <div class="kv mono" id="cast-kv"></div>
+        </article>
 
-      <article class="panel card">
-        <div class="card-header">
-          <div class="card-title">
-            <h2>Combat And Follow</h2>
-            <span>Combat flags, charges, and follow slot state</span>
+        <article class="panel card">
+          <div class="card-header">
+            <div class="card-title">
+              <h2>Combat And Follow</h2>
+              <span>Combat flags, charges, and follow slot state</span>
+            </div>
+            <span class="pill warn" id="combat-pill">waiting</span>
           </div>
-          <span class="pill warn" id="combat-pill">waiting</span>
-        </div>
-        <div class="kv mono" id="combat-kv"></div>
-      </article>
+          <div class="kv mono" id="combat-kv"></div>
+        </article>
+      </div>
+    </section>
 
-      <article class="panel card">
-        <div class="card-header">
-          <div class="card-title">
-            <h2>Target</h2>
-            <span>Target vitals, resources, position, and aux cast</span>
+    <section class="dashboard-section">
+      <div class="section-header">
+        <h2>Diagnostics</h2>
+        <p>Bridge detail, slower telemetry pages, and transport activity for troubleshooting.</p>
+      </div>
+      <div class="cards cards-diagnostics">
+        <article class="panel card card-span-2">
+          <div class="card-header">
+            <div class="card-title">
+              <h2>Bridge Diagnostics</h2>
+              <span>Snapshot timing, path, and inspection tools</span>
+            </div>
+            <span class="pill warn" id="bridge-card-pill">waiting</span>
           </div>
-          <span class="pill warn" id="target-pill">waiting</span>
-        </div>
-        <div class="kv mono" id="target-kv"></div>
-      </article>
+          <div class="kv mono" id="bridge-kv"></div>
+          <div class="card-tools">
+            <button id="refresh-button" type="button">Refresh</button>
+            <a class="button" href="/latest-snapshot" target="_blank" rel="noreferrer">Open JSON</a>
+            <a class="button" href="/health" target="_blank" rel="noreferrer">Health</a>
+            <a class="button" href="/ready" target="_blank" rel="noreferrer">Ready</a>
+          </div>
+        </article>
 
-      <article class="panel card">
-        <div class="card-header">
-          <div class="card-title">
-            <h2>Generic Pages</h2>
-            <span>Aura, text, ability watch, and frame activity</span>
+        <article class="panel card">
+          <div class="card-header">
+            <div class="card-title">
+              <h2>Telemetry Pages</h2>
+              <span>Aura, text, and ability-watch page snapshots</span>
+            </div>
+            <span class="pill warn" id="pages-pill">waiting</span>
           </div>
-          <span class="pill warn" id="pages-pill">waiting</span>
-        </div>
-        <div class="kv mono" id="pages-kv"></div>
-        <div class="frame-list frame-list-spaced mono" id="frame-list"></div>
-      </article>
+          <div class="kv mono" id="pages-kv"></div>
+        </article>
+
+        <article class="panel card">
+          <div class="card-header">
+            <div class="card-title">
+              <h2>Frame Activity</h2>
+              <span>Accepted frame counts by type</span>
+            </div>
+            <span class="pill warn" id="frames-pill">waiting</span>
+          </div>
+          <div class="frame-list frame-list-spaced mono" id="frame-list"></div>
+        </article>
+      </div>
     </section>
 
     <div class="footer mono" id="footer-text">Polling local HTTP bridge...</div>
@@ -510,6 +585,7 @@
     const combatPill = document.getElementById('combat-pill');
     const targetPill = document.getElementById('target-pill');
     const pagesPill = document.getElementById('pages-pill');
+    const framesPill = document.getElementById('frames-pill');
     const bridgeKv = document.getElementById('bridge-kv');
     const playerCoreKv = document.getElementById('player-core-kv');
     const castKv = document.getElementById('cast-kv');
@@ -641,7 +717,7 @@
         freshStat.textContent = '0';
         oldestStat.textContent = 'n/a';
         footerText.textContent = 'Polling local HTTP bridge...';
-        [bridgeCardPill, playerCorePill, castPill, combatPill, targetPill, pagesPill].forEach(pill => setPill(pill, { label: 'waiting', className: 'warn' }));
+        [bridgeCardPill, playerCorePill, castPill, combatPill, targetPill, pagesPill, framesPill].forEach(pill => setPill(pill, { label: 'waiting', className: 'warn' }));
         [bridgeKv, playerCoreKv, castKv, combatKv, targetKv, pagesKv].forEach(node => { node.innerHTML = ''; });
         frameList.innerHTML = '';
         return;
@@ -657,6 +733,9 @@
       const combatState = sectionState([aggregate.playerCombat, aggregate.followUnitStatus]);
       const targetState = sectionState([aggregate.targetVitals, aggregate.targetResources, aggregate.targetPosition, aggregate.auxUnitCast]);
       const pagesState = sectionState([aggregate.auraPage, aggregate.textPage, aggregate.abilityWatch]);
+      const frameState = Object.keys(snapshot.metrics?.frameTypeCounts || {}).length
+        ? { label: 'active', className: 'good' }
+        : { label: 'waiting', className: 'warn' };
 
       bridgeState.textContent = ready ? 'Bridge Ready' : (health.snapshotExists ? 'Bridge Stale' : 'Bridge Missing');
       bridgeDetail.textContent = `${health.contract?.name ?? 'unknown'} / v${health.contract?.schemaVersion ?? 0} / ${asText(snapshot.lastBackend, 'backend n/a')}`;
@@ -681,23 +760,23 @@
       setPill(combatPill, combatState);
       setPill(targetPill, targetState);
       setPill(pagesPill, pagesState);
+      setPill(framesPill, frameState);
 
       renderKv(bridgeKv, [
-        ['Ready', boolText(health.ready)],
-        ['Healthy', boolText(aggregate.healthy)],
-        ['Stale', boolText(aggregate.stale)],
-        ['Snapshot Exists', boolText(health.snapshotExists)],
-        ['Snapshot Age', health.snapshotAgeSeconds !== null ? `${health.snapshotAgeSeconds.toFixed(1)}s` : 'n/a'],
+        ['Latest Frame', snapshot.lastFrame ? `${snapshot.lastFrame.frameType} #${snapshot.lastFrame.sequence}` : 'n/a'],
+        ['Accepted Samples', asText(snapshot.metrics?.acceptedSamples, 0)],
+        ['Rejected Samples', asText(snapshot.metrics?.rejectedSamples, 0)],
         ['Fresh Window', freshness.windowMs !== undefined ? `${freshness.windowMs}ms` : 'n/a'],
+        ['Snapshot Age', health.snapshotAgeSeconds !== null ? `${health.snapshotAgeSeconds.toFixed(1)}s` : 'n/a'],
         ['Fresh Frames', asText(freshness.freshFrameCount)],
         ['Stale Frames', asText(freshness.staleFrameCount)],
-        ['Latest Frame', snapshot.lastFrame ? `${snapshot.lastFrame.frameType} #${snapshot.lastFrame.sequence}` : 'n/a'],
+        ['Healthy', boolText(aggregate.healthy)],
+        ['Snapshot Exists', boolText(health.snapshotExists)],
         ['Snapshot Path', asText(health.snapshotPath)]
       ]);
 
       renderKv(playerCoreKv, [
         ['Player HP %', q8ToPercent(aggregate.coreStatus?.playerHealthPctQ8)],
-        ['Target HP %', q8ToPercent(aggregate.coreStatus?.targetHealthPctQ8)],
         ['Vitals HP', aggregate.playerVitals ? `${aggregate.playerVitals.healthCurrent}/${aggregate.playerVitals.healthMax}` : 'n/a'],
         ['Vitals Resource', aggregate.playerVitals ? `${aggregate.playerVitals.resourceCurrent}/${aggregate.playerVitals.resourceMax}` : 'n/a'],
         ['Position', positionText(aggregate.playerPosition)],
@@ -736,6 +815,7 @@
       ]);
 
       renderKv(targetKv, [
+        ['Target HP %', q8ToPercent(aggregate.coreStatus?.targetHealthPctQ8)],
         ['Target HP', aggregate.targetVitals ? `${aggregate.targetVitals.healthCurrent}/${aggregate.targetVitals.healthMax}` : 'n/a'],
         ['Target Absorb', asText(aggregate.targetVitals?.absorb)],
         ['Target Alive', boolText(aggregate.targetVitals?.alive)],

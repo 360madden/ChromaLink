@@ -126,6 +126,41 @@ Keep.
 
 ---
 
+## 2026-04-02 - Session AF - dashboard organization pass
+
+### Goal
+
+Reorganize the dashboard into a more operator-first flow without adding features or changing the bridge contract.
+
+### Change
+
+- regroup the dashboard into `Primary Telemetry`, `Secondary Telemetry`, and `Diagnostics` sections
+- keep the hero focused on overall bridge status and summary counters
+- move refresh/JSON/health/ready controls into the diagnostics area
+- split frame activity into its own card instead of mixing it into telemetry pages
+- trim the bridge diagnostics card so it emphasizes transport detail rather than repeating the hero state
+- document the plan in `notes/next-product-plan-2026-04-02-dashboard-organization-pass.md`
+
+### Why
+
+The previous dashboard was readable, but it still reflected transport slice structure more than the way an operator naturally checks the system.
+
+### Verification
+
+- built `DesktopDotNet/ChromaLink.HttpBridge/ChromaLink.HttpBridge.csproj`
+- sanity-checked the updated HTML structure and client-side bindings after the reorganization
+
+### Result
+
+- the page now reads more naturally from live status, to player/target telemetry, to secondary state, to diagnostics
+- bridge tools and transport detail are still available, but no longer compete with the primary telemetry view at the top
+
+### Decision
+
+Keep.
+
+---
+
 ## 2026-04-02 - Session AE - dashboard upgrade and pinned access
 
 ### Goal
