@@ -235,6 +235,9 @@ Useful helper scripts:
 - [scripts/Bench-ChromaLink.cmd](scripts/Bench-ChromaLink.cmd)
 - [scripts/Live-ChromaLink.cmd](scripts/Live-ChromaLink.cmd)
 - [scripts/Show-ChromaLinkTelemetry.cmd](scripts/Show-ChromaLinkTelemetry.cmd)
+- [scripts/Watch-ChromaLinkTelemetry.cmd](scripts/Watch-ChromaLinkTelemetry.cmd)
+- [scripts/Open-ChromaLinkTelemetryJson.cmd](scripts/Open-ChromaLinkTelemetryJson.cmd)
+- [scripts/Open-ChromaLinkTelemetryFolder.cmd](scripts/Open-ChromaLinkTelemetryFolder.cmd)
 - [scripts/Open-ChromaLink-Inspector.cmd](scripts/Open-ChromaLink-Inspector.cmd)
 - [scripts/Reload-RiftUi.cmd](scripts/Reload-RiftUi.cmd)
 - [scripts/Send-RiftSlash.cmd](scripts/Send-RiftSlash.cmd)
@@ -280,6 +283,12 @@ For a simple console watcher:
 ```powershell
 .\scripts\Show-ChromaLinkTelemetry.cmd -Watch
 ```
+
+If you want a one-click version:
+
+- `Watch-ChromaLinkTelemetry.cmd` keeps the console snapshot view live
+- `Open-ChromaLinkTelemetryJson.cmd` opens the raw snapshot file
+- `Open-ChromaLinkTelemetryFolder.cmd` opens the telemetry output folder
 
 For an automation-friendly readiness check that exits nonzero when the bridge is stale or missing:
 
