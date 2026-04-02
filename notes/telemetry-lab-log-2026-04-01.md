@@ -1278,7 +1278,7 @@ Keep.
 
 ---
 
-## 2026-04-04 - Session W - planned local HTTP bridge docs
+## 2026-04-04 - Session W - local HTTP bridge docs
 
 ### Goal
 
@@ -1286,9 +1286,9 @@ Document the upcoming local HTTP bridge so it fits cleanly beside the rolling sn
 
 ### Change
 
-- add a planned local HTTP bridge section to the README
-- anchor the bridge to the expected `DesktopDotNet/ChromaLink.HttpBridge` project name
-- reference the expected helper scripts:
+- add a local HTTP bridge section to the README
+- anchor the bridge to the `DesktopDotNet/ChromaLink.HttpBridge` project name
+- reference the helper scripts:
   - `Open-ChromaLinkHttpBridge.cmd`
   - `Launch-ChromaLinkHttpBridge.cmd`
   - `Probe-ChromaLinkHttpBridge.cmd`
@@ -1302,16 +1302,16 @@ Document the upcoming local HTTP bridge so it fits cleanly beside the rolling sn
 
 ### Why
 
-The docs needed to make room for the next layer without pretending the HTTP bridge was already a replacement for the existing bridge contract.
+The docs needed to make room for the HTTP bridge layer while keeping the rolling snapshot contract as the source of truth.
 
 ### Verification
 
 - confirmed the current docs tree and tool layout
-- checked that the README and plan note describe the HTTP bridge as planned and local-only
+- checked that the README and plan note describe the HTTP bridge as local-only and contract-backed
 
 ### Result
 
-- the planned HTTP bridge now has a clear place in the product story
+- the HTTP bridge now has a clear place in the product story
 - the current tools remain the authoritative path for snapshots and readiness
 
 ### Decision
@@ -1320,4 +1320,4 @@ Keep.
 
 ### Saved Checkpoint
 
-- pending commit for planned local HTTP bridge docs
+- pending commit for local HTTP bridge docs

@@ -363,6 +363,7 @@ If you want a one-click version:
 - `Watch-ChromaLinkTelemetry.cmd` keeps the console snapshot view live
 - `Open-ChromaLinkTelemetryJson.cmd` opens the raw snapshot file
 - `Open-ChromaLinkTelemetryFolder.cmd` opens the telemetry output folder
+- `Open-ChromaLink-LiveStack.cmd` starts the bridge plus monitor workflow
 
 For an automation-friendly readiness check that exits nonzero when the bridge is stale or missing:
 
