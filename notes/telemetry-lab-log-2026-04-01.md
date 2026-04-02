@@ -1215,3 +1215,49 @@ Keep.
 ### Saved Checkpoint
 
 - pending commit for live monitor launch and discovery
+
+---
+
+## 2026-04-04 - Session W - planned local HTTP bridge docs
+
+### Goal
+
+Document the upcoming local HTTP bridge so it fits cleanly beside the rolling snapshot, live monitor, inspector, and readiness script.
+
+### Change
+
+- add a planned local HTTP bridge section to the README
+- anchor the bridge to the expected `DesktopDotNet/ChromaLink.HttpBridge` project name
+- reference the expected helper scripts:
+  - `Open-ChromaLinkHttpBridge.cmd`
+  - `Launch-ChromaLinkHttpBridge.cmd`
+  - `Probe-ChromaLinkHttpBridge.cmd`
+- describe the intended division of labor:
+  - JSON snapshot as the source of truth
+  - live monitor for human viewing
+  - inspector for BMP/overlay analysis
+  - readiness script for automation checks
+  - HTTP bridge for local tool integration
+- keep the HTTP wording intentionally flexible so it can absorb the eventual project and endpoint names
+
+### Why
+
+The docs needed to make room for the next layer without pretending the HTTP bridge was already a replacement for the existing bridge contract.
+
+### Verification
+
+- confirmed the current docs tree and tool layout
+- checked that the README and plan note describe the HTTP bridge as planned and local-only
+
+### Result
+
+- the planned HTTP bridge now has a clear place in the product story
+- the current tools remain the authoritative path for snapshots and readiness
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for planned local HTTP bridge docs

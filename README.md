@@ -242,6 +242,22 @@ Use the live monitor when you want a product-style view of the rolling bridge sn
 - `Watch-ChromaLinkTelemetry.cmd` opens the console snapshot view if you want something lighter than the GUI
 - `Test-ChromaLinkTelemetryReady.cmd` is the automation-friendly gate for readiness and freshness
 
+## Local HTTP Bridge
+
+The next planned layer is a tiny local HTTP bridge on top of the same rolling snapshot contract.
+The bridge project is expected to live in `DesktopDotNet/ChromaLink.HttpBridge`.
+
+It should fit alongside the current tools like this:
+
+- the rolling JSON snapshot remains the source of truth
+- the live monitor stays the human-facing live viewer
+- the inspector stays the BMP and overlay analyzer
+- the readiness script stays the automation gate
+- the HTTP bridge will make the same live state easier for other local tools to consume
+- `Open-ChromaLinkHttpBridge.cmd`, `Launch-ChromaLinkHttpBridge.cmd`, and `Probe-ChromaLinkHttpBridge.cmd` are the expected bridge helpers
+
+The intended shape is local-only and lightweight, and it should read the snapshot rather than bypassing the existing bridge contract.
+
 Recommended workflow:
 
 1. Start `Bridge-ChromaLink.cmd` or `Watch-ChromaLinkTelemetry.cmd`
