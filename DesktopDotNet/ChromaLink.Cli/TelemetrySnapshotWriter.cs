@@ -3,6 +3,9 @@ using ChromaLink.Reader;
 
 internal static class TelemetrySnapshotWriter
 {
+    public const int ContractSchemaVersion = 1;
+    public const string ContractName = "chromalink-live-telemetry";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true
@@ -15,11 +18,39 @@ internal static class TelemetrySnapshotWriter
         FrameValidationResult? lastValidation)
     {
         var outDirectory = PathProvider.EnsureOutDirectory();
-        var path = Path.Combine(outDirectory, "chromalink-live-telemetry.json");
+        var path = Path.Combine(outDirectory, $"{ContractName}.json");
         var payload = new
         {
             artifactKind = "live-telemetry",
+            contract = new
+            {
+                name = ContractName,
+                schemaVersion = ContractSchemaVersion
+            },
             generatedAtUtc = DateTime.UtcNow,
+            profile = new
+            {
+                id = "P360C",
+                numericId = 1,
+                windowWidth = 640,
+                windowHeight = 360,
+                bandWidth = 640,
+                bandHeight = 24,
+                segmentCount = 80,
+                segmentWidth = 8,
+                segmentHeight = 24,
+                payloadStartIndex = 9,
+                payloadSymbolCount = 64
+            },
+            transport = new
+            {
+                protocolVersion = 1,
+                reservedFlags = new
+                {
+                    multiFrameRotation = 1,
+                    playerPosition = 2
+                }
+            },
             aggregate = new
             {
                 acceptedFrames = aggregate.AcceptedFrames,

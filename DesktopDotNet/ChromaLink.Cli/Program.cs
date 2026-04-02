@@ -293,6 +293,7 @@ internal sealed class CliApp
         }
         if (telemetrySnapshotPath is not null)
         {
+            Console.WriteLine($"TelemetryContract: {TelemetrySnapshotWriter.ContractName}/v{TelemetrySnapshotWriter.ContractSchemaVersion}");
             Console.WriteLine($"TelemetrySnapshot: {telemetrySnapshotPath}");
         }
 
