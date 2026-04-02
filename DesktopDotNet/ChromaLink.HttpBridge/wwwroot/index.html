@@ -8,159 +8,246 @@
     :root {
       color-scheme: dark;
       --bg: #07111d;
-      --panel: rgba(12, 19, 31, 0.92);
-      --line: rgba(142, 171, 219, 0.2);
-      --text: #edf4ff;
-      --muted: #99aecf;
-      --good: #64f0aa;
-      --warn: #f4c56a;
-      --bad: #ff7f7f;
-      --shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+      --bg-2: #0b1728;
+      --panel: rgba(10, 18, 30, 0.9);
+      --panel-strong: rgba(13, 24, 39, 0.96);
+      --line: rgba(133, 176, 230, 0.18);
+      --line-strong: rgba(133, 176, 230, 0.34);
+      --text: #edf5ff;
+      --muted: #96abc8;
+      --good: #6cf0b0;
+      --warn: #f1c56f;
+      --bad: #ff8585;
+      --accent: #8fd6ff;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+      --radius: 20px;
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     body {
       margin: 0;
       min-height: 100vh;
-      font: 14px/1.5 "Segoe UI", system-ui, sans-serif;
+      font: 14px/1.45 "Segoe UI", system-ui, sans-serif;
       color: var(--text);
       background:
-        radial-gradient(circle at top left, rgba(133, 210, 255, 0.15), transparent 28%),
-        radial-gradient(circle at top right, rgba(100, 240, 170, 0.11), transparent 24%),
-        linear-gradient(180deg, #07111d 0%, var(--bg) 100%);
+        radial-gradient(circle at top left, rgba(143, 214, 255, 0.16), transparent 24%),
+        radial-gradient(circle at top right, rgba(108, 240, 176, 0.12), transparent 22%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
     }
 
     .shell {
-      max-width: 1220px;
+      max-width: 1380px;
       margin: 0 auto;
-      padding: 22px;
+      padding: 24px;
     }
 
     .hero {
       display: grid;
-      grid-template-columns: 1.5fr 1fr;
-      gap: 16px;
-      margin-bottom: 16px;
+      grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr);
+      gap: 18px;
+      margin-bottom: 18px;
     }
 
     .panel {
       background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 18px;
+      border-radius: var(--radius);
       box-shadow: var(--shadow);
       backdrop-filter: blur(12px);
     }
 
     .hero-main {
-      padding: 24px;
+      padding: 26px;
     }
 
     h1 {
-      margin: 0 0 10px;
-      font-size: clamp(30px, 5vw, 48px);
-      letter-spacing: -0.04em;
-      line-height: 1;
+      margin: 0 0 12px;
+      font-size: clamp(34px, 5vw, 56px);
+      line-height: 0.95;
+      letter-spacing: -0.05em;
     }
 
     .lede {
-      margin: 0 0 18px;
-      max-width: 70ch;
+      margin: 0;
+      max-width: 72ch;
       color: var(--muted);
+      font-size: 15px;
     }
 
-    .chips {
+    .chip-row {
       display: flex;
-      gap: 8px;
       flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
     }
 
     .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 11px;
+      border-radius: 999px;
       border: 1px solid var(--line);
       background: rgba(255, 255, 255, 0.04);
-      border-radius: 999px;
-      padding: 6px 10px;
       color: var(--muted);
       font-size: 12px;
+      letter-spacing: 0.02em;
     }
 
     .hero-side {
-      padding: 18px;
       display: grid;
       gap: 12px;
+      padding: 18px;
       align-content: start;
     }
 
-    .status {
+    .status-card {
+      display: grid;
+      gap: 14px;
+      padding: 18px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .status-title {
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 12px;
-      padding: 16px;
-      border-radius: 14px;
-      border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.04);
     }
 
-    .status strong {
+    .status-title strong {
       display: block;
-      font-size: 22px;
-      margin-bottom: 2px;
+      font-size: 24px;
+    }
+
+    .status-subtitle {
+      color: var(--muted);
     }
 
     .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
       border-radius: 999px;
       border: 1px solid var(--line);
-      padding: 6px 10px;
       font-size: 12px;
       white-space: nowrap;
     }
 
-    .good { color: var(--good); }
-    .warn { color: var(--warn); }
-    .bad { color: var(--bad); }
+    .pill.good,
+    .dot.good {
+      color: var(--good);
+    }
+
+    .pill.warn,
+    .dot.warn {
+      color: var(--warn);
+    }
+
+    .pill.bad,
+    .dot.bad {
+      color: var(--bad);
+    }
 
     .actions {
       display: flex;
-      gap: 8px;
       flex-wrap: wrap;
+      gap: 8px;
     }
 
-    button, a.button {
+    button,
+    a.button {
       appearance: none;
       border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.04);
+      background: rgba(255, 255, 255, 0.045);
       color: var(--text);
       border-radius: 12px;
       padding: 10px 12px;
       font: inherit;
       cursor: pointer;
       text-decoration: none;
+      transition: border-color 120ms ease, background 120ms ease;
     }
 
-    button:hover, a.button:hover {
-      border-color: rgba(133, 210, 255, 0.45);
+    button:hover,
+    a.button:hover {
+      border-color: var(--line-strong);
+      background: rgba(255, 255, 255, 0.08);
     }
 
-    .grid {
+    .summary-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .summary-stat {
+      padding: 14px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .summary-stat span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .summary-stat strong {
+      display: block;
+      font-size: 22px;
+      line-height: 1.05;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 16px;
     }
 
     .card {
       padding: 18px;
+      background: var(--panel-strong);
     }
 
-    .card h2 {
-      margin: 0 0 12px;
-      font-size: 16px;
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .card-title {
+      display: grid;
+      gap: 3px;
+    }
+
+    .card-title h2 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: -0.03em;
+    }
+
+    .card-title span {
+      color: var(--muted);
+      font-size: 12px;
     }
 
     .kv {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
-      gap: 8px 12px;
+      gap: 9px 12px;
       align-items: center;
     }
 
@@ -183,15 +270,77 @@
       font-size: 12px;
     }
 
+    .frame-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .frame-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    .dot {
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .frame-row strong {
+      white-space: nowrap;
+    }
+
+    .frame-row span {
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     .footer {
       margin-top: 16px;
       color: var(--muted);
       font-size: 12px;
     }
 
-    @media (max-width: 900px) {
-      .hero, .grid {
+    @media (max-width: 1180px) {
+      .hero,
+      .cards {
         grid-template-columns: 1fr;
+      }
+
+      .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 720px) {
+      .shell {
+        padding: 16px;
+      }
+
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .status-title {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .kv,
+      .frame-row {
+        grid-template-columns: 1fr;
+      }
+
+      .kv strong,
+      .frame-row strong {
+        text-align: left;
       }
     }
   </style>
@@ -200,26 +349,50 @@
   <main class="shell">
     <section class="hero">
       <div class="panel hero-main">
-        <h1>ChromaLink Dashboard</h1>
+        <h1>ChromaLink Live Dashboard</h1>
         <p class="lede">
-          A tiny browser view of the live bridge contract. It reads the local HTTP bridge and shows
-          readiness, freshness, and the current telemetry state without opening the WinForms monitor.
+          A local telemetry cockpit for the live bridge contract. This view stays tied to the same
+          rolling snapshot as the CLI, monitor, and readiness checks, but exposes more of the active
+          telemetry surface at a glance.
         </p>
-        <div class="chips">
+        <div class="chip-row">
           <span class="chip" id="contract-chip">contract: loading</span>
           <span class="chip" id="freshness-chip">freshness: loading</span>
-          <span class="chip" id="frames-chip">frames: loading</span>
+          <span class="chip" id="backend-chip">backend: loading</span>
+          <span class="chip" id="flags-chip">flags: loading</span>
         </div>
       </div>
 
       <div class="panel hero-side">
-        <div class="status">
-          <div>
-            <strong id="bridge-state">Loading</strong>
-            <span id="bridge-detail">Waiting for bridge snapshot</span>
+        <div class="status-card">
+          <div class="status-title">
+            <div>
+              <strong id="bridge-state">Loading</strong>
+              <div class="status-subtitle" id="bridge-detail">Waiting for local bridge data</div>
+            </div>
+            <span class="pill warn" id="bridge-pill">connecting</span>
           </div>
-          <span class="pill warn" id="bridge-pill">connecting</span>
+
+          <div class="summary-grid">
+            <div class="summary-stat">
+              <span>Accepted</span>
+              <strong id="accepted-stat">0</strong>
+            </div>
+            <div class="summary-stat">
+              <span>Frame Types</span>
+              <strong id="types-stat">0</strong>
+            </div>
+            <div class="summary-stat">
+              <span>Fresh Frames</span>
+              <strong id="fresh-stat">0</strong>
+            </div>
+            <div class="summary-stat">
+              <span>Oldest Age</span>
+              <strong id="oldest-stat">n/a</strong>
+            </div>
+          </div>
         </div>
+
         <div class="actions">
           <button id="refresh-button" type="button">Refresh</button>
           <a class="button" href="/latest-snapshot" target="_blank" rel="noreferrer">Open JSON</a>
@@ -229,18 +402,72 @@
       </div>
     </section>
 
-    <section class="grid">
+    <section class="cards">
       <article class="panel card">
-        <h2>Bridge</h2>
+        <div class="card-header">
+          <div class="card-title">
+            <h2>Bridge Health</h2>
+            <span>Global readiness, freshness, and contract state</span>
+          </div>
+          <span class="pill warn" id="bridge-card-pill">waiting</span>
+        </div>
         <div class="kv mono" id="bridge-kv"></div>
       </article>
+
       <article class="panel card">
-        <h2>Telemetry</h2>
-        <div class="kv mono" id="telemetry-kv"></div>
+        <div class="card-header">
+          <div class="card-title">
+            <h2>Player Core</h2>
+            <span>Heartbeat, vitals, and coordinates</span>
+          </div>
+          <span class="pill warn" id="player-core-pill">waiting</span>
+        </div>
+        <div class="kv mono" id="player-core-kv"></div>
       </article>
+
       <article class="panel card">
-        <h2>Snapshot</h2>
-        <div class="kv mono" id="snapshot-kv"></div>
+        <div class="card-header">
+          <div class="card-title">
+            <h2>Cast And Resources</h2>
+            <span>Cast state, mana, energy, and power lanes</span>
+          </div>
+          <span class="pill warn" id="cast-pill">waiting</span>
+        </div>
+        <div class="kv mono" id="cast-kv"></div>
+      </article>
+
+      <article class="panel card">
+        <div class="card-header">
+          <div class="card-title">
+            <h2>Combat And Follow</h2>
+            <span>Combat flags, charges, and follow slot state</span>
+          </div>
+          <span class="pill warn" id="combat-pill">waiting</span>
+        </div>
+        <div class="kv mono" id="combat-kv"></div>
+      </article>
+
+      <article class="panel card">
+        <div class="card-header">
+          <div class="card-title">
+            <h2>Target</h2>
+            <span>Target vitals, resources, position, and aux cast</span>
+          </div>
+          <span class="pill warn" id="target-pill">waiting</span>
+        </div>
+        <div class="kv mono" id="target-kv"></div>
+      </article>
+
+      <article class="panel card">
+        <div class="card-header">
+          <div class="card-title">
+            <h2>Generic Pages</h2>
+            <span>Aura, text, ability watch, and frame activity</span>
+          </div>
+          <span class="pill warn" id="pages-pill">waiting</span>
+        </div>
+        <div class="kv mono" id="pages-kv"></div>
+        <div class="frame-list mono" id="frame-list" style="margin-top: 14px;"></div>
       </article>
     </section>
 
@@ -255,10 +482,25 @@
     const bridgePill = document.getElementById('bridge-pill');
     const contractChip = document.getElementById('contract-chip');
     const freshnessChip = document.getElementById('freshness-chip');
-    const framesChip = document.getElementById('frames-chip');
+    const backendChip = document.getElementById('backend-chip');
+    const flagsChip = document.getElementById('flags-chip');
+    const acceptedStat = document.getElementById('accepted-stat');
+    const typesStat = document.getElementById('types-stat');
+    const freshStat = document.getElementById('fresh-stat');
+    const oldestStat = document.getElementById('oldest-stat');
+    const bridgeCardPill = document.getElementById('bridge-card-pill');
+    const playerCorePill = document.getElementById('player-core-pill');
+    const castPill = document.getElementById('cast-pill');
+    const combatPill = document.getElementById('combat-pill');
+    const targetPill = document.getElementById('target-pill');
+    const pagesPill = document.getElementById('pages-pill');
     const bridgeKv = document.getElementById('bridge-kv');
-    const telemetryKv = document.getElementById('telemetry-kv');
-    const snapshotKv = document.getElementById('snapshot-kv');
+    const playerCoreKv = document.getElementById('player-core-kv');
+    const castKv = document.getElementById('cast-kv');
+    const combatKv = document.getElementById('combat-kv');
+    const targetKv = document.getElementById('target-kv');
+    const pagesKv = document.getElementById('pages-kv');
+    const frameList = document.getElementById('frame-list');
     const footerText = document.getElementById('footer-text');
 
     document.getElementById('refresh-button').addEventListener('click', refresh);
@@ -273,8 +515,76 @@
       return value === null || value === undefined || value === '' ? fallback : String(value);
     }
 
+    function q8ToPercent(value) {
+      if (value === null || value === undefined) {
+        return 'n/a';
+      }
+      return `${Math.round((Number(value) / 255) * 100)}%`;
+    }
+
+    function secondsText(value) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) {
+        return 'n/a';
+      }
+      return `${Number(value).toFixed(2)}s`;
+    }
+
+    function positionText(source) {
+      if (!source) {
+        return 'n/a';
+      }
+      return `${asText(source.x)}, ${asText(source.y)}, ${asText(source.z)}`;
+    }
+
+    function ageText(frame) {
+      return frame && frame.ageMs !== null && frame.ageMs !== undefined ? `${Math.round(frame.ageMs)}ms` : 'n/a';
+    }
+
     function boolText(value) {
       return value ? 'true' : 'false';
+    }
+
+    function sectionState(frames) {
+      const present = frames.filter(Boolean);
+      if (!present.length) {
+        return { label: 'missing', className: 'bad' };
+      }
+
+      if (present.some(frame => frame.stale)) {
+        return { label: 'stale', className: 'warn' };
+      }
+
+      return { label: 'fresh', className: 'good' };
+    }
+
+    function setPill(element, stateInfo) {
+      element.textContent = stateInfo.label;
+      element.className = `pill ${stateInfo.className}`;
+    }
+
+    function renderKv(element, pairs) {
+      element.innerHTML = pairs
+        .map(([label, value]) => `<span>${label}</span><strong>${asText(value)}</strong>`)
+        .join('');
+    }
+
+    function renderFrameCounts(counts) {
+      const entries = Object.entries(counts || {})
+        .sort((left, right) => right[1] - left[1]);
+
+      if (!entries.length) {
+        frameList.innerHTML = '<div class="frame-row"><strong>No accepted frame counts yet</strong><span>waiting</span><span class="dot warn">•</span></div>';
+        return;
+      }
+
+      frameList.innerHTML = entries
+        .map(([name, count]) => `
+          <div class="frame-row">
+            <span class="dot good">•</span>
+            <strong>${name}</strong>
+            <span>${count}</span>
+          </div>`)
+        .join('');
     }
 
     function render() {
@@ -283,54 +593,144 @@
 
       if (!health || !snapshot) {
         bridgeState.textContent = 'Waiting';
-        bridgeDetail.textContent = state.lastError ? state.lastError : 'Waiting for bridge data';
+        bridgeDetail.textContent = state.lastError || 'Waiting for bridge data';
         bridgePill.textContent = 'connecting';
         bridgePill.className = 'pill warn';
+        contractChip.textContent = 'contract: loading';
+        freshnessChip.textContent = 'freshness: loading';
+        backendChip.textContent = 'backend: loading';
+        flagsChip.textContent = 'flags: loading';
+        acceptedStat.textContent = '0';
+        typesStat.textContent = '0';
+        freshStat.textContent = '0';
+        oldestStat.textContent = 'n/a';
         footerText.textContent = 'Polling local HTTP bridge...';
-        bridgeKv.innerHTML = '';
-        telemetryKv.innerHTML = '';
-        snapshotKv.innerHTML = '';
+        [bridgeCardPill, playerCorePill, castPill, combatPill, targetPill, pagesPill].forEach(pill => setPill(pill, { label: 'waiting', className: 'warn' }));
+        [bridgeKv, playerCoreKv, castKv, combatKv, targetKv, pagesKv].forEach(node => { node.innerHTML = ''; });
+        frameList.innerHTML = '';
         return;
       }
 
+      const aggregate = snapshot.aggregate || {};
+      const freshness = aggregate.freshness || {};
       const ready = Boolean(health.ready && health.fresh);
-      const pillClass = ready ? 'good' : (health.snapshotExists ? 'warn' : 'bad');
-      bridgeState.textContent = ready ? 'Ready' : (health.snapshotExists ? 'Stale' : 'Missing');
-      bridgeDetail.textContent = `${health.contract?.name ?? 'unknown'} / v${health.contract?.schemaVersion ?? 0}`;
-      bridgePill.textContent = ready ? 'healthy' : (health.snapshotExists ? 'stale' : 'missing');
-      bridgePill.className = `pill ${pillClass}`;
+      const bridgeClass = ready ? 'good' : (health.snapshotExists ? 'warn' : 'bad');
+      const bridgeLabel = ready ? 'healthy' : (health.snapshotExists ? 'stale' : 'missing');
+      const playerState = sectionState([aggregate.coreStatus, aggregate.playerVitals, aggregate.playerPosition]);
+      const castState = sectionState([aggregate.playerCast, aggregate.playerResources]);
+      const combatState = sectionState([aggregate.playerCombat, aggregate.followUnitStatus]);
+      const targetState = sectionState([aggregate.targetVitals, aggregate.targetResources, aggregate.targetPosition, aggregate.auxUnitCast]);
+      const pagesState = sectionState([aggregate.auraPage, aggregate.textPage, aggregate.abilityWatch]);
+
+      bridgeState.textContent = ready ? 'Bridge Ready' : (health.snapshotExists ? 'Bridge Stale' : 'Bridge Missing');
+      bridgeDetail.textContent = `${health.contract?.name ?? 'unknown'} / v${health.contract?.schemaVersion ?? 0} / ${asText(snapshot.lastBackend, 'backend n/a')}`;
+      bridgePill.textContent = bridgeLabel;
+      bridgePill.className = `pill ${bridgeClass}`;
 
       contractChip.textContent = `contract: ${health.contract?.name ?? 'unknown'}/v${health.contract?.schemaVersion ?? 0}`;
-      freshnessChip.textContent = `freshness: ${health.fresh ? 'fresh' : 'stale'}${health.snapshotAgeSeconds !== null ? ` (${health.snapshotAgeSeconds.toFixed(1)}s)` : ''}`;
-      framesChip.textContent = `frames: ${snapshot.aggregate?.acceptedFrames ?? 0}`;
+      freshnessChip.textContent = `freshness: ${health.fresh ? 'fresh' : 'stale'} (${health.snapshotAgeSeconds !== null ? health.snapshotAgeSeconds.toFixed(1) : 'n/a'}s)`;
+      backendChip.textContent = `backend: ${asText(snapshot.lastBackend, 'n/a')}`;
+      flagsChip.textContent = `flags: 0x${((snapshot.lastFrame && snapshot.lastFrame.reservedFlags) || 0).toString(16).toUpperCase().padStart(2, '0')}`;
 
-      bridgeKv.innerHTML = [
+      acceptedStat.textContent = asText(aggregate.acceptedFrames, '0');
+      typesStat.textContent = String(Object.keys(snapshot.metrics?.frameTypeCounts || {}).length);
+      freshStat.textContent = asText(freshness.freshFrameCount, '0');
+      oldestStat.textContent = freshness.oldestFrameAgeMs !== null && freshness.oldestFrameAgeMs !== undefined
+        ? `${Math.round(freshness.oldestFrameAgeMs)}ms`
+        : 'n/a';
+
+      setPill(bridgeCardPill, { label: bridgeLabel, className: bridgeClass });
+      setPill(playerCorePill, playerState);
+      setPill(castPill, castState);
+      setPill(combatPill, combatState);
+      setPill(targetPill, targetState);
+      setPill(pagesPill, pagesState);
+
+      renderKv(bridgeKv, [
         ['Ready', boolText(health.ready)],
-        ['Healthy', boolText(health.healthy)],
-        ['Fresh', boolText(health.fresh)],
-        ['Stale', boolText(health.stale)],
+        ['Healthy', boolText(aggregate.healthy)],
+        ['Stale', boolText(aggregate.stale)],
         ['Snapshot Exists', boolText(health.snapshotExists)],
-        ['Age Seconds', health.snapshotAgeSeconds === null ? 'n/a' : health.snapshotAgeSeconds.toFixed(1)],
-        ['Contract', `${health.contract?.name ?? 'unknown'}/v${health.contract?.schemaVersion ?? 0}`]
-      ].map(([k, v]) => `<span>${k}</span><strong>${asText(v)}</strong>`).join('');
-
-      telemetryKv.innerHTML = [
-        ['CoreStatus', snapshot.aggregate?.coreStatus ? `seq ${snapshot.aggregate.coreStatus.sequence}` : 'missing'],
-        ['PlayerVitals', snapshot.aggregate?.playerVitals ? `seq ${snapshot.aggregate.playerVitals.sequence}` : 'missing'],
-        ['PlayerPosition', snapshot.aggregate?.playerPosition ? `seq ${snapshot.aggregate.playerPosition.sequence}` : 'missing'],
-        ['Accepted Frames', snapshot.aggregate?.acceptedFrames ?? 0],
-        ['Frame Types', snapshot.metrics?.frameTypeCounts ? Object.keys(snapshot.metrics.frameTypeCounts).length : 0]
-      ].map(([k, v]) => `<span>${k}</span><strong>${asText(v)}</strong>`).join('');
-
-      snapshotKv.innerHTML = [
-        ['Last Backend', asText(snapshot.lastBackend)],
-        ['Last Frame', snapshot.lastFrame ? `${snapshot.lastFrame.frameType} #${snapshot.lastFrame.sequence}` : 'n/a'],
-        ['Core Flags', snapshot.aggregate?.coreStatus ? snapshot.aggregate.coreStatus.playerFlags : 'n/a'],
-        ['Health Age', health.snapshotAgeSeconds === null ? 'n/a' : `${health.snapshotAgeSeconds.toFixed(1)}s`],
+        ['Snapshot Age', health.snapshotAgeSeconds !== null ? `${health.snapshotAgeSeconds.toFixed(1)}s` : 'n/a'],
+        ['Fresh Window', freshness.windowMs !== undefined ? `${freshness.windowMs}ms` : 'n/a'],
+        ['Fresh Frames', asText(freshness.freshFrameCount)],
+        ['Stale Frames', asText(freshness.staleFrameCount)],
+        ['Latest Frame', snapshot.lastFrame ? `${snapshot.lastFrame.frameType} #${snapshot.lastFrame.sequence}` : 'n/a'],
         ['Snapshot Path', asText(health.snapshotPath)]
-      ].map(([k, v]) => `<span>${k}</span><strong>${asText(v)}</strong>`).join('');
+      ]);
 
-      footerText.textContent = `Updated ${new Date(snapshot.generatedAtUtc ?? Date.now()).toLocaleString()} | Latest frame: ${snapshot.lastFrame ? snapshot.lastFrame.frameType : 'n/a'}`;
+      renderKv(playerCoreKv, [
+        ['Player HP %', q8ToPercent(aggregate.coreStatus?.playerHealthPctQ8)],
+        ['Target HP %', q8ToPercent(aggregate.coreStatus?.targetHealthPctQ8)],
+        ['Vitals HP', aggregate.playerVitals ? `${aggregate.playerVitals.healthCurrent}/${aggregate.playerVitals.healthMax}` : 'n/a'],
+        ['Vitals Resource', aggregate.playerVitals ? `${aggregate.playerVitals.resourceCurrent}/${aggregate.playerVitals.resourceMax}` : 'n/a'],
+        ['Position', positionText(aggregate.playerPosition)],
+        ['Core Age', ageText(aggregate.coreStatus)],
+        ['Vitals Age', ageText(aggregate.playerVitals)],
+        ['Position Age', ageText(aggregate.playerPosition)]
+      ]);
+
+      renderKv(castKv, [
+        ['Cast Active', boolText(aggregate.playerCast?.castActive)],
+        ['Spell', asText(aggregate.playerCast?.spellLabel)],
+        ['Cast Target', asText(aggregate.playerCast?.castTargetCode)],
+        ['Progress', q8ToPercent(aggregate.playerCast?.progressPctQ8)],
+        ['Remaining', secondsText(aggregate.playerCast?.remainingSeconds)],
+        ['Uninterruptible', boolText(aggregate.playerCast?.uninterruptible)],
+        ['Mana', aggregate.playerResources ? `${aggregate.playerResources.manaCurrent}/${aggregate.playerResources.manaMax}` : 'n/a'],
+        ['Energy', aggregate.playerResources ? `${aggregate.playerResources.energyCurrent}/${aggregate.playerResources.energyMax}` : 'n/a'],
+        ['Power', aggregate.playerResources ? `${aggregate.playerResources.powerCurrent}/${aggregate.playerResources.powerMax}` : 'n/a'],
+        ['Cast Age', ageText(aggregate.playerCast)],
+        ['Resources Age', ageText(aggregate.playerResources)]
+      ]);
+
+      renderKv(combatKv, [
+        ['Combo', asText(aggregate.playerCombat?.combo)],
+        ['Charge', aggregate.playerCombat ? `${aggregate.playerCombat.chargeCurrent}/${aggregate.playerCombat.chargeMax}` : 'n/a'],
+        ['Planar', aggregate.playerCombat ? `${aggregate.playerCombat.planarCurrent}/${aggregate.playerCombat.planarMax}` : 'n/a'],
+        ['Absorb', asText(aggregate.playerCombat?.absorb)],
+        ['PvP', boolText(aggregate.playerCombat?.pvp)],
+        ['Mentoring', boolText(aggregate.playerCombat?.mentoring)],
+        ['Ready', boolText(aggregate.playerCombat?.ready)],
+        ['AFK', boolText(aggregate.playerCombat?.afk)],
+        ['Follow Slot', asText(aggregate.followUnitStatus?.slot)],
+        ['Follow Flags', aggregate.followUnitStatus ? `0x${Number(aggregate.followUnitStatus.followFlags).toString(16).toUpperCase().padStart(2, '0')}` : 'n/a'],
+        ['Follow Position', positionText(aggregate.followUnitStatus)],
+        ['Follow Units Seen', Array.isArray(aggregate.followUnitStatuses) ? aggregate.followUnitStatuses.length : 0]
+      ]);
+
+      renderKv(targetKv, [
+        ['Target HP', aggregate.targetVitals ? `${aggregate.targetVitals.healthCurrent}/${aggregate.targetVitals.healthMax}` : 'n/a'],
+        ['Target Absorb', asText(aggregate.targetVitals?.absorb)],
+        ['Target Alive', boolText(aggregate.targetVitals?.alive)],
+        ['Target Tagged', boolText(aggregate.targetVitals?.tagged)],
+        ['Target Mana', aggregate.targetResources ? `${aggregate.targetResources.manaCurrent}/${aggregate.targetResources.manaMax}` : 'n/a'],
+        ['Target Energy', aggregate.targetResources ? `${aggregate.targetResources.energyCurrent}/${aggregate.targetResources.energyMax}` : 'n/a'],
+        ['Target Power', aggregate.targetResources ? `${aggregate.targetResources.powerCurrent}/${aggregate.targetResources.powerMax}` : 'n/a'],
+        ['Target Position', positionText(aggregate.targetPosition)],
+        ['Aux Unit', asText(aggregate.auxUnitCast?.unitSelectorCode)],
+        ['Aux Spell', asText(aggregate.auxUnitCast?.label)],
+        ['Aux Remaining', secondsText(aggregate.auxUnitCast ? aggregate.auxUnitCast.remainingCenti / 100.0 : null)]
+      ]);
+
+      renderKv(pagesKv, [
+        ['Aura Page', aggregate.auraPage ? `kind ${aggregate.auraPage.pageKindCode}` : 'n/a'],
+        ['Aura Count', asText(aggregate.auraPage?.totalAuraCount)],
+        ['Aura Entry 1', aggregate.auraPage?.entry1 ? `id ${aggregate.auraPage.entry1.id} stack ${aggregate.auraPage.entry1.stack}` : 'n/a'],
+        ['Text Page', aggregate.textPage ? `kind ${aggregate.textPage.textKindCode}` : 'n/a'],
+        ['Text Label', asText(aggregate.textPage?.label)],
+        ['Ability Page', aggregate.abilityWatch ? `page ${aggregate.abilityWatch.pageIndex}` : 'n/a'],
+        ['Ready Count', asText(aggregate.abilityWatch?.readyCount)],
+        ['Cooling Count', asText(aggregate.abilityWatch?.coolingCount)],
+        ['Shortest Cooldown', aggregate.abilityWatch ? `${aggregate.abilityWatch.shortestCooldownQ4 / 4.0}s` : 'n/a']
+      ]);
+
+      renderFrameCounts(snapshot.metrics?.frameTypeCounts);
+
+      footerText.textContent =
+        `Updated ${new Date(snapshot.generatedAtUtc ?? Date.now()).toLocaleString()} | ` +
+        `Latest frame: ${snapshot.lastFrame ? `${snapshot.lastFrame.frameType} #${snapshot.lastFrame.sequence}` : 'n/a'} | ` +
+        `Accepted samples: ${asText(snapshot.metrics?.acceptedSamples, 0)} / Rejected: ${asText(snapshot.metrics?.rejectedSamples, 0)}`;
     }
 
     async function refresh() {
@@ -350,7 +750,7 @@
     }
 
     refresh();
-    setInterval(refresh, 2000);
+    setInterval(refresh, 1500);
   </script>
 </body>
 </html>

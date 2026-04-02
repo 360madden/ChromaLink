@@ -138,6 +138,7 @@ $manifest = [pscustomobject]@{
     "Bridge-ChromaLink.cmd",
     "Start-ChromaLinkStack.cmd",
     "Open-ChromaLink-Monitor.cmd",
+    "Open-ChromaLinkDashboardPinned.cmd",
     "Status-ChromaLinkStack.cmd",
     "Stop-ChromaLinkStack.cmd",
     "Open-ChromaLinkDashboard.cmd"
@@ -167,6 +168,7 @@ Common launchers:
 - `Bridge-ChromaLink.cmd`
 - `Start-ChromaLinkStack.cmd`
 - `Open-ChromaLink-Monitor.cmd`
+- `Open-ChromaLinkDashboardPinned.cmd`
 - `Status-ChromaLinkStack.cmd`
 - `Stop-ChromaLinkStack.cmd`
 - `Open-ChromaLinkDashboard.cmd`
@@ -182,6 +184,7 @@ Notes:
 - `Bridge-ChromaLink.cmd` starts the packaged CLI in `watch` mode so it can keep the rolling snapshot fresh.
 - `Start-ChromaLinkStack.cmd` starts the packaged CLI watch loop plus HTTP bridge without opening UI.
 - `Open-ChromaLink-Monitor.cmd` opens the packaged monitor explicitly.
+- `Open-ChromaLinkDashboardPinned.cmd` opens the packaged monitor in opt-in always-on-top mode.
 - `Open-ChromaLinkDashboard.cmd` opens the local browser dashboard explicitly.
 - `Status-ChromaLinkStack.cmd` reports bridge endpoint health, snapshot freshness, and package-local process counts.
 - `Stop-ChromaLinkStack.cmd` stops only the packaged CLI, HTTP bridge, and monitor processes from this package folder.
@@ -192,8 +195,9 @@ First-run workflow:
 1. If you are about to play, start with `Start-ChromaLinkStack.cmd`.
 2. Use `Open-ChromaLink-Product.cmd` when you want the guided path that also opens the monitor.
 3. If you want UI later, open `Open-ChromaLink-Monitor.cmd` or `Open-ChromaLinkDashboard.cmd`.
-4. If something looks wrong, run `Status-ChromaLinkStack.cmd`.
-5. Use `Stop-ChromaLinkStack.cmd` when you are done.
+4. If you want a pinned live view while playing, use `Open-ChromaLinkDashboardPinned.cmd`.
+5. If something looks wrong, run `Status-ChromaLinkStack.cmd`.
+6. Use `Stop-ChromaLinkStack.cmd` when you are done.
 '@ | Set-Content -LiteralPath $readmePath -Encoding utf8
 
 (Get-Content -LiteralPath $readmePath -Raw).
@@ -308,6 +312,16 @@ start "" /min "%~dp0desktop\ChromaLink.Monitor\ChromaLink.Monitor.exe" --start-m
 
 exit /b 0
 '@ | Set-Content -LiteralPath $openMonitorScript -Encoding ascii
+
+$pinnedDashboardScript = Join-Path $OutputRoot "Open-ChromaLinkDashboardPinned.cmd"
+@'
+@echo off
+setlocal
+
+start "" "%~dp0desktop\ChromaLink.Monitor\ChromaLink.Monitor.exe" --always-on-top
+
+exit /b 0
+'@ | Set-Content -LiteralPath $pinnedDashboardScript -Encoding ascii
 
 $statusPs1 = Join-Path $OutputRoot "Status-ChromaLinkStack.ps1"
 @'
@@ -515,4 +529,4 @@ exit /b 0
 Write-Host ""
 Write-Host "ChromaLink desktop package written to $OutputRoot" -ForegroundColor Green
 Write-Host "Manifest: $manifestPath" -ForegroundColor Green
-Write-Host "Launchers: Open-ChromaLink-Product.cmd, Bridge-ChromaLink.cmd, Start-ChromaLinkStack.cmd, Open-ChromaLink-Monitor.cmd, Status-ChromaLinkStack.cmd, Stop-ChromaLinkStack.cmd, Open-ChromaLinkDashboard.cmd" -ForegroundColor Green
+Write-Host "Launchers: Open-ChromaLink-Product.cmd, Bridge-ChromaLink.cmd, Start-ChromaLinkStack.cmd, Open-ChromaLink-Monitor.cmd, Open-ChromaLinkDashboardPinned.cmd, Status-ChromaLinkStack.cmd, Stop-ChromaLinkStack.cmd, Open-ChromaLinkDashboard.cmd" -ForegroundColor Green

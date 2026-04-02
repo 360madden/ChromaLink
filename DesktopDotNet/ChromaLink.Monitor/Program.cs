@@ -43,6 +43,14 @@ internal sealed class MonitorForm : Form
     private readonly Label _positionLine = new() { AutoSize = true, ForeColor = Color.WhiteSmoke };
     private readonly Label _metricsLine = new() { AutoSize = true, ForeColor = Color.WhiteSmoke };
     private readonly Label _statusLine = new() { AutoSize = true, ForeColor = Color.Gainsboro };
+    private readonly CheckBox _topMostToggle = new()
+    {
+        AutoSize = true,
+        Text = "Always On Top",
+        ForeColor = Color.Gainsboro,
+        BackColor = Color.Transparent,
+        Margin = new Padding(8, 6, 0, 0)
+    };
     private readonly TextBox _details = new()
     {
         Dock = DockStyle.Fill,
@@ -56,6 +64,7 @@ internal sealed class MonitorForm : Form
 
     private string _snapshotPath = DefaultSnapshotPath;
     private DateTime _snapshotWriteTimeUtc;
+    private bool _alwaysOnTop;
     private bool _startMinimized;
 
     public MonitorForm(string[] args)
@@ -82,6 +91,8 @@ internal sealed class MonitorForm : Form
         };
         reloadButton.Click += (_, _) => RefreshSnapshot(force: true);
 
+        _topMostToggle.CheckedChanged += (_, _) => ApplyTopMost(_topMostToggle.Checked);
+
         var topRow = new FlowLayoutPanel
         {
             Dock = DockStyle.Top,
@@ -92,6 +103,13 @@ internal sealed class MonitorForm : Form
         };
         topRow.Controls.Add(openButton);
         topRow.Controls.Add(reloadButton);
+        topRow.Controls.Add(new Label
+        {
+            AutoSize = true,
+            Text = " ",
+            Width = 8
+        });
+        topRow.Controls.Add(_topMostToggle);
         topRow.Controls.Add(new Label
         {
             AutoSize = true,
@@ -144,6 +162,7 @@ internal sealed class MonitorForm : Form
         _refreshTimer.Start();
 
         RefreshSnapshot(force: true);
+        ApplyTopMost(_alwaysOnTop);
 
         if (_startMinimized)
         {
@@ -158,6 +177,13 @@ internal sealed class MonitorForm : Form
     {
         foreach (var arg in args)
         {
+            if (string.Equals(arg, "--always-on-top", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(arg, "--topmost", StringComparison.OrdinalIgnoreCase))
+            {
+                _alwaysOnTop = true;
+                continue;
+            }
+
             if (string.Equals(arg, "--start-minimized", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(arg, "--minimized", StringComparison.OrdinalIgnoreCase))
             {
@@ -170,6 +196,13 @@ internal sealed class MonitorForm : Form
                 _snapshotPath = arg;
             }
         }
+    }
+
+    private void ApplyTopMost(bool enabled)
+    {
+        _alwaysOnTop = enabled;
+        TopMost = enabled;
+        _topMostToggle.Checked = enabled;
     }
 
     private void OpenSnapshot()

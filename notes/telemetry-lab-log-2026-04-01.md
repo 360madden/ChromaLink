@@ -91,6 +91,57 @@ Keep.
 
 ---
 
+## 2026-04-02 - Session AE - dashboard upgrade and pinned access
+
+### Goal
+
+Make the dashboard materially more useful for live telemetry while adding an opt-in always-on-top path that works during gameplay.
+
+### Change
+
+- rebuild the browser dashboard in `DesktopDotNet/ChromaLink.HttpBridge/wwwroot/index.html` into a telemetry-first cockpit
+- surface richer aggregate sections:
+  - player core
+  - cast and resources
+  - combat and follow
+  - target telemetry
+  - generic pages and frame activity
+- add per-section freshness and state pills in the browser view
+- add `--always-on-top` support and a runtime toggle to `DesktopDotNet/ChromaLink.Monitor/Program.cs`
+- add `scripts/Open-ChromaLinkDashboardPinned.cmd`
+- extend `scripts/Package-ChromaLinkDesktop.ps1` so packaged output also emits `Open-ChromaLinkDashboardPinned.cmd`
+
+### Why
+
+The old browser dashboard worked, but it was still mostly a thin bridge page. The user also wanted a ChromaLink surface that could stay above the game when needed, and that part has to live in the desktop monitor path because a normal browser window cannot reliably force itself to stay always on top.
+
+### Verification
+
+```powershell
+dotnet build .\DesktopDotNet\ChromaLink.HttpBridge\ChromaLink.HttpBridge.csproj
+```
+
+```powershell
+dotnet build .\DesktopDotNet\ChromaLink.Monitor\ChromaLink.Monitor.csproj
+```
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+### Result
+
+- the browser dashboard now exposes much more of the live bridge surface
+- the live monitor supports opt-in always-on-top mode
+- there is now a dedicated pinned-launcher path for gameplay
+- package generation stays aligned with the new launcher surface
+
+### Decision
+
+Keep.
+
+---
+
 ## 2026-04-02 - Session AD - remaining telemetry capability expansion
 
 ### Goal
