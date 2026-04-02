@@ -928,6 +928,7 @@ Turn the rotating live frame stream into a coherent reader-side telemetry state 
 - keep the newest accepted `CoreStatus`, `PlayerVitals`, and `PlayerPosition` observations with timestamps
 - print an aggregate summary from CLI `live` and `watch`
 - write a rolling JSON snapshot for live aggregate state under `%LOCALAPPDATA%\ChromaLink\DesktopDotNet\out`
+- add `scripts/Bridge-ChromaLink.cmd` as a simple continuous bridge launcher
 - show `ReservedFlags` in inspector header details
 - add tests for aggregate readiness and same-type replacement behavior
 

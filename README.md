@@ -214,6 +214,7 @@ That gives live captures a direct way to prove whether the running addon actuall
 
 Useful helper scripts:
 
+- [scripts/Bridge-ChromaLink.cmd](scripts/Bridge-ChromaLink.cmd)
 - [scripts/Prepare-ChromaLink-640x360.cmd](scripts/Prepare-ChromaLink-640x360.cmd)
 - [scripts/Smoke-ChromaLink.cmd](scripts/Smoke-ChromaLink.cmd)
 - [scripts/Bench-ChromaLink.cmd](scripts/Bench-ChromaLink.cmd)
@@ -233,6 +234,22 @@ Examples:
 ```powershell
 .\scripts\Sweep-RiftResolutions.ps1 -Resolutions @('640x360') -ReloadUi -ObserverLane on
 ```
+
+## Bridge Output
+
+For a simple always-on desktop bridge, run:
+
+```powershell
+.\scripts\Bridge-ChromaLink.cmd
+```
+
+That runs the CLI in continuous watch mode and keeps `%LOCALAPPDATA%\ChromaLink\DesktopDotNet\out\chromalink-live-telemetry.json` refreshed with:
+
+- latest merged aggregate state
+- frame counts
+- most recent detection geometry
+- last decoded frame metadata
+- reserved build flags
 
 `Reload-RiftUi.cmd` sends the normal RIFT `/reloadui` command to the active game window.
 
