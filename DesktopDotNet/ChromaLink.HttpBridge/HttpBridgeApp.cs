@@ -15,7 +15,10 @@ public static class HttpBridgeApp
         var app = builder.Build();
         var snapshotPath = ResolveSnapshotPath(snapshotPathOverride);
 
-        app.MapGet("/", () => Results.Text("ChromaLink HTTP Bridge", "text/plain"));
+        app.UseDefaultFiles();
+        app.UseStaticFiles();
+
+        app.MapGet("/dashboard", () => Results.Redirect("/"));
         app.MapGet("/latest-snapshot", () => HttpBridgeSnapshotService.TryReadRawSnapshot(snapshotPath).ToResult());
         app.MapGet("/snapshot", () => HttpBridgeSnapshotService.TryReadRawSnapshot(snapshotPath).ToResult());
         app.MapGet("/health", () =>

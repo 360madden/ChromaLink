@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ChromaLink Dashboard</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111d;
+      --panel: rgba(12, 19, 31, 0.92);
+      --line: rgba(142, 171, 219, 0.2);
+      --text: #edf4ff;
+      --muted: #99aecf;
+      --good: #64f0aa;
+      --warn: #f4c56a;
+      --bad: #ff7f7f;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font: 14px/1.5 "Segoe UI", system-ui, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(133, 210, 255, 0.15), transparent 28%),
+        radial-gradient(circle at top right, rgba(100, 240, 170, 0.11), transparent 24%),
+        linear-gradient(180deg, #07111d 0%, var(--bg) 100%);
+    }
+
+    .shell {
+      max-width: 1220px;
+      margin: 0 auto;
+      padding: 22px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .hero-main {
+      padding: 24px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(30px, 5vw, 48px);
+      letter-spacing: -0.04em;
+      line-height: 1;
+    }
+
+    .lede {
+      margin: 0 0 18px;
+      max-width: 70ch;
+      color: var(--muted);
+    }
+
+    .chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 999px;
+      padding: 6px 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .hero-side {
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .status {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .status strong {
+      display: block;
+      font-size: 22px;
+      margin-bottom: 2px;
+    }
+
+    .pill {
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      padding: 6px 10px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .good { color: var(--good); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button, a.button {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font: inherit;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    button:hover, a.button:hover {
+      border-color: rgba(133, 210, 255, 0.45);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      padding: 18px;
+    }
+
+    .card h2 {
+      margin: 0 0 12px;
+      font-size: 16px;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px 12px;
+      align-items: center;
+    }
+
+    .kv span {
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .kv strong {
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .mono {
+      font-family: "Cascadia Mono", "Consolas", monospace;
+      font-size: 12px;
+    }
+
+    .footer {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    @media (max-width: 900px) {
+      .hero, .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="panel hero-main">
+        <h1>ChromaLink Dashboard</h1>
+        <p class="lede">
+          A tiny browser view of the live bridge contract. It reads the local HTTP bridge and shows
+          readiness, freshness, and the current telemetry state without opening the WinForms monitor.
+        </p>
+        <div class="chips">
+          <span class="chip" id="contract-chip">contract: loading</span>
+          <span class="chip" id="freshness-chip">freshness: loading</span>
+          <span class="chip" id="frames-chip">frames: loading</span>
+        </div>
+      </div>
+
+      <div class="panel hero-side">
+        <div class="status">
+          <div>
+            <strong id="bridge-state">Loading</strong>
+            <span id="bridge-detail">Waiting for bridge snapshot</span>
+          </div>
+          <span class="pill warn" id="bridge-pill">connecting</span>
+        </div>
+        <div class="actions">
+          <button id="refresh-button" type="button">Refresh</button>
+          <a class="button" href="/latest-snapshot" target="_blank" rel="noreferrer">Open JSON</a>
+          <a class="button" href="/health" target="_blank" rel="noreferrer">Health</a>
+          <a class="button" href="/ready" target="_blank" rel="noreferrer">Ready</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="panel card">
+        <h2>Bridge</h2>
+        <div class="kv mono" id="bridge-kv"></div>
+      </article>
+      <article class="panel card">
+        <h2>Telemetry</h2>
+        <div class="kv mono" id="telemetry-kv"></div>
+      </article>
+      <article class="panel card">
+        <h2>Snapshot</h2>
+        <div class="kv mono" id="snapshot-kv"></div>
+      </article>
+    </section>
+
+    <div class="footer mono" id="footer-text">Polling local HTTP bridge...</div>
+  </main>
+
+  <script>
+    const state = { health: null, snapshot: null, lastError: null };
+
+    const bridgeState = document.getElementById('bridge-state');
+    const bridgeDetail = document.getElementById('bridge-detail');
+    const bridgePill = document.getElementById('bridge-pill');
+    const contractChip = document.getElementById('contract-chip');
+    const freshnessChip = document.getElementById('freshness-chip');
+    const framesChip = document.getElementById('frames-chip');
+    const bridgeKv = document.getElementById('bridge-kv');
+    const telemetryKv = document.getElementById('telemetry-kv');
+    const snapshotKv = document.getElementById('snapshot-kv');
+    const footerText = document.getElementById('footer-text');
+
+    document.getElementById('refresh-button').addEventListener('click', refresh);
+
+    async function fetchJson(path) {
+      const response = await fetch(path, { cache: 'no-store' });
+      const payload = await response.json();
+      return { response, payload };
+    }
+
+    function asText(value, fallback = 'n/a') {
+      return value === null || value === undefined || value === '' ? fallback : String(value);
+    }
+
+    function boolText(value) {
+      return value ? 'true' : 'false';
+    }
+
+    function render() {
+      const health = state.health;
+      const snapshot = state.snapshot;
+
+      if (!health || !snapshot) {
+        bridgeState.textContent = 'Waiting';
+        bridgeDetail.textContent = state.lastError ? state.lastError : 'Waiting for bridge data';
+        bridgePill.textContent = 'connecting';
+        bridgePill.className = 'pill warn';
+        footerText.textContent = 'Polling local HTTP bridge...';
+        bridgeKv.innerHTML = '';
+        telemetryKv.innerHTML = '';
+        snapshotKv.innerHTML = '';
+        return;
+      }
+
+      const ready = Boolean(health.ready && health.fresh);
+      const pillClass = ready ? 'good' : (health.snapshotExists ? 'warn' : 'bad');
+      bridgeState.textContent = ready ? 'Ready' : (health.snapshotExists ? 'Stale' : 'Missing');
+      bridgeDetail.textContent = `${health.contract?.name ?? 'unknown'} / v${health.contract?.schemaVersion ?? 0}`;
+      bridgePill.textContent = ready ? 'healthy' : (health.snapshotExists ? 'stale' : 'missing');
+      bridgePill.className = `pill ${pillClass}`;
+
+      contractChip.textContent = `contract: ${health.contract?.name ?? 'unknown'}/v${health.contract?.schemaVersion ?? 0}`;
+      freshnessChip.textContent = `freshness: ${health.fresh ? 'fresh' : 'stale'}${health.snapshotAgeSeconds !== null ? ` (${health.snapshotAgeSeconds.toFixed(1)}s)` : ''}`;
+      framesChip.textContent = `frames: ${snapshot.aggregate?.acceptedFrames ?? 0}`;
+
+      bridgeKv.innerHTML = [
+        ['Ready', boolText(health.ready)],
+        ['Healthy', boolText(health.healthy)],
+        ['Fresh', boolText(health.fresh)],
+        ['Stale', boolText(health.stale)],
+        ['Snapshot Exists', boolText(health.snapshotExists)],
+        ['Age Seconds', health.snapshotAgeSeconds === null ? 'n/a' : health.snapshotAgeSeconds.toFixed(1)],
+        ['Contract', `${health.contract?.name ?? 'unknown'}/v${health.contract?.schemaVersion ?? 0}`]
+      ].map(([k, v]) => `<span>${k}</span><strong>${asText(v)}</strong>`).join('');
+
+      telemetryKv.innerHTML = [
+        ['CoreStatus', snapshot.aggregate?.coreStatus ? `seq ${snapshot.aggregate.coreStatus.sequence}` : 'missing'],
+        ['PlayerVitals', snapshot.aggregate?.playerVitals ? `seq ${snapshot.aggregate.playerVitals.sequence}` : 'missing'],
+        ['PlayerPosition', snapshot.aggregate?.playerPosition ? `seq ${snapshot.aggregate.playerPosition.sequence}` : 'missing'],
+        ['Accepted Frames', snapshot.aggregate?.acceptedFrames ?? 0],
+        ['Frame Types', snapshot.metrics?.frameTypeCounts ? Object.keys(snapshot.metrics.frameTypeCounts).length : 0]
+      ].map(([k, v]) => `<span>${k}</span><strong>${asText(v)}</strong>`).join('');
+
+      snapshotKv.innerHTML = [
+        ['Last Backend', asText(snapshot.lastBackend)],
+        ['Last Frame', snapshot.lastFrame ? `${snapshot.lastFrame.frameType} #${snapshot.lastFrame.sequence}` : 'n/a'],
+        ['Core Flags', snapshot.aggregate?.coreStatus ? snapshot.aggregate.coreStatus.playerFlags : 'n/a'],
+        ['Health Age', health.snapshotAgeSeconds === null ? 'n/a' : `${health.snapshotAgeSeconds.toFixed(1)}s`],
+        ['Snapshot Path', asText(health.snapshotPath)]
+      ].map(([k, v]) => `<span>${k}</span><strong>${asText(v)}</strong>`).join('');
+
+      footerText.textContent = `Updated ${new Date(snapshot.generatedAtUtc ?? Date.now()).toLocaleString()} | Latest frame: ${snapshot.lastFrame ? snapshot.lastFrame.frameType : 'n/a'}`;
+    }
+
+    async function refresh() {
+      try {
+        state.lastError = null;
+        const [health, snapshot] = await Promise.all([
+          fetchJson('/health'),
+          fetchJson('/latest-snapshot')
+        ]);
+        state.health = health.payload;
+        state.snapshot = snapshot.payload;
+      } catch (error) {
+        state.lastError = error.message;
+      } finally {
+        render();
+      }
+    }
+
+    refresh();
+    setInterval(refresh, 2000);
+  </script>
+</body>
+</html>
