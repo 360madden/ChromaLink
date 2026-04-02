@@ -12,6 +12,7 @@ Default output root:
 
 ```text
 artifacts\package\
+├── Bridge-ChromaLink.cmd
 ├── README.md
 ├── package-manifest.json
 ├── Start-ChromaLinkStack.cmd
@@ -29,9 +30,12 @@ artifacts\package\
 - The folder name matches the project name.
 - `desktop\ChromaLink.HttpBridge` and `desktop\ChromaLink.Monitor` are the quickest path to the running stack.
 - `ChromaLink.Cli` and `ChromaLink.Inspector` stay available as standalone tools inside the same package.
-- The package only emits two top-level launchers:
+- The package emits three top-level launchers:
+  - `Bridge-ChromaLink.cmd`
   - `Start-ChromaLinkStack.cmd`
   - `Open-ChromaLinkDashboard.cmd`
+- `Bridge-ChromaLink.cmd` starts the packaged CLI in `watch` mode.
+- `Start-ChromaLinkStack.cmd` starts the packaged CLI watch loop, HTTP bridge, and monitor together.
 - Repo-native helper scripts such as status, stop, probe, and live-stack wrappers remain in the source tree and are not copied into the package by default.
 
 ## Intent

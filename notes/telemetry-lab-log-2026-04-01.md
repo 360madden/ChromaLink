@@ -191,6 +191,64 @@ Keep.
 
 ---
 
+## 2026-04-02 - Session AF - packaged live stack producer
+
+### Goal
+
+Make the packaged desktop output capable of refreshing live telemetry on its own instead of only opening bridge and monitor viewers.
+
+### Change
+
+- extend `scripts/Package-ChromaLinkDesktop.ps1` to emit:
+  - `Bridge-ChromaLink.cmd`
+  - an updated `Start-ChromaLinkStack.cmd`
+- make the packaged live-stack launcher start:
+  - packaged `ChromaLink.Cli.exe watch`
+  - packaged `ChromaLink.HttpBridge.exe`
+  - packaged `ChromaLink.Monitor.exe`
+- add launcher metadata to `package-manifest.json`
+- align the package docs with the new producer-aware launcher roles
+
+### Why
+
+The earlier package milestone proved the folder layout, but it still depended on repo-native scripts to keep the rolling snapshot fresh. That meant the handoff package was not yet a true runnable live stack.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+.\scripts\Package-ChromaLinkDesktop.ps1
+```
+
+```powershell
+cmd /c .\artifacts\package\Start-ChromaLinkStack.cmd
+```
+
+```powershell
+Get-Process | Where-Object { $_.ProcessName -in @('ChromaLink.Cli','ChromaLink.HttpBridge','ChromaLink.Monitor') }
+```
+
+### Result
+
+- tests passed: `20/20`
+- the package script completed successfully
+- the generated package now includes:
+  - `Bridge-ChromaLink.cmd`
+  - `Start-ChromaLinkStack.cmd`
+  - `Open-ChromaLinkDashboard.cmd`
+- the packaged launcher started `ChromaLink.Cli`, `ChromaLink.HttpBridge`, and `ChromaLink.Monitor` from the package output
+- `%LOCALAPPDATA%\ChromaLink\DesktopDotNet\out\chromalink-live-telemetry.json` advanced while the packaged stack was running
+- the package now behaves like a true runnable live stack instead of a viewer-only folder
+
+### Decision
+
+Keep.
+
+---
+
 ## 2026-04-01 - Session B - quiet default diagnostics
 
 ### Goal

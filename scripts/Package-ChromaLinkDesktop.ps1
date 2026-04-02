@@ -107,6 +107,11 @@ $manifest = [pscustomobject]@{
   Runtime = $Runtime
   SelfContained = [bool]$SelfContained
   PackageLayout = "desktop/<ProjectName>"
+  Launchers = @(
+    "Bridge-ChromaLink.cmd",
+    "Start-ChromaLinkStack.cmd",
+    "Open-ChromaLinkDashboard.cmd"
+  )
   Projects = $published
 }
 
@@ -128,22 +133,34 @@ Layout:
 
 Common launchers:
 
+- `Bridge-ChromaLink.cmd`
 - `Start-ChromaLinkStack.cmd`
 - `Open-ChromaLinkDashboard.cmd`
 
 Notes:
 
 - The package is framework-dependent unless `-SelfContained` is used.
-- The HTTP bridge should start before opening the dashboard.
-- The monitor reads the rolling snapshot produced by the bridge/CLI.
+- `Bridge-ChromaLink.cmd` starts the packaged CLI in `watch` mode so it can keep the rolling snapshot fresh.
+- `Start-ChromaLinkStack.cmd` starts the packaged CLI watch loop, HTTP bridge, and monitor together.
 - Each project folder keeps the published executable and its supporting DLLs together.
 '@ | Set-Content -LiteralPath $readmePath -Encoding utf8
+
+$bridgeScript = Join-Path $OutputRoot "Bridge-ChromaLink.cmd"
+@'
+@echo off
+setlocal
+
+start "" "%~dp0desktop\ChromaLink.Cli\ChromaLink.Cli.exe" watch
+
+exit /b 0
+'@ | Set-Content -LiteralPath $bridgeScript -Encoding ascii
 
 $startScript = Join-Path $OutputRoot "Start-ChromaLinkStack.cmd"
 @'
 @echo off
 setlocal
 
+start "" "%~dp0desktop\ChromaLink.Cli\ChromaLink.Cli.exe" watch
 start "" "%~dp0desktop\ChromaLink.HttpBridge\ChromaLink.HttpBridge.exe"
 start "" "%~dp0desktop\ChromaLink.Monitor\ChromaLink.Monitor.exe"
 
@@ -163,4 +180,4 @@ exit /b 0
 Write-Host ""
 Write-Host "ChromaLink desktop package written to $OutputRoot" -ForegroundColor Green
 Write-Host "Manifest: $manifestPath" -ForegroundColor Green
-Write-Host "Launchers: Start-ChromaLinkStack.cmd, Open-ChromaLinkDashboard.cmd" -ForegroundColor Green
+Write-Host "Launchers: Bridge-ChromaLink.cmd, Start-ChromaLinkStack.cmd, Open-ChromaLinkDashboard.cmd" -ForegroundColor Green

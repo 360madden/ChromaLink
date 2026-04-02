@@ -450,6 +450,7 @@ The default package layout is:
 
 ```text
 artifacts\package\
+├── Bridge-ChromaLink.cmd
 ├── README.md
 ├── package-manifest.json
 ├── Start-ChromaLinkStack.cmd
@@ -481,8 +482,15 @@ Practical difference:
 
 Package-emitted launchers are intentionally narrow:
 
+- `Bridge-ChromaLink.cmd`
 - `Start-ChromaLinkStack.cmd`
 - `Open-ChromaLinkDashboard.cmd`
+
+Packaged launcher roles:
+
+- `Bridge-ChromaLink.cmd` starts the packaged CLI in `watch` mode so the rolling snapshot stays fresh
+- `Start-ChromaLinkStack.cmd` starts the packaged CLI watch loop, HTTP bridge, and monitor together
+- `Open-ChromaLinkDashboard.cmd` opens the local dashboard URL
 
 The broader helper surface in `scripts/` stays repo-native. That includes launchers such as `Open-ChromaLink-LiveStack.cmd`, `Open-ChromaLink-Monitor.cmd`, status helpers, stop helpers, and the probe/readiness scripts.
 
