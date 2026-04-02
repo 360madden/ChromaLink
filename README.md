@@ -237,12 +237,13 @@ Use the live monitor when you want a product-style view of the rolling bridge sn
 
 - `ChromaLink.Monitor` is the live-first UI for `chromalink-live-telemetry.json`
 - the inspector is still the artifact and BMP analyzer
+- `Start-ChromaLinkStack.cmd` starts the local CLI watch loop plus HTTP bridge in the background without opening extra UI
 - `Bridge-ChromaLink.cmd` keeps the snapshot fresh in the background
 - `Open-ChromaLink-Monitor.cmd` launches the live monitor directly
-- `Open-ChromaLink-LiveStack.cmd` launches the local HTTP bridge, rolling snapshot loop, and monitor together
+- `Open-ChromaLink-LiveStack.cmd` reuses `Start-ChromaLinkStack.cmd` and then opens the monitor
 - `Open-ChromaLinkHttpBridge.cmd` opens the local HTTP bridge
 - `Open-ChromaLinkDashboard.cmd` opens the browser dashboard
-- `Open-ChromaLink-DashboardStack.cmd` launches the HTTP bridge and browser dashboard together
+- `Open-ChromaLink-DashboardStack.cmd` reuses `Start-ChromaLinkStack.cmd` and then opens the browser dashboard
 - `Get-ChromaLinkStackStatus.cmd` checks the stack health endpoints and process counts
 - `Status-ChromaLinkStack.cmd` checks the stack bridge and readiness status
 - `Status-ChromaLinkHttpBridge.cmd` checks the HTTP bridge endpoints and process counts
@@ -281,17 +282,19 @@ The bridge is local-only and lightweight, and it reads the snapshot rather than 
 
 Recommended workflow:
 
-1. Start `Open-ChromaLink-LiveStack.cmd` for the fastest full setup
-2. Use `Open-ChromaLink-DashboardStack.cmd` or `Open-ChromaLinkDashboard.cmd` when you want a browser view
-3. Use `Probe-ChromaLinkHttpBridge.cmd`, `Get-ChromaLinkStackStatus.cmd`, or `Status-ChromaLinkHttpBridge.cmd` when you want to verify the local API surface
-4. Open the inspector only when you need BMP artifacts or overlay diagnostics
-5. Use `Test-ChromaLinkTelemetryReady.cmd` in scripts or checks
-6. Stop the stack with `Stop-ChromaLinkStack.cmd` when you are done, or `Stop-ChromaLinkHttpBridge.cmd` if you only want to stop the HTTP bridge
+1. Start `Start-ChromaLinkStack.cmd` for the safest background capture setup, or `Bridge-ChromaLink.cmd` if you only want the rolling snapshot loop
+2. Use `Open-ChromaLink-LiveStack.cmd` when you want the monitor on top of the running stack
+3. Use `Open-ChromaLink-DashboardStack.cmd` or `Open-ChromaLinkDashboard.cmd` when you want a browser view
+4. Use `Probe-ChromaLinkHttpBridge.cmd`, `Get-ChromaLinkStackStatus.cmd`, or `Status-ChromaLinkHttpBridge.cmd` when you want to verify the local API surface
+5. Open the inspector only when you need BMP artifacts or overlay diagnostics
+6. Use `Test-ChromaLinkTelemetryReady.cmd` in scripts or checks
+7. Stop the stack with `Stop-ChromaLinkStack.cmd` when you are done, or `Stop-ChromaLinkHttpBridge.cmd` if you only want to stop the HTTP bridge
 
 ## Wrapper Scripts
 
 Useful helper scripts:
 
+- [scripts/Start-ChromaLinkStack.cmd](scripts/Start-ChromaLinkStack.cmd)
 - [scripts/Bridge-ChromaLink.cmd](scripts/Bridge-ChromaLink.cmd)
 - [scripts/Launch-ChromaLinkHttpBridge.cmd](scripts/Launch-ChromaLinkHttpBridge.cmd)
 - [scripts/Open-ChromaLinkHttpBridge.cmd](scripts/Open-ChromaLinkHttpBridge.cmd)
@@ -388,7 +391,7 @@ Use `Probe-ChromaLinkHttpBridge.cmd` to sanity-check those endpoints from script
 
 The current ChromaLink flow is:
 
-1. Start with `Open-ChromaLink-LiveStack.cmd` for the full local setup, or `Bridge-ChromaLink.cmd` if you only want the rolling snapshot loop.
+1. Start with `Start-ChromaLinkStack.cmd` for the background CLI watch plus HTTP bridge path, or `Bridge-ChromaLink.cmd` if you only want the rolling snapshot loop.
 2. Inspect with `Open-ChromaLink-Monitor.cmd`, `Open-ChromaLinkDashboard.cmd`, or `Open-ChromaLinkHttpBridge.cmd` depending on whether you want the WinForms monitor, browser dashboard, or raw bridge.
 3. Verify with `Probe-ChromaLinkHttpBridge.cmd`, `Get-ChromaLinkStackStatus.cmd`, `Status-ChromaLinkStack.cmd`, or `Status-ChromaLinkHttpBridge.cmd`.
 4. Stop with `Stop-ChromaLinkStack.cmd`, or `Stop-ChromaLinkHttpBridge.cmd` if you only want to stop the bridge process.
@@ -416,7 +419,7 @@ If you want a one-click version:
 - `Watch-ChromaLinkTelemetry.cmd` keeps the console snapshot view live
 - `Open-ChromaLinkTelemetryJson.cmd` opens the raw snapshot file
 - `Open-ChromaLinkTelemetryFolder.cmd` opens the telemetry output folder
-- `Open-ChromaLink-LiveStack.cmd` starts the bridge plus monitor workflow
+- `Open-ChromaLink-LiveStack.cmd` starts the background stack and then opens the monitor
 
 For an automation-friendly readiness check that exits nonzero when the bridge is stale or missing:
 
@@ -455,6 +458,7 @@ artifacts\package\
 ├── Bridge-ChromaLink.cmd
 ├── README.md
 ├── package-manifest.json
+├── Open-ChromaLink-Monitor.cmd
 ├── Status-ChromaLinkStack.cmd
 ├── Stop-ChromaLinkStack.cmd
 ├── Start-ChromaLinkStack.cmd
@@ -488,6 +492,7 @@ Package-emitted launchers are intentionally narrow:
 
 - `Bridge-ChromaLink.cmd`
 - `Start-ChromaLinkStack.cmd`
+- `Open-ChromaLink-Monitor.cmd`
 - `Status-ChromaLinkStack.cmd`
 - `Stop-ChromaLinkStack.cmd`
 - `Open-ChromaLinkDashboard.cmd`
@@ -495,7 +500,8 @@ Package-emitted launchers are intentionally narrow:
 Packaged launcher roles:
 
 - `Bridge-ChromaLink.cmd` starts the packaged CLI in `watch` mode so the rolling snapshot stays fresh
-- `Start-ChromaLinkStack.cmd` starts the packaged CLI watch loop, HTTP bridge, and monitor together
+- `Start-ChromaLinkStack.cmd` starts the packaged CLI watch loop plus HTTP bridge without opening UI
+- `Open-ChromaLink-Monitor.cmd` opens the packaged monitor explicitly
 - `Status-ChromaLinkStack.cmd` reports local endpoint health, snapshot freshness, and package-local process counts
 - `Stop-ChromaLinkStack.cmd` stops only the packaged CLI, HTTP bridge, and monitor processes from that package folder
 - `Open-ChromaLinkDashboard.cmd` opens the local dashboard URL

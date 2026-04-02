@@ -365,6 +365,64 @@ Keep.
 
 ---
 
+## 2026-04-02 - Session AI - background-first helper flow
+
+### Goal
+
+Separate background stack startup from explicit UI opening so live-capture workflows can keep telemetry running without unnecessary helper windows on top of the game client.
+
+### Change
+
+- add `scripts/Start-ChromaLinkStack.cmd` as the repo-native background stack entry point
+- make `Open-ChromaLink-LiveStack.cmd` reuse `Start-ChromaLinkStack.cmd` and then open the monitor
+- make `Open-ChromaLink-DashboardStack.cmd` reuse `Start-ChromaLinkStack.cmd` and then open the dashboard
+- fix the dashboard stack so it now includes the CLI watch producer path instead of only the HTTP bridge
+- align the packaged output with the same split by:
+  - keeping `Start-ChromaLinkStack.cmd` background-only
+  - emitting `Open-ChromaLink-Monitor.cmd` for explicit monitor launch
+
+### Why
+
+Minimizing helper windows helped, but the launch surface was still mixing background service startup with optional UI opening. The dashboard stack also had a real functional gap because it did not start the live snapshot producer.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+```powershell
+cmd /c .\scripts\Start-ChromaLinkStack.cmd
+```
+
+```powershell
+cmd /c .\scripts\Status-ChromaLinkStack.cmd
+```
+
+```powershell
+cmd /c .\scripts\Stop-ChromaLinkStack.cmd
+```
+
+```powershell
+.\scripts\Package-ChromaLinkDesktop.ps1
+```
+
+### Result
+
+- tests passed: `20/20`
+- repo-native stack startup now has a clear background entry point
+- `Open-ChromaLink-LiveStack.cmd` and `Open-ChromaLink-DashboardStack.cmd` no longer own partial startup logic
+- the dashboard stack now includes the live producer path
+- packaged output now mirrors the same start-vs-open split with:
+  - `Start-ChromaLinkStack.cmd`
+  - `Open-ChromaLink-Monitor.cmd`
+
+### Decision
+
+Keep.
+
+---
+
 ## 2026-04-01 - Session B - quiet default diagnostics
 
 ### Goal

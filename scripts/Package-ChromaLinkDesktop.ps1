@@ -111,6 +111,7 @@ $manifest = [pscustomobject]@{
   Launchers = @(
     "Bridge-ChromaLink.cmd",
     "Start-ChromaLinkStack.cmd",
+    "Open-ChromaLink-Monitor.cmd",
     "Status-ChromaLinkStack.cmd",
     "Stop-ChromaLinkStack.cmd",
     "Open-ChromaLinkDashboard.cmd"
@@ -138,6 +139,7 @@ Common launchers:
 
 - `Bridge-ChromaLink.cmd`
 - `Start-ChromaLinkStack.cmd`
+- `Open-ChromaLink-Monitor.cmd`
 - `Status-ChromaLinkStack.cmd`
 - `Stop-ChromaLinkStack.cmd`
 - `Open-ChromaLinkDashboard.cmd`
@@ -147,7 +149,8 @@ Notes:
 - The package is framework-dependent unless `-SelfContained` is used.
 - launcher windows start minimized by default to reduce the chance of covering the RIFT client during live capture
 - `Bridge-ChromaLink.cmd` starts the packaged CLI in `watch` mode so it can keep the rolling snapshot fresh.
-- `Start-ChromaLinkStack.cmd` starts the packaged CLI watch loop, HTTP bridge, and monitor together.
+- `Start-ChromaLinkStack.cmd` starts the packaged CLI watch loop plus HTTP bridge without opening UI.
+- `Open-ChromaLink-Monitor.cmd` opens the packaged monitor explicitly.
 - `Status-ChromaLinkStack.cmd` reports bridge endpoint health, snapshot freshness, and package-local process counts.
 - `Stop-ChromaLinkStack.cmd` stops only the packaged CLI, HTTP bridge, and monitor processes from this package folder.
 - Each project folder keeps the published executable and its supporting DLLs together.
@@ -170,10 +173,19 @@ setlocal
 
 start "" /min "%~dp0desktop\ChromaLink.Cli\ChromaLink.Cli.exe" watch
 start "" /min "%~dp0desktop\ChromaLink.HttpBridge\ChromaLink.HttpBridge.exe"
-start "" /min "%~dp0desktop\ChromaLink.Monitor\ChromaLink.Monitor.exe" --start-minimized
 
 exit /b 0
 '@ | Set-Content -LiteralPath $startScript -Encoding ascii
+
+$openMonitorScript = Join-Path $OutputRoot "Open-ChromaLink-Monitor.cmd"
+@'
+@echo off
+setlocal
+
+start "" /min "%~dp0desktop\ChromaLink.Monitor\ChromaLink.Monitor.exe" --start-minimized
+
+exit /b 0
+'@ | Set-Content -LiteralPath $openMonitorScript -Encoding ascii
 
 $statusPs1 = Join-Path $OutputRoot "Status-ChromaLinkStack.ps1"
 @'
@@ -381,4 +393,4 @@ exit /b 0
 Write-Host ""
 Write-Host "ChromaLink desktop package written to $OutputRoot" -ForegroundColor Green
 Write-Host "Manifest: $manifestPath" -ForegroundColor Green
-Write-Host "Launchers: Bridge-ChromaLink.cmd, Start-ChromaLinkStack.cmd, Status-ChromaLinkStack.cmd, Stop-ChromaLinkStack.cmd, Open-ChromaLinkDashboard.cmd" -ForegroundColor Green
+Write-Host "Launchers: Bridge-ChromaLink.cmd, Start-ChromaLinkStack.cmd, Open-ChromaLink-Monitor.cmd, Status-ChromaLinkStack.cmd, Stop-ChromaLinkStack.cmd, Open-ChromaLinkDashboard.cmd" -ForegroundColor Green
