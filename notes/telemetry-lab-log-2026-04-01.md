@@ -603,6 +603,55 @@ Keep.
 
 ---
 
+## 2026-04-01 - Session M - experimental display compensation toggle
+
+### Goal
+
+Create a safe way to test the idea of oversizing the strip internally so the final displayed strip stays closer to the target machine-readable size.
+
+### Change
+
+- add `displayCompensation` config with:
+  - `enabled`
+  - `mode`
+  - `maxScaleX`
+  - `maxScaleY`
+  - `allowShrink`
+- update layout math to derive effective display scale from the current anchor dimensions when compensation is enabled
+- add slash commands:
+  - `/cl compensate on`
+  - `/cl compensate off`
+  - `/cl compensate status`
+- extend `/cl status` output with compensation summary fields
+- document the feature in the README as experimental
+
+### Why
+
+The project has been fighting RIFT UI shrink behavior. A controllable compensation path lets us test the idea that the addon can oversize the strip before RIFT applies its own layout/scaling, so the final on-screen strip may stay closer to the intended readable size.
+
+### Verification
+
+```powershell
+dotnet test .\DesktopDotNet\ChromaLink.sln
+```
+
+### Result
+
+- tests passed: `10/10`
+- compensation mode is now available as an explicit experiment instead of an undocumented code branch
+- desktop validation stayed green
+- live RIFT validation is still pending
+
+### Decision
+
+Keep as experimental.
+
+### Saved Checkpoint
+
+- pending commit for experimental display compensation toggle
+
+---
+
 ## Current Stable Baseline At End Of Log
 
 - target client: `640x360`

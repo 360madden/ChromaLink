@@ -77,6 +77,69 @@ local function CreateQuietZone(rootFrame)
   return quietZone
 end
 
+local function ResolveDisplayCompensation(anchorWidth, anchorHeight, profile)
+  local compensationConfig = config.displayCompensation or {}
+  local baseScaleX = tonumber(profile.displayScaleX) or tonumber(profile.displayScale) or 1
+  local baseScaleY = tonumber(profile.displayScaleY) or tonumber(profile.displayScale) or 1
+  local compensationX = 1.0
+  local compensationY = 1.0
+  local reason = "disabled"
+
+  if not compensationConfig.enabled then
+    return {
+      enabled = false,
+      compensationX = 1.0,
+      compensationY = 1.0,
+      effectiveScaleX = baseScaleX,
+      effectiveScaleY = baseScaleY,
+      reason = reason,
+      anchorRatioX = anchorWidth / math.max(1, profile.windowWidth),
+      anchorRatioY = anchorHeight / math.max(1, profile.windowHeight)
+    }
+  end
+
+  local anchorRatioX = anchorWidth / math.max(1, profile.windowWidth)
+  local anchorRatioY = anchorHeight / math.max(1, profile.windowHeight)
+  local allowShrink = compensationConfig.allowShrink and true or false
+
+  if compensationConfig.mode == "anchor-ratio" then
+    if anchorRatioX > 0 then
+      compensationX = 1.0 / anchorRatioX
+    end
+
+    if anchorRatioY > 0 then
+      compensationY = 1.0 / anchorRatioY
+    end
+
+    if not allowShrink then
+      if compensationX < 1.0 then
+        compensationX = 1.0
+      end
+      if compensationY < 1.0 then
+        compensationY = 1.0
+      end
+    end
+
+    reason = "anchor-ratio"
+  end
+
+  local minScaleX = allowShrink and 0.10 or 1.0
+  local minScaleY = allowShrink and 0.10 or 1.0
+  compensationX = math.max(minScaleX, math.min(compensationX, tonumber(compensationConfig.maxScaleX) or 4.0))
+  compensationY = math.max(minScaleY, math.min(compensationY, tonumber(compensationConfig.maxScaleY) or 4.0))
+
+  return {
+    enabled = true,
+    compensationX = compensationX,
+    compensationY = compensationY,
+    effectiveScaleX = baseScaleX * compensationX,
+    effectiveScaleY = baseScaleY * compensationY,
+    reason = reason,
+    anchorRatioX = anchorRatioX,
+    anchorRatioY = anchorRatioY
+  }
+end
+
 local function ComputeLayout(renderState)
   local profile = renderState.profile
   local quietZoneConfig = config.quietZone or {}
@@ -84,8 +147,13 @@ local function ComputeLayout(renderState)
   local anchorFrame = renderState.anchorFrame or UIParent or renderState.rootFrame
   local anchorWidth = ReadDimension(anchorFrame, "GetWidth", profile.windowWidth)
   local anchorHeight = ReadDimension(anchorFrame, "GetHeight", profile.windowHeight)
-  local rootWidth = profile.bandWidth
-  local rootHeight = profile.bandHeight
+  local compensation = ResolveDisplayCompensation(anchorWidth, anchorHeight, profile)
+  local effectiveScaleX = compensation.effectiveScaleX
+  local effectiveScaleY = compensation.effectiveScaleY
+  local bandWidth = profile.bandWidth * effectiveScaleX
+  local bandHeight = profile.bandHeight * effectiveScaleY
+  local rootWidth = bandWidth
+  local rootHeight = bandHeight
   local requestedLeft = tonumber(config.stripOffsetX) or 0
   local requestedTop = tonumber(config.stripOffsetY) or 0
 
@@ -118,7 +186,12 @@ local function ComputeLayout(renderState)
     rootLeft = rootLeft,
     rootTop = rootTop,
     rootWidth = rootWidth,
-    rootHeight = rootHeight
+    rootHeight = rootHeight,
+    bandWidth = bandWidth,
+    bandHeight = bandHeight,
+    displayScaleX = effectiveScaleX,
+    displayScaleY = effectiveScaleY,
+    displayCompensation = compensation
   }
 end
 
@@ -126,26 +199,20 @@ local function ApplyLayout(renderState)
   local profile = renderState.profile
   local observerConfig = config.observerLane or {}
   local layout = ComputeLayout(renderState)
-  local displayScaleX = tonumber(profile.displayScaleX) or tonumber(profile.displayScale) or 1
-  local displayScaleY = tonumber(profile.displayScaleY) or tonumber(profile.displayScale) or 1
+  local displayScaleX = layout.displayScaleX
+  local displayScaleY = layout.displayScaleY
   local index
-
-  if displayScaleX <= 0 then
-    displayScaleX = 1
-  end
-  if displayScaleY <= 0 then
-    displayScaleY = 1
-  end
-
-  local bandWidth = profile.bandWidth * displayScaleX
-  local bandHeight = profile.bandHeight * displayScaleY
+  local bandWidth = layout.bandWidth
+  local bandHeight = layout.bandHeight
 
   if renderState.lastRootLeft == layout.rootLeft
       and renderState.lastRootTop == layout.rootTop
       and renderState.lastRootWidth == layout.rootWidth
       and renderState.lastRootHeight == layout.rootHeight
       and renderState.lastAnchorWidth == layout.anchorWidth
-      and renderState.lastAnchorHeight == layout.anchorHeight then
+      and renderState.lastAnchorHeight == layout.anchorHeight
+      and renderState.lastDisplayScaleX == displayScaleX
+      and renderState.lastDisplayScaleY == displayScaleY then
     return false
   end
 
@@ -219,6 +286,9 @@ local function ApplyLayout(renderState)
   renderState.lastRootHeight = layout.rootHeight
   renderState.lastAnchorWidth = layout.anchorWidth
   renderState.lastAnchorHeight = layout.anchorHeight
+  renderState.lastDisplayScaleX = displayScaleX
+  renderState.lastDisplayScaleY = displayScaleY
+  renderState.lastDisplayCompensation = layout.displayCompensation
   return true
 end
 
@@ -269,7 +339,10 @@ function ChromaLink.Render.Initialize(rootFrame, anchorFrame)
     lastRootWidth = nil,
     lastRootHeight = nil,
     lastAnchorWidth = nil,
-    lastAnchorHeight = nil
+    lastAnchorHeight = nil,
+    lastDisplayScaleX = nil,
+    lastDisplayScaleY = nil,
+    lastDisplayCompensation = nil
   }
 end
 
@@ -284,6 +357,19 @@ function ChromaLink.Render.SetObserverEnabled(renderState, enabled)
 
   renderState.observerLane.enabled = enabled and true or false
   return ApplyLayout(renderState)
+end
+
+function ChromaLink.Render.GetDisplayCompensationSummary(renderState)
+  if renderState == nil then
+    return nil
+  end
+
+  local summary = renderState.lastDisplayCompensation
+  if summary == nil then
+    return nil
+  end
+
+  return summary
 end
 
 function ChromaLink.Render.Update(renderState, symbols)

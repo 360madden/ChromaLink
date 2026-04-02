@@ -23,7 +23,7 @@ local function SetTraceMode(enabled)
 end
 
 local function PrintHelp()
-  ChromaLink.Diagnostics.Log("Commands: /cl status | /cl diag | /cl refresh | /cl observer on|off|status | /cl traces on|off")
+  ChromaLink.Diagnostics.Log("Commands: /cl status | /cl diag | /cl refresh | /cl observer on|off|status | /cl compensate on|off|status | /cl traces on|off")
 end
 
 function ChromaLink.Commands.OnSlashCommand(_, commandText)
@@ -74,6 +74,23 @@ function ChromaLink.Commands.OnSlashCommand(_, commandText)
     if option == "off" then
       SetTraceMode(false)
       ChromaLink.Diagnostics.Log("Layout traces disabled for this session. Run /reloadui to remove existing probe frames and trace hooks.")
+      return
+    end
+  end
+
+  if command == "compensate" or command == "compensation" then
+    if option == "on" then
+      ChromaLink.Bootstrap.SetDisplayCompensationEnabled(true)
+      return
+    end
+
+    if option == "off" then
+      ChromaLink.Bootstrap.SetDisplayCompensationEnabled(false)
+      return
+    end
+
+    if option == "status" or option == "" then
+      ChromaLink.Bootstrap.LogStatus(false)
       return
     end
   end

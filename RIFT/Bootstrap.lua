@@ -178,6 +178,8 @@ function ChromaLink.Bootstrap.LogStatus(includeNativeFrames)
   local state = ChromaLink.Bootstrap.state
   local diagnosticsConfig = ChromaLink.Config.layoutDiagnostics or {}
   local observerConfig = ChromaLink.Config.observerLane or {}
+  local compensationConfig = ChromaLink.Config.displayCompensation or {}
+  local compensationSummary
   local nativeFrames
   local entry
 
@@ -197,6 +199,18 @@ function ChromaLink.Bootstrap.LogStatus(includeNativeFrames)
     "Anchor=%s strata=%s.",
     tostring(state.layoutAnchorReason or "context"),
     tostring(state.resolvedStrata or ChromaLink.Config.requestedStrata or "default")))
+
+  compensationSummary = ChromaLink.Render.GetDisplayCompensationSummary(state.render)
+  if compensationSummary ~= nil then
+    ChromaLink.Diagnostics.Log(string.format(
+      "Compensation: enabled=%s mode=%s anchorRatio=%.3fx%.3f scale=%.3fx%.3f.",
+      compensationConfig.enabled and "on" or "off",
+      tostring(compensationSummary.reason or compensationConfig.mode or "disabled"),
+      tonumber(compensationSummary.anchorRatioX) or 1,
+      tonumber(compensationSummary.anchorRatioY) or 1,
+      tonumber(compensationSummary.effectiveScaleX) or 1,
+      tonumber(compensationSummary.effectiveScaleY) or 1))
+  end
 
   LogFrameStatus("layout.anchor", state.layoutAnchor, "status")
   LogFrameStatus("layout.root", state.root, "status")
@@ -243,6 +257,26 @@ function ChromaLink.Bootstrap.SetObserverEnabled(enabled)
 
   ChromaLink.Render.SetObserverEnabled(state.render, observerConfig.enabled)
   ChromaLink.Diagnostics.Log("Observer lane " .. (observerConfig.enabled and "enabled" or "disabled") .. ".")
+end
+
+function ChromaLink.Bootstrap.SetDisplayCompensationEnabled(enabled)
+  local state = ChromaLink.Bootstrap.state
+  local compensationConfig = ChromaLink.Config.displayCompensation
+
+  if compensationConfig == nil then
+    ChromaLink.Diagnostics.Log("Display compensation is unavailable in this build.")
+    return
+  end
+
+  compensationConfig.enabled = enabled and true or false
+
+  if state == nil or state.render == nil then
+    ChromaLink.Diagnostics.Log("Display compensation updated; reload the addon to apply it.")
+    return
+  end
+
+  ChromaLink.Render.SyncLayout(state.render)
+  ChromaLink.Bootstrap.LogStatus(false)
 end
 
 function ChromaLink.Bootstrap.Initialize()

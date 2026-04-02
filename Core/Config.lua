@@ -39,6 +39,13 @@ ChromaLink.Config = {
     markerWidth = 20,
     markerSymbols = { 0, 1, 2, 3, 4, 5, 6, 7 }
   },
+  displayCompensation = {
+    enabled = false,
+    mode = "anchor-ratio",
+    maxScaleX = 4.0,
+    maxScaleY = 4.0,
+    allowShrink = false
+  },
   preferHighestAvailableStrata = true,
   protocolVersion = 1,
   syntheticMode = {

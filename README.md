@@ -132,6 +132,9 @@ ChromaLink exposes a small slash-command surface inside RIFT:
 - `/cl observer on`
 - `/cl observer off`
 - `/cl observer status`
+- `/cl compensate on`
+- `/cl compensate off`
+- `/cl compensate status`
 - `/cl traces on`
 - `/cl traces off`
 
@@ -141,7 +144,10 @@ What they are for:
 - `diag` adds nearby native RIFT frame summaries for overlap and layout checks
 - `refresh` forces an immediate strip redraw
 - `observer` toggles the optional observer lane below the strip
+- `compensate` toggles experimental display-compensation sizing that tries to preserve final on-screen strip size when the UI anchor reports shrinkage
 - `traces` arms or disables verbose layout tracing for the next `/reloadui`
+
+Display compensation is still experimental. It is meant to test the idea of oversizing the strip internally so the final displayed strip stays closer to the target machine-readable size.
 
 ## Observer Lane
 
