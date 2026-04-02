@@ -1138,6 +1138,43 @@ Keep.
 
 ---
 
+## 2026-04-03 - Session V - monitor launch ergonomics
+
+### Goal
+
+Make the new live monitor as easy to launch from the repo as the other ChromaLink tools.
+
+### Change
+
+- add `scripts/Open-ChromaLink-Monitor.cmd`
+- update README workflow text so the monitor has a concrete one-command launch path
+
+### Why
+
+The monitor was already built and documented, but without a simple launcher it still felt less polished than the rest of the toolkit.
+
+### Verification
+
+```powershell
+.\scripts\Open-ChromaLink-Monitor.cmd
+```
+
+### Result
+
+- the monitor launch wrapper executed without error
+- the monitor now has a repo-level entry point consistent with the other ChromaLink tools
+- README workflow text now points to a concrete launch command instead of a generic app name
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for monitor launch ergonomics
+
+---
+
 ## 2026-04-03 - Session V - live monitor launch and discovery
 
 ### Goal

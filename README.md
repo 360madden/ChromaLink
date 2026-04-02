@@ -238,13 +238,14 @@ Use the live monitor when you want a product-style view of the rolling bridge sn
 - `ChromaLink.Monitor` is the live-first UI for `chromalink-live-telemetry.json`
 - the inspector is still the artifact and BMP analyzer
 - `Bridge-ChromaLink.cmd` keeps the snapshot fresh in the background
+- `Open-ChromaLink-Monitor.cmd` launches the live monitor directly
 - `Watch-ChromaLinkTelemetry.cmd` opens the console snapshot view if you want something lighter than the GUI
 - `Test-ChromaLinkTelemetryReady.cmd` is the automation-friendly gate for readiness and freshness
 
 Recommended workflow:
 
 1. Start `Bridge-ChromaLink.cmd` or `Watch-ChromaLinkTelemetry.cmd`
-2. Open `ChromaLink.Monitor` for the live bridge view
+2. Open `Open-ChromaLink-Monitor.cmd` for the live bridge view
 3. Open the inspector only when you need BMP artifacts or overlay diagnostics
 4. Use `Test-ChromaLinkTelemetryReady.cmd` in scripts or checks
 
@@ -259,6 +260,7 @@ Useful helper scripts:
 - [scripts/Live-ChromaLink.cmd](scripts/Live-ChromaLink.cmd)
 - [scripts/Show-ChromaLinkTelemetry.cmd](scripts/Show-ChromaLinkTelemetry.cmd)
 - [scripts/Watch-ChromaLinkTelemetry.cmd](scripts/Watch-ChromaLinkTelemetry.cmd)
+- [scripts/Open-ChromaLink-Monitor.cmd](scripts/Open-ChromaLink-Monitor.cmd)
 - [scripts/Open-ChromaLinkTelemetryJson.cmd](scripts/Open-ChromaLinkTelemetryJson.cmd)
 - [scripts/Open-ChromaLinkTelemetryFolder.cmd](scripts/Open-ChromaLinkTelemetryFolder.cmd)
 - [scripts/Test-ChromaLinkTelemetryReady.cmd](scripts/Test-ChromaLinkTelemetryReady.cmd)
