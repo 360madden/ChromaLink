@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChromaLink.Tests", "ChromaL
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChromaLink.Inspector", "ChromaLink.Inspector\ChromaLink.Inspector.csproj", "{5DF7BB7D-8A58-44A6-9C26-52F7E8A8CC6D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChromaLink.Monitor", "ChromaLink.Monitor\ChromaLink.Monitor.csproj", "{E8A8C9C0-6D43-4B3A-8D93-72A7AE4F3A90}"
+EndProject
 Global
   GlobalSection(SolutionConfigurationPlatforms) = preSolution
     Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
     {5DF7BB7D-8A58-44A6-9C26-52F7E8A8CC6D}.Debug|Any CPU.Build.0 = Debug|Any CPU
     {5DF7BB7D-8A58-44A6-9C26-52F7E8A8CC6D}.Release|Any CPU.ActiveCfg = Release|Any CPU
     {5DF7BB7D-8A58-44A6-9C26-52F7E8A8CC6D}.Release|Any CPU.Build.0 = Release|Any CPU
+    {E8A8C9C0-6D43-4B3A-8D93-72A7AE4F3A90}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+    {E8A8C9C0-6D43-4B3A-8D93-72A7AE4F3A90}.Debug|Any CPU.Build.0 = Debug|Any CPU
+    {E8A8C9C0-6D43-4B3A-8D93-72A7AE4F3A90}.Release|Any CPU.ActiveCfg = Release|Any CPU
+    {E8A8C9C0-6D43-4B3A-8D93-72A7AE4F3A90}.Release|Any CPU.Build.0 = Release|Any CPU
   EndGlobalSection
   GlobalSection(SolutionProperties) = preSolution
     HideSolutionNode = FALSE
