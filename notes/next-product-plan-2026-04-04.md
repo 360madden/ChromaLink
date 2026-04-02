@@ -104,3 +104,52 @@ Assemble only if all of these remain healthy:
 - another local tool can read ChromaLink state over HTTP without parsing files directly
 - the JSON snapshot remains the backing contract
 - the repo ends in a clean, documented checkpoint
+
+---
+
+## 2026-04-04 - Session W - HTTP bridge helper scripts
+
+### Goal
+
+Add thin scripts around the local HTTP bridge so it is easy to launch, open, and probe from the repo.
+
+### Change
+
+- add `scripts/Launch-ChromaLinkHttpBridge.cmd`
+- add `scripts/Open-ChromaLinkHttpBridge.cmd`
+- add `scripts/Probe-ChromaLinkHttpBridge.ps1`
+- add `scripts/Probe-ChromaLinkHttpBridge.cmd`
+- point the open helper at the latest-snapshot endpoint by default
+- keep the probe helper contract-driven with `/health`, `/ready`, `/latest-snapshot`, and `/snapshot`
+
+### Why
+
+The bridge already existed, so the right scripts-level improvement was to make it easy to launch and validate without creating another layer of custom plumbing.
+
+### Verification
+
+```powershell
+dotnet build .\DesktopDotNet\ChromaLink.HttpBridge\ChromaLink.HttpBridge.csproj
+```
+
+```powershell
+$bridge = Start-Process -FilePath dotnet -ArgumentList @('run','--project','.\\DesktopDotNet\\ChromaLink.HttpBridge\\ChromaLink.HttpBridge.csproj') -PassThru -WindowStyle Hidden; try { Start-Sleep -Seconds 3; .\\scripts\\Probe-ChromaLinkHttpBridge.cmd -BaseUrl http://127.0.0.1:7337/; } finally { if ($bridge -and -not $bridge.HasExited) { Stop-Process -Id $bridge.Id -Force } }
+```
+
+### Result
+
+- the HTTP bridge built successfully
+- the probe script reported successful responses from:
+  - `/latest-snapshot`
+  - `/health`
+  - `/ready`
+  - `/snapshot`
+- the open helper defaults to the latest snapshot view, which is the most useful human-facing entry point
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for HTTP bridge helper scripts
