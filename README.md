@@ -104,6 +104,12 @@ dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- liv
 dotnet run --project .\DesktopDotNet\ChromaLink.Inspector\ChromaLink.Inspector.csproj
 ```
 
+### Open The Live Monitor
+
+```powershell
+dotnet run --project .\DesktopDotNet\ChromaLink.Monitor\ChromaLink.Monitor.csproj
+```
+
 ## CLI Commands
 
 `ChromaLink.Cli` currently supports:
@@ -225,6 +231,23 @@ The header `ReservedFlags` byte is now used as a live build-capability marker. C
 
 That gives live captures a direct way to prove whether the running addon actually loaded a newer telemetry build.
 
+## Live Monitor
+
+Use the live monitor when you want a product-style view of the rolling bridge snapshot.
+
+- `ChromaLink.Monitor` is the live-first UI for `chromalink-live-telemetry.json`
+- the inspector is still the artifact and BMP analyzer
+- `Bridge-ChromaLink.cmd` keeps the snapshot fresh in the background
+- `Watch-ChromaLinkTelemetry.cmd` opens the console snapshot view if you want something lighter than the GUI
+- `Test-ChromaLinkTelemetryReady.cmd` is the automation-friendly gate for readiness and freshness
+
+Recommended workflow:
+
+1. Start `Bridge-ChromaLink.cmd` or `Watch-ChromaLinkTelemetry.cmd`
+2. Open `ChromaLink.Monitor` for the live bridge view
+3. Open the inspector only when you need BMP artifacts or overlay diagnostics
+4. Use `Test-ChromaLinkTelemetryReady.cmd` in scripts or checks
+
 ## Wrapper Scripts
 
 Useful helper scripts:
@@ -238,6 +261,7 @@ Useful helper scripts:
 - [scripts/Watch-ChromaLinkTelemetry.cmd](scripts/Watch-ChromaLinkTelemetry.cmd)
 - [scripts/Open-ChromaLinkTelemetryJson.cmd](scripts/Open-ChromaLinkTelemetryJson.cmd)
 - [scripts/Open-ChromaLinkTelemetryFolder.cmd](scripts/Open-ChromaLinkTelemetryFolder.cmd)
+- [scripts/Test-ChromaLinkTelemetryReady.cmd](scripts/Test-ChromaLinkTelemetryReady.cmd)
 - [scripts/Open-ChromaLink-Inspector.cmd](scripts/Open-ChromaLink-Inspector.cmd)
 - [scripts/Reload-RiftUi.cmd](scripts/Reload-RiftUi.cmd)
 - [scripts/Send-RiftSlash.cmd](scripts/Send-RiftSlash.cmd)
@@ -271,6 +295,7 @@ That runs the CLI in continuous watch mode and keeps `%LOCALAPPDATA%\ChromaLink\
 - last decoded frame metadata
 - reserved build flags
 - bridge contract metadata for downstream consumers
+- the `ChromaLink.Monitor` UI is the primary live viewer for that snapshot
 
 To read the latest merged telemetry snapshot from the console without opening the inspector:
 
@@ -317,6 +342,7 @@ ChromaLink/
 ├── DesktopDotNet/                # .NET 9 solution
 │   ├── ChromaLink.Reader/        # capture, geometry lock, decode, shared diagnostics
 │   ├── ChromaLink.Cli/           # smoke, replay, live, watch, bench, dump, prep
+│   ├── ChromaLink.Monitor/       # live bridge UI for the rolling snapshot
 │   ├── ChromaLink.Inspector/     # visual frame inspection and overlays
 │   ├── ChromaLink.Tests/         # protocol, replay, synthetic, observer tests
 │   └── ChromaLink.sln

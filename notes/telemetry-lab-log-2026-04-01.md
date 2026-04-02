@@ -1135,3 +1135,46 @@ Keep.
 ### Saved Checkpoint
 
 - pending commit for bridge freshness and live-first monitoring
+
+---
+
+## 2026-04-03 - Session V - live monitor launch and discovery
+
+### Goal
+
+Make the live monitor easy to find and clearly position it relative to the inspector, bridge scripts, and readiness checks.
+
+### Change
+
+- add `ChromaLink.Monitor` to the docs as the primary live viewer for `chromalink-live-telemetry.json`
+- document the launch command for the monitor
+- clarify the division of labor:
+  - monitor for live bridge viewing
+  - inspector for BMP/artifact inspection
+  - bridge scripts for keeping the snapshot fresh
+  - readiness script for automation checks
+- add the helper script discovery paths for:
+  - `Watch-ChromaLinkTelemetry.cmd`
+  - `Open-ChromaLinkTelemetryJson.cmd`
+  - `Open-ChromaLinkTelemetryFolder.cmd`
+  - `Test-ChromaLinkTelemetryReady.cmd`
+
+### Why
+
+Once the consumer and bridge health work landed, the docs needed to make the monitor the obvious first stop for live telemetry use.
+
+### Verification
+
+Pending local launch/build sanity check.
+
+### Result
+
+Pending.
+
+### Decision
+
+Keep.
+
+### Saved Checkpoint
+
+- pending commit for live monitor launch and discovery
