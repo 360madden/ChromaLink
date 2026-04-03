@@ -1,6 +1,6 @@
 param(
   [Parameter(Position = 0)]
-  [ValidateSet("smoke", "bench", "capture-dump", "live", "watch", "replay", "prepare-window")]
+  [ValidateSet("smoke", "bench", "validate", "capture-dump", "live", "watch", "replay", "prepare-window")]
   [string]$Mode = "smoke",
 
   [Parameter(Position = 1)]

@@ -24,6 +24,7 @@ internal sealed class CliApp
             "live" => RunLive(args, watchMode: false),
             "watch" => RunLive(args, watchMode: true),
             "bench" => RunBench(),
+            "validate" => RunValidate(),
             "capture-dump" => RunCaptureDump(args),
             "prepare-window" => RunPrepareWindow(args),
             "help" or "--help" or "-h" => PrintUsage(),
@@ -183,6 +184,31 @@ internal sealed class CliApp
         Console.WriteLine($"AverageReplayDecodeMs: {results.Average(static result => result.LocateDecodeMs):F2}");
         Console.WriteLine($"P95ReplayDecodeMs: {Percentile(results.Select(static result => result.LocateDecodeMs).ToArray(), 0.95):F2}");
         return results.All(static result => result.Result.IsAccepted) ? 0 : 1;
+    }
+
+    private int RunValidate()
+    {
+        Console.WriteLine("ChromaLink");
+        Console.WriteLine("Mode: validate");
+
+        var smokeExitCode = RunSmoke();
+
+        var fixturePath = Path.Combine(PathProvider.EnsureFixtureDirectory(), "chromalink-color-core.bmp");
+        var replayExitCode = File.Exists(fixturePath)
+            ? RunReplay(new[] { "replay", fixturePath })
+            : Fail($"Replay fixture not found after smoke: {fixturePath}");
+        var benchExitCode = RunBench();
+
+        var smokePassed = smokeExitCode == 0;
+        var replayPassed = replayExitCode == 0;
+        var benchPassed = benchExitCode == 0;
+
+        Console.WriteLine("ValidateSummary:");
+        Console.WriteLine($"Smoke: {(smokePassed ? "passed" : "failed")}");
+        Console.WriteLine($"Replay: {(replayPassed ? "passed" : "failed")} ({fixturePath})");
+        Console.WriteLine($"Bench: {(benchPassed ? "passed" : "failed")}");
+
+        return smokePassed && replayPassed && benchPassed ? 0 : 1;
     }
 
     private int RunLive(string[] args, bool watchMode)
@@ -761,6 +787,7 @@ internal sealed class CliApp
         Console.WriteLine("  live [sampleCount] [sleepMs] [--backend desktopdup|screen|printwindow]");
         Console.WriteLine("  watch [durationSeconds] [sleepMs] [--backend desktopdup|screen|printwindow]");
         Console.WriteLine("  bench");
+        Console.WriteLine("  validate");
         Console.WriteLine("  capture-dump [--backend desktopdup|screen|printwindow]");
         Console.WriteLine("  prepare-window [left] [top]");
         return 0;
