@@ -21,11 +21,23 @@ ChromaLink is intentionally narrow right now. The active baseline is:
 - `80` vertical segments at `8x24`
 - fixed `8-color` alphabet
 - fixed control markers on both edges
-- fast heartbeat frame: `coreStatus`
-- proven rotating expansions: `playerVitals`, `playerPosition`
-- proven cast expansion: `playerCast`
-- live-proven expanded slices: `playerResources`, `playerCombat`, `targetPosition`, `followUnitStatus`
-- expanded generic telemetry pages: `targetVitals`, `targetResources`, `auxUnitCast`, `auraPage`, `textPage`, `abilityWatch`
+- telemetry-first default rotation:
+  - `coreStatus`
+  - `playerVitals`
+  - `playerResources`
+  - `playerCombat`
+- additional frame types remain in the codebase for compatibility and future controlled expansion:
+  - `playerPosition`
+  - `playerCast`
+  - `targetVitals`
+  - `targetResources`
+  - `targetPosition`
+  - `followUnitStatus`
+  - `auxUnitCast`
+  - `auraPage`
+  - `textPage`
+  - `abilityWatch`
+- Rift Meter integration is being prepared as an optional enrichment path, but it is not part of the active transport contract yet
 
 Current live proof:
 
@@ -42,6 +54,12 @@ Current live proof:
   - text and aura pages are loaded
   - live captures now also decode `TargetVitals`, `AuxUnitCast`, `AuraPage`, `TextPage`, and `AbilityWatch`
 - capture sessions emit raw BMP, annotated BMP, and JSON sidecars under `%LOCALAPPDATA%\ChromaLink\DesktopDotNet\out`
+
+Current offline refocus note:
+
+- while RIFT is unavailable, active work is limited to low-risk refocus steps
+- the addon now carries a disabled-by-default Rift Meter adapter boundary for future integration
+- no Rift Meter data is currently published into transport payloads
 
 ## How It Works
 
@@ -92,6 +110,12 @@ dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- pre
 dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- smoke
 ```
 
+### Validate The Local Baseline
+
+```powershell
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- validate
+```
+
 ### Replay A Saved Capture
 
 ```powershell
@@ -126,8 +150,11 @@ dotnet run --project .\DesktopDotNet\ChromaLink.Monitor\ChromaLink.Monitor.cspro
 - `live [sampleCount] [sleepMs]`
 - `watch [durationSeconds] [sleepMs]`
 - `bench`
+- `validate`
 - `capture-dump`
 - `prepare-window [left] [top]`
+
+Use `validate` to run `smoke`, replay of the generated fixture, and `bench` in one command.
 
 `live` and `watch` now report per-frame-type counts for accepted samples, which makes rotating telemetry easier to verify.
 
@@ -424,6 +451,7 @@ Useful helper scripts:
 - [scripts/Prepare-ChromaLink-640x360.cmd](scripts/Prepare-ChromaLink-640x360.cmd)
 - [scripts/Smoke-ChromaLink.cmd](scripts/Smoke-ChromaLink.cmd)
 - [scripts/Bench-ChromaLink.cmd](scripts/Bench-ChromaLink.cmd)
+- [scripts/Validate-ChromaLink.cmd](scripts/Validate-ChromaLink.cmd)
 - [scripts/Live-ChromaLink.cmd](scripts/Live-ChromaLink.cmd)
 - [scripts/Show-ChromaLinkTelemetry.cmd](scripts/Show-ChromaLinkTelemetry.cmd)
 - [scripts/Watch-ChromaLinkTelemetry.cmd](scripts/Watch-ChromaLinkTelemetry.cmd)

@@ -327,6 +327,33 @@ local function SafeRealtimeNow()
   return 0
 end
 
+local function BuildRiftMeterSnapshot()
+  local integrationConfig = config.riftMeter or {}
+  local adapter = ChromaLink.RiftMeterAdapter
+
+  if not integrationConfig.enabled and not integrationConfig.probeStatus then
+    return nil
+  end
+
+  if adapter == nil or adapter.BuildSnapshot == nil then
+    return nil
+  end
+
+  return adapter.BuildSnapshot()
+end
+
+local function AttachSourceContext(snapshot)
+  local enriched = snapshot or {}
+  local riftMeterSnapshot = BuildRiftMeterSnapshot()
+
+  enriched.sourceNow = SafeRealtimeNow()
+  if riftMeterSnapshot ~= nil then
+    enriched.riftMeter = riftMeterSnapshot
+  end
+
+  return enriched
+end
+
 local function BuildAbilityNameIndex()
   local abilities = SafeAbilityList()
   local details
@@ -703,7 +730,7 @@ function ChromaLink.Gather.BuildCoreStatusSnapshot()
   local playerResourceKind, _, _, playerResourcePct = SelectPreferredResource(player, playerCallingCode)
   local targetResourceKind, _, _, targetResourcePct = SelectPreferredResource(target, targetCallingCode)
 
-  return {
+  return AttachSourceContext({
     playerStateFlags = ClampByte(BuildPlayerStateFlags(player)),
     playerHealthPctQ8 = ClampByte(QuantizePercent(player and player.health, player and player.healthMax)),
     playerResourceKind = ClampByte(playerResourceKind),
@@ -716,7 +743,7 @@ function ChromaLink.Gather.BuildCoreStatusSnapshot()
     targetLevel = ClampByte(target and target.level),
     playerCallingRolePacked = ClampByte((playerCallingCode * 16) + playerRoleCode),
     targetCallingRelationPacked = ClampByte((targetCallingCode * 16) + relationCode)
-  }
+  })
 end
 
 function ChromaLink.Gather.BuildPlayerVitalsSnapshot()
@@ -724,13 +751,13 @@ function ChromaLink.Gather.BuildPlayerVitalsSnapshot()
   local playerCallingCode = EncodeCallingCode(player and (player.calling or player.callingName))
   local playerResourceKind, resourceCurrent, resourceMax, _ = SelectPreferredResource(player, playerCallingCode)
 
-  return {
+  return AttachSourceContext({
     resourceKind = ClampByte(playerResourceKind),
     healthCurrent = ClampUInt32(player and player.health),
     healthMax = ClampUInt32(player and player.healthMax),
     resourceCurrent = ClampUInt16(resourceCurrent),
     resourceMax = ClampUInt16(resourceMax)
-  }
+  })
 end
 
 function ChromaLink.Gather.BuildPlayerPositionSnapshot()
@@ -873,14 +900,14 @@ end
 function ChromaLink.Gather.BuildPlayerResourcesSnapshot()
   local player = SafeUnitDetail("player")
 
-  return {
+  return AttachSourceContext({
     manaCurrent = ClampUInt16(player and player.mana),
     manaMax = ClampUInt16(player and player.manaMax),
     energyCurrent = ClampUInt16(player and player.energy),
     energyMax = ClampUInt16(player and player.energyMax),
     powerCurrent = ClampUInt16(player and player.power),
     powerMax = ClampUInt16(player and player.powerMax)
-  }
+  })
 end
 
 function ChromaLink.Gather.BuildPlayerCombatSnapshot()
@@ -912,7 +939,7 @@ function ChromaLink.Gather.BuildPlayerCombatSnapshot()
     flags = flags + 128
   end
 
-  return {
+  return AttachSourceContext({
     combatFlags = ClampByte(flags),
     combo = ClampByte(player and player.combo),
     chargeCurrent = ClampUInt16(player and player.charge),
@@ -920,7 +947,7 @@ function ChromaLink.Gather.BuildPlayerCombatSnapshot()
     planarCurrent = ClampUInt16(player and player.planar),
     planarMax = ClampUInt16(player and player.planarMax),
     absorb = ClampUInt16(player and player.absorb)
-  }
+  })
 end
 
 function ChromaLink.Gather.BuildFollowUnitStatusSnapshot(slotOverride)

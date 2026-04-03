@@ -64,6 +64,11 @@ ChromaLink.Config = {
     enabled = true,
     trackedAbilities = {}
   },
+  riftMeter = {
+    enabled = false,
+    probeStatus = true,
+    publishTelemetry = false
+  },
   preferHighestAvailableStrata = true,
   protocolVersion = 1,
   headerFlags = {
@@ -94,36 +99,11 @@ ChromaLink.Config = {
   },
   frameRotation = {
     "coreStatus",
-    "coreStatus",
     "playerVitals",
-    "coreStatus",
-    "playerPosition",
-    "coreStatus",
-    "playerCast",
     "coreStatus",
     "playerResources",
     "coreStatus",
-    "playerCombat",
-    "coreStatus",
-    "targetVitals",
-    "coreStatus",
-    "targetResources",
-    "coreStatus",
-    "targetPosition",
-    "coreStatus",
-    "auxUnitCast",
-    "coreStatus",
-    "followUnitStatus",
-    "coreStatus",
-    "auraPage",
-    "coreStatus",
-    "auraPage",
-    "coreStatus",
-    "textPage",
-    "coreStatus",
-    "textPage",
-    "coreStatus",
-    "abilityWatch"
+    "playerCombat"
   },
   syntheticMode = {
     enabled = false

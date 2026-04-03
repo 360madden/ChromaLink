@@ -282,6 +282,37 @@ local function ResolveNextAbilityWatchPage(state)
   return selected
 end
 
+local function BuildRiftMeterStatus()
+  local adapter = ChromaLink.RiftMeterAdapter
+  local integrationConfig = ChromaLink.Config.riftMeter or {}
+  local snapshot
+
+  if adapter == nil or adapter.BuildSnapshot == nil then
+    return {
+      configured = integrationConfig.enabled and true or false,
+      probeStatus = integrationConfig.probeStatus and true or false,
+      available = false,
+      loaded = false,
+      warnings = { "adapter unavailable" }
+    }
+  end
+
+  if not integrationConfig.probeStatus then
+    return {
+      configured = integrationConfig.enabled and true or false,
+      probeStatus = false,
+      available = false,
+      loaded = false,
+      warnings = { "status probe disabled" }
+    }
+  end
+
+  snapshot = adapter.BuildSnapshot() or {}
+  snapshot.configured = integrationConfig.enabled and true or false
+  snapshot.probeStatus = true
+  return snapshot
+end
+
 local function BuildSyntheticFrame(frameKind, sequence)
   local snapshot
   local _, symbols
@@ -475,6 +506,8 @@ function ChromaLink.Bootstrap.LogStatus(includeNativeFrames)
   local compensationConfig = ChromaLink.Config.displayCompensation or {}
   local compensationSummary
   local rotation = ChromaLink.Config.frameRotation or {}
+  local riftMeterStatus
+  local warningsSummary
   local nativeFrames
   local entry
 
@@ -482,6 +515,9 @@ function ChromaLink.Bootstrap.LogStatus(includeNativeFrames)
     ChromaLink.Diagnostics.Log("Status requested before initialization.")
     return
   end
+
+  state.riftMeterStatus = BuildRiftMeterStatus()
+  riftMeterStatus = state.riftMeterStatus
 
   ChromaLink.Diagnostics.Log(string.format(
     "Status: seq=%d frame=%s strips=%d lastReason=%s diag=%s traces=%s observer=%s.",
@@ -493,6 +529,19 @@ function ChromaLink.Bootstrap.LogStatus(includeNativeFrames)
     diagnosticsConfig.logEvents and "on" or "off",
     observerConfig.enabled and "on" or "off"))
   ChromaLink.Diagnostics.Log("Rotation: " .. table.concat(rotation, " -> ") .. ".")
+  warningsSummary = "none"
+  if type(riftMeterStatus.warnings) == "table" and #riftMeterStatus.warnings > 0 then
+    warningsSummary = table.concat(riftMeterStatus.warnings, "; ")
+  end
+  ChromaLink.Diagnostics.Log(string.format(
+    "RiftMeter: configured=%s probe=%s loaded=%s active=%s combats=%s durationMs=%s warnings=%s.",
+    riftMeterStatus.configured and "on" or "off",
+    riftMeterStatus.probeStatus and "on" or "off",
+    riftMeterStatus.loaded and "yes" or "no",
+    riftMeterStatus.inCombat and "yes" or "no",
+    tostring(riftMeterStatus.combatCount or 0),
+    tostring(riftMeterStatus.activeCombatDurationMs or "n/a"),
+    warningsSummary))
   ChromaLink.Diagnostics.Log(string.format(
     "Anchor=%s strata=%s.",
     tostring(state.layoutAnchorReason or "context"),
@@ -544,6 +593,7 @@ function ChromaLink.Bootstrap.LogBuildStatus()
   local profile = ChromaLink.Config.profile or {}
   local frameTypes = ChromaLink.Config.frameTypes or {}
   local headerFlags = ChromaLink.Config.headerFlags or {}
+  local riftMeterConfig = ChromaLink.Config.riftMeter or {}
 
   ChromaLink.Diagnostics.Log(string.format("%s build: version=%s protocol=%s profile=%s.", identifier, tostring(version), tostring(protocolVersion), tostring(profile.id or "unknown")))
   ChromaLink.Diagnostics.Log(string.format(
@@ -583,6 +633,11 @@ function ChromaLink.Bootstrap.LogBuildStatus()
     ResolveStripCount(),
     tonumber(profile.segmentCount or 0),
     tonumber(profile.segmentWidth or 0)))
+  ChromaLink.Diagnostics.Log(string.format(
+    "RiftMeter integration: enabled=%s probe=%s publish=%s.",
+    riftMeterConfig.enabled and "on" or "off",
+    riftMeterConfig.probeStatus and "on" or "off",
+    riftMeterConfig.publishTelemetry and "on" or "off"))
 end
 
 function ChromaLink.Bootstrap.LogRotationStatus()
@@ -675,6 +730,7 @@ function ChromaLink.Bootstrap.Initialize()
     followSlotIndex = 1,
     auxUnitCastIndex = 1,
     abilityWatchPageIndex = 1,
+    riftMeterStatus = BuildRiftMeterStatus(),
     lastRefreshAt = 0,
     lastReason = "startup",
     lastFrameKind = "coreStatus",

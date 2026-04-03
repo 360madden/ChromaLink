@@ -42,7 +42,8 @@ public sealed record TelemetryAggregateSnapshot(
     public bool HasCompleteState =>
         CoreStatus is not null &&
         PlayerVitals is not null &&
-        PlayerPosition is not null;
+        PlayerResources is not null &&
+        PlayerCombat is not null;
 }
 
 public sealed class TelemetryAggregate

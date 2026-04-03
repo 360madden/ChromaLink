@@ -420,7 +420,8 @@ internal static class TelemetrySnapshotWriter
         {
             AgeMs(nowUtc, aggregate.CoreStatus?.ObservedAtUtc),
             AgeMs(nowUtc, aggregate.PlayerVitals?.ObservedAtUtc),
-            AgeMs(nowUtc, aggregate.PlayerPosition?.ObservedAtUtc)
+            AgeMs(nowUtc, aggregate.PlayerResources?.ObservedAtUtc),
+            AgeMs(nowUtc, aggregate.PlayerCombat?.ObservedAtUtc)
         };
 
         var presentAges = ages.Where(static age => age.HasValue).Select(static age => age!.Value).ToArray();
