@@ -41,7 +41,7 @@ local function PrintRotationStatus()
 end
 
 local function PrintHelp()
-  ChromaLink.Diagnostics.Log("Commands: /cl status | /cl build | /cl rotation | /cl diag | /cl refresh | /cl abilities status|export | /cl observer on|off|status | /cl compensate on|off|status | /cl traces on|off")
+  ChromaLink.Diagnostics.Log("Commands: /cl status | /cl build | /cl rotation | /cl diag | /cl refresh | /cl cache status | /cl abilities status|export | /cl observer on|off|status | /cl compensate on|off|status | /cl traces on|off")
 end
 
 function ChromaLink.Commands.OnSlashCommand(_, commandText)
@@ -70,9 +70,24 @@ function ChromaLink.Commands.OnSlashCommand(_, commandText)
   end
 
   if command == "refresh" then
+    if ChromaLink.StateCache ~= nil and ChromaLink.StateCache.ForceRefresh ~= nil then
+      ChromaLink.StateCache.ForceRefresh()
+    end
     ChromaLink.Bootstrap.SafeRefresh(true, "slash-refresh")
     ChromaLink.Diagnostics.Log("Forced strip refresh requested.")
     return
+  end
+
+  if command == "cache" then
+    if ChromaLink.StateCache == nil then
+      ChromaLink.Diagnostics.Log("State cache support is unavailable in this build.")
+      return
+    end
+
+    if option == "status" or option == "" then
+      ChromaLink.StateCache.LogStatus()
+      return
+    end
   end
 
   if command == "abilities" or command == "ability" then

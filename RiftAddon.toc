@@ -9,6 +9,7 @@ Version = "0.1.0"
 Environment = "4.4"
 RunOnStartup = {
   "Core/Config.lua",
+  "Core/StateCache.lua",
   "Core/Gather.lua",
   "Core/Protocol.lua",
   "RIFT/Diagnostics.lua",

@@ -646,6 +646,10 @@ function ChromaLink.Bootstrap.Initialize()
     return
   end
 
+  if ChromaLink.StateCache ~= nil and ChromaLink.StateCache.Initialize ~= nil then
+    ChromaLink.StateCache.Initialize()
+  end
+
   local context = UI.CreateContext("ChromaLinkContext")
   local root = UI.CreateFrame("Frame", "ChromaLinkRoot", context)
   local renderAnchor = UIParent or context
@@ -687,6 +691,9 @@ function ChromaLink.Bootstrap.Initialize()
   end
   ChromaLink.Diagnostics.Log("Using strata: " .. tostring(resolvedStrata or ChromaLink.Config.requestedStrata or "default") .. ".")
   ChromaLink.Diagnostics.Log("Using stacked strips: " .. tostring(ResolveStripCount()) .. ".")
+  if ChromaLink.StateCache ~= nil and ChromaLink.StateCache.LogStatus ~= nil then
+    ChromaLink.StateCache.LogStatus()
+  end
   if ChromaLink.Config.syntheticMode ~= nil and ChromaLink.Config.syntheticMode.enabled then
     ChromaLink.Diagnostics.Log("Synthetic strip mode is enabled.")
   end

@@ -11,6 +11,14 @@ ChromaLink.Config = {
   requestedStrata = "topmost",
   showOnStartup = true,
   refreshIntervalSeconds = 0.10,
+  stateCache = {
+    enabled = true,
+    unitTtlSeconds = 0.25,
+    castTtlSeconds = 0.10,
+    buffTtlSeconds = 0.25,
+    abilityTtlSeconds = 1.00,
+    primeTrackedUnitsOnInit = true
+  },
   stripOffsetX = 0,
   stripOffsetY = 0,
   layoutDiagnostics = {

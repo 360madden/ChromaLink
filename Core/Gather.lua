@@ -46,6 +46,15 @@ local function Lower(value)
 end
 
 local function SafeUnitLookup(reference)
+  local stateCache = ChromaLink.StateCache
+
+  if stateCache ~= nil and stateCache.GetUnitId ~= nil then
+    local cached = stateCache.GetUnitId(reference)
+    if cached ~= nil then
+      return cached
+    end
+  end
+
   if Inspect == nil or Inspect.Unit == nil or Inspect.Unit.Lookup == nil then
     return nil
   end
@@ -59,6 +68,15 @@ local function SafeUnitLookup(reference)
 end
 
 local function SafeUnitDetail(unit)
+  local stateCache = ChromaLink.StateCache
+
+  if stateCache ~= nil and stateCache.GetUnitDetail ~= nil then
+    local cached = stateCache.GetUnitDetail(unit)
+    if cached ~= nil then
+      return cached
+    end
+  end
+
   if unit == nil or Inspect == nil or Inspect.Unit == nil or Inspect.Unit.Detail == nil then
     return nil
   end
@@ -72,6 +90,15 @@ local function SafeUnitDetail(unit)
 end
 
 local function SafeUnitCastbar(unit)
+  local stateCache = ChromaLink.StateCache
+
+  if stateCache ~= nil and stateCache.GetUnitCastbar ~= nil then
+    local cached = stateCache.GetUnitCastbar(unit)
+    if cached ~= nil then
+      return cached
+    end
+  end
+
   if unit == nil or Inspect == nil or Inspect.Unit == nil or Inspect.Unit.Castbar == nil then
     return nil
   end
@@ -85,6 +112,15 @@ local function SafeUnitCastbar(unit)
 end
 
 local function SafeAbilityDetail(ability)
+  local stateCache = ChromaLink.StateCache
+
+  if stateCache ~= nil and stateCache.GetAbilityDetail ~= nil then
+    local cached = stateCache.GetAbilityDetail(ability)
+    if cached ~= nil then
+      return cached
+    end
+  end
+
   if ability == nil or Inspect == nil or Inspect.Ability == nil or Inspect.Ability.New == nil or Inspect.Ability.New.Detail == nil then
     return nil
   end
@@ -98,6 +134,15 @@ local function SafeAbilityDetail(ability)
 end
 
 local function SafeAbilityList()
+  local stateCache = ChromaLink.StateCache
+
+  if stateCache ~= nil and stateCache.GetAbilityList ~= nil then
+    local cached = stateCache.GetAbilityList()
+    if cached ~= nil then
+      return cached
+    end
+  end
+
   if Inspect == nil or Inspect.Ability == nil or Inspect.Ability.New == nil or Inspect.Ability.New.List == nil then
     return nil
   end
@@ -111,6 +156,15 @@ local function SafeAbilityList()
 end
 
 local function SafeBuffList(unit)
+  local stateCache = ChromaLink.StateCache
+
+  if stateCache ~= nil and stateCache.GetBuffList ~= nil then
+    local cached = stateCache.GetBuffList(unit)
+    if cached ~= nil then
+      return cached
+    end
+  end
+
   if unit == nil or Inspect == nil or Inspect.Buff == nil or Inspect.Buff.List == nil then
     return nil
   end
@@ -124,6 +178,15 @@ local function SafeBuffList(unit)
 end
 
 local function SafeBuffDetail(unit, buffs)
+  local stateCache = ChromaLink.StateCache
+
+  if stateCache ~= nil and stateCache.GetBuffDetail ~= nil then
+    local cached = stateCache.GetBuffDetail(unit, buffs)
+    if cached ~= nil then
+      return cached
+    end
+  end
+
   if unit == nil or buffs == nil or Inspect == nil or Inspect.Buff == nil or Inspect.Buff.Detail == nil then
     return nil
   end
