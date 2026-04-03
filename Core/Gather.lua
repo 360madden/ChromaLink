@@ -962,6 +962,7 @@ end
 function ChromaLink.Gather.BuildRiftMeterCombatSnapshot()
   local status = BuildRiftMeterSnapshot() or {}
   local flags = 0
+  local warningCount = type(status.warnings) == "table" and #status.warnings or 0
 
   if status.loaded then
     flags = flags + 1
@@ -980,6 +981,11 @@ function ChromaLink.Gather.BuildRiftMeterCombatSnapshot()
   end
   if tonumber(status.overallDurationMs) ~= nil and tonumber(status.overallDurationMs) > 0 then
     flags = flags + 32
+  end
+  if warningCount > 0 then
+    flags = flags + 64
+  elseif status.available then
+    flags = flags + 128
   end
 
   return AttachSourceContext({
@@ -1162,7 +1168,7 @@ end
 
 function ChromaLink.Gather.BuildSyntheticRiftMeterCombatSnapshot()
   return {
-    riftMeterFlags = 0x3F,
+    riftMeterFlags = 0xBF,
     combatCount = 2,
     activeCombatDurationDeci = 123,
     activeCombatPlayerCount = 1,

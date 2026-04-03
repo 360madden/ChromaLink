@@ -501,6 +501,8 @@ internal sealed class CliApp
                 Console.WriteLine($"RiftMeterLoaded: {((riftMeterCombat.Payload.RiftMeterFlags & 0x01) != 0).ToString().ToLowerInvariant()}");
                 Console.WriteLine($"RiftMeterAvailable: {((riftMeterCombat.Payload.RiftMeterFlags & 0x02) != 0).ToString().ToLowerInvariant()}");
                 Console.WriteLine($"RiftMeterActive: {((riftMeterCombat.Payload.RiftMeterFlags & 0x04) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"RiftMeterDegraded: {((riftMeterCombat.Payload.RiftMeterFlags & 0x40) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"RiftMeterStableSnapshot: {((riftMeterCombat.Payload.RiftMeterFlags & 0x80) != 0).ToString().ToLowerInvariant()}");
                 Console.WriteLine($"RiftMeterCombatCount: {riftMeterCombat.Payload.CombatCount}");
                 Console.WriteLine($"RiftMeterActiveDurationSeconds: {riftMeterCombat.Payload.ActiveCombatDurationDeci / 10.0:F1}");
                 Console.WriteLine($"RiftMeterActivePlayers: {riftMeterCombat.Payload.ActiveCombatPlayerCount}");
@@ -620,7 +622,7 @@ internal sealed class CliApp
             snapshot.RiftMeterCombat,
             nowUtc,
             observation =>
-                $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} flags=0x{observation.Frame.Payload.RiftMeterFlags:X2} combats={observation.Frame.Payload.CombatCount} activeSec={observation.Frame.Payload.ActiveCombatDurationDeci / 10.0:F1} activePlayers={observation.Frame.Payload.ActiveCombatPlayerCount} activeHostiles={observation.Frame.Payload.ActiveCombatHostileCount} overallSec={observation.Frame.Payload.OverallDurationDeci / 10.0:F1} overallPlayers={observation.Frame.Payload.OverallPlayerCount} overallHostiles={observation.Frame.Payload.OverallHostileCount} dmgK={observation.Frame.Payload.OverallDamageK} healK={observation.Frame.Payload.OverallHealingK}");
+                $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} flags=0x{observation.Frame.Payload.RiftMeterFlags:X2} degraded={((observation.Frame.Payload.RiftMeterFlags & 0x40) != 0).ToString().ToLowerInvariant()} combats={observation.Frame.Payload.CombatCount} activeSec={observation.Frame.Payload.ActiveCombatDurationDeci / 10.0:F1} activePlayers={observation.Frame.Payload.ActiveCombatPlayerCount} activeHostiles={observation.Frame.Payload.ActiveCombatHostileCount} overallSec={observation.Frame.Payload.OverallDurationDeci / 10.0:F1} overallPlayers={observation.Frame.Payload.OverallPlayerCount} overallHostiles={observation.Frame.Payload.OverallHostileCount} dmgK={observation.Frame.Payload.OverallDamageK} healK={observation.Frame.Payload.OverallHealingK}");
     }
 
     private static void WriteAggregateObservation<TFrame>(

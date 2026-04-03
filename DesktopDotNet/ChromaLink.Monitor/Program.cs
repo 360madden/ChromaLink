@@ -379,12 +379,22 @@ internal sealed class MonitorForm : Form
 
     private static string BuildRiftMeterCombatLine(JsonElement root)
     {
-        if (!root.TryGetProperty("aggregate", out var aggregate) || !aggregate.TryGetProperty("riftMeterCombat", out var frame) || frame.ValueKind != JsonValueKind.Object)
+        if (!root.TryGetProperty("aggregate", out var aggregate) || aggregate.ValueKind != JsonValueKind.Object)
         {
             return "RiftMeterCombat: missing";
         }
 
-        return $"RiftMeterCombat: active={TryGetBool(frame, "active")} combats={TryGetInt(frame, "combatCount")} activeSec={TryGetDouble(frame, "activeCombatDurationSeconds"):F1} dmgK={TryGetInt(frame, "overallDamageK")} healK={TryGetInt(frame, "overallHealingK")} age={TryGetDouble(frame, "ageMs"):F0}ms";
+        if (aggregate.TryGetProperty("combat", out var combat) && combat.ValueKind == JsonValueKind.Object)
+        {
+            return $"Combat: active={TryGetBool(combat, "riftMeterActive")} degraded={TryGetBool(combat, "riftMeterDegraded")} skew={TryGetDouble(combat, "observationSkewMs"):F0}ms combo={TryGetInt(combat, "combo")} dmgK={TryGetInt(combat, "overallDamageK")} healK={TryGetInt(combat, "overallHealingK")}";
+        }
+
+        if (!aggregate.TryGetProperty("riftMeterCombat", out var frame) || frame.ValueKind != JsonValueKind.Object)
+        {
+            return "RiftMeterCombat: missing";
+        }
+
+        return $"RiftMeterCombat: active={TryGetBool(frame, "active")} degraded={TryGetBool(frame, "degraded")} combats={TryGetInt(frame, "combatCount")} activeSec={TryGetDouble(frame, "activeCombatDurationSeconds"):F1} dmgK={TryGetInt(frame, "overallDamageK")} healK={TryGetInt(frame, "overallHealingK")} age={TryGetDouble(frame, "ageMs"):F0}ms";
     }
 
     private static string BuildDetails(JsonElement root)

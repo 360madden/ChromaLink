@@ -261,7 +261,7 @@ public readonly record struct RiftMeterCombatSnapshot(
     byte OverallDamageK,
     byte OverallHealingK)
 {
-    public static RiftMeterCombatSnapshot CreateSynthetic() => new(0x3F, 2, 123, 1, 3, 456, 5, 8, 42, 9);
+    public static RiftMeterCombatSnapshot CreateSynthetic() => new(0xBF, 2, 123, 1, 3, 456, 5, 8, 42, 9);
 }
 
 public sealed record CoreStatusFrame(

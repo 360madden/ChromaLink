@@ -3,6 +3,34 @@ namespace ChromaLink.Reader;
 public sealed record FrameObservation<TFrame>(TFrame Frame, DateTimeOffset ObservedAtUtc)
     where TFrame : TelemetryFrame;
 
+public sealed record CombatTelemetrySnapshot(
+    bool Available,
+    bool RiftMeterPresent,
+    bool RiftMeterLoaded,
+    bool RiftMeterAvailable,
+    bool RiftMeterActive,
+    bool RiftMeterDegraded,
+    bool RiftMeterStableSnapshot,
+    byte? PlayerCombatSequence,
+    byte? RiftMeterSequence,
+    int? SequenceDelta,
+    double? ObservationSkewMs,
+    byte? Combo,
+    ushort? ChargeCurrent,
+    ushort? ChargeMax,
+    ushort? PlanarCurrent,
+    ushort? PlanarMax,
+    ushort? Absorb,
+    byte? CombatCount,
+    double? ActiveCombatDurationSeconds,
+    byte? ActiveCombatPlayerCount,
+    byte? ActiveCombatHostileCount,
+    double? OverallDurationSeconds,
+    byte? OverallPlayerCount,
+    byte? OverallHostileCount,
+    byte? OverallDamageK,
+    byte? OverallHealingK);
+
 public sealed record TelemetryAggregateSnapshot(
     FrameObservation<CoreStatusFrame>? CoreStatus,
     FrameObservation<PlayerVitalsFrame>? PlayerVitals,
@@ -46,6 +74,68 @@ public sealed record TelemetryAggregateSnapshot(
         PlayerVitals is not null &&
         PlayerResources is not null &&
         PlayerCombat is not null;
+
+    public CombatTelemetrySnapshot? Combat => BuildCombatTelemetrySnapshot(PlayerCombat, RiftMeterCombat);
+
+    private static CombatTelemetrySnapshot? BuildCombatTelemetrySnapshot(
+        FrameObservation<PlayerCombatFrame>? playerCombat,
+        FrameObservation<RiftMeterCombatFrame>? riftMeterCombat)
+    {
+        if (playerCombat is null && riftMeterCombat is null)
+        {
+            return null;
+        }
+
+        var playerSequence = playerCombat?.Frame.Header.Sequence;
+        var riftSequence = riftMeterCombat?.Frame.Header.Sequence;
+        var riftFlags = riftMeterCombat?.Frame.Payload.RiftMeterFlags ?? 0;
+        double? observationSkewMs = playerCombat is null || riftMeterCombat is null
+            ? null
+            : Math.Round(Math.Abs((playerCombat.ObservedAtUtc - riftMeterCombat.ObservedAtUtc).TotalMilliseconds), 2);
+
+        return new CombatTelemetrySnapshot(
+            Available: true,
+            RiftMeterPresent: riftMeterCombat is not null,
+            RiftMeterLoaded: (riftFlags & 0x01) != 0,
+            RiftMeterAvailable: (riftFlags & 0x02) != 0,
+            RiftMeterActive: (riftFlags & 0x04) != 0,
+            RiftMeterDegraded: (riftFlags & 0x40) != 0,
+            RiftMeterStableSnapshot: (riftFlags & 0x80) != 0,
+            PlayerCombatSequence: playerSequence,
+            RiftMeterSequence: riftSequence,
+            SequenceDelta: playerSequence.HasValue && riftSequence.HasValue ? ComputeSequenceDelta(riftSequence.Value, playerSequence.Value) : null,
+            ObservationSkewMs: observationSkewMs,
+            Combo: playerCombat?.Frame.Payload.Combo,
+            ChargeCurrent: playerCombat?.Frame.Payload.ChargeCurrent,
+            ChargeMax: playerCombat?.Frame.Payload.ChargeMax,
+            PlanarCurrent: playerCombat?.Frame.Payload.PlanarCurrent,
+            PlanarMax: playerCombat?.Frame.Payload.PlanarMax,
+            Absorb: playerCombat?.Frame.Payload.Absorb,
+            CombatCount: riftMeterCombat?.Frame.Payload.CombatCount,
+            ActiveCombatDurationSeconds: riftMeterCombat is null ? null : Math.Round(riftMeterCombat.Frame.Payload.ActiveCombatDurationDeci / 10.0, 1),
+            ActiveCombatPlayerCount: riftMeterCombat?.Frame.Payload.ActiveCombatPlayerCount,
+            ActiveCombatHostileCount: riftMeterCombat?.Frame.Payload.ActiveCombatHostileCount,
+            OverallDurationSeconds: riftMeterCombat is null ? null : Math.Round(riftMeterCombat.Frame.Payload.OverallDurationDeci / 10.0, 1),
+            OverallPlayerCount: riftMeterCombat?.Frame.Payload.OverallPlayerCount,
+            OverallHostileCount: riftMeterCombat?.Frame.Payload.OverallHostileCount,
+            OverallDamageK: riftMeterCombat?.Frame.Payload.OverallDamageK,
+            OverallHealingK: riftMeterCombat?.Frame.Payload.OverallHealingK);
+    }
+
+    private static int ComputeSequenceDelta(byte laterSequence, byte earlierSequence)
+    {
+        var delta = laterSequence - earlierSequence;
+        if (delta > 127)
+        {
+            delta -= 256;
+        }
+        else if (delta < -127)
+        {
+            delta += 256;
+        }
+
+        return delta;
+    }
 }
 
 public sealed class TelemetryAggregate

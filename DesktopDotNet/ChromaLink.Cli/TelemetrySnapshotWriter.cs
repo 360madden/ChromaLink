@@ -3,7 +3,7 @@ using ChromaLink.Reader;
 
 internal static class TelemetrySnapshotWriter
 {
-    public const int ContractSchemaVersion = 1;
+    public const int ContractSchemaVersion = 2;
     public const string ContractName = "chromalink-live-telemetry";
     private const double FreshnessWindowMilliseconds = 2000.0;
 
@@ -330,6 +330,8 @@ internal static class TelemetrySnapshotWriter
                     hasOverallTotals = IsFlagSet(aggregate.RiftMeterCombat.Frame.Payload.RiftMeterFlags, 0x08),
                     hasActiveDuration = IsFlagSet(aggregate.RiftMeterCombat.Frame.Payload.RiftMeterFlags, 0x10),
                     hasOverallDuration = IsFlagSet(aggregate.RiftMeterCombat.Frame.Payload.RiftMeterFlags, 0x20),
+                    degraded = IsFlagSet(aggregate.RiftMeterCombat.Frame.Payload.RiftMeterFlags, 0x40),
+                    stableSnapshot = IsFlagSet(aggregate.RiftMeterCombat.Frame.Payload.RiftMeterFlags, 0x80),
                     combatCount = aggregate.RiftMeterCombat.Frame.Payload.CombatCount,
                     activeCombatDurationSeconds = DeciToSeconds(aggregate.RiftMeterCombat.Frame.Payload.ActiveCombatDurationDeci),
                     activeCombatPlayerCount = aggregate.RiftMeterCombat.Frame.Payload.ActiveCombatPlayerCount,
@@ -339,6 +341,35 @@ internal static class TelemetrySnapshotWriter
                     overallHostileCount = aggregate.RiftMeterCombat.Frame.Payload.OverallHostileCount,
                     overallDamageK = aggregate.RiftMeterCombat.Frame.Payload.OverallDamageK,
                     overallHealingK = aggregate.RiftMeterCombat.Frame.Payload.OverallHealingK
+                },
+                combat = aggregate.Combat is null ? null : new
+                {
+                    available = aggregate.Combat.Available,
+                    riftMeterPresent = aggregate.Combat.RiftMeterPresent,
+                    riftMeterLoaded = aggregate.Combat.RiftMeterLoaded,
+                    riftMeterAvailable = aggregate.Combat.RiftMeterAvailable,
+                    riftMeterActive = aggregate.Combat.RiftMeterActive,
+                    riftMeterDegraded = aggregate.Combat.RiftMeterDegraded,
+                    riftMeterStableSnapshot = aggregate.Combat.RiftMeterStableSnapshot,
+                    playerCombatSequence = aggregate.Combat.PlayerCombatSequence,
+                    riftMeterSequence = aggregate.Combat.RiftMeterSequence,
+                    sequenceDelta = aggregate.Combat.SequenceDelta,
+                    observationSkewMs = aggregate.Combat.ObservationSkewMs,
+                    combo = aggregate.Combat.Combo,
+                    chargeCurrent = aggregate.Combat.ChargeCurrent,
+                    chargeMax = aggregate.Combat.ChargeMax,
+                    planarCurrent = aggregate.Combat.PlanarCurrent,
+                    planarMax = aggregate.Combat.PlanarMax,
+                    absorb = aggregate.Combat.Absorb,
+                    combatCount = aggregate.Combat.CombatCount,
+                    activeCombatDurationSeconds = aggregate.Combat.ActiveCombatDurationSeconds,
+                    activeCombatPlayerCount = aggregate.Combat.ActiveCombatPlayerCount,
+                    activeCombatHostileCount = aggregate.Combat.ActiveCombatHostileCount,
+                    overallDurationSeconds = aggregate.Combat.OverallDurationSeconds,
+                    overallPlayerCount = aggregate.Combat.OverallPlayerCount,
+                    overallHostileCount = aggregate.Combat.OverallHostileCount,
+                    overallDamageK = aggregate.Combat.OverallDamageK,
+                    overallHealingK = aggregate.Combat.OverallHealingK
                 },
                 followUnitStatus = aggregate.FollowUnitStatus is null ? null : new
                 {
