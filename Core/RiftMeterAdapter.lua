@@ -27,6 +27,28 @@ local function SafeCountEntries(value)
   return count
 end
 
+local function SafeSortedKeys(value, limit)
+  local keys = {}
+  local capped = math.max(1, tonumber(limit) or 8)
+  local key
+
+  if type(value) ~= "table" then
+    return keys
+  end
+
+  for key in pairs(value) do
+    table.insert(keys, tostring(key))
+  end
+
+  table.sort(keys)
+
+  while #keys > capped do
+    table.remove(keys)
+  end
+
+  return keys
+end
+
 local function SafeLatestCombat(riftMeter)
   local combats
   local count
@@ -73,6 +95,9 @@ local function BuildSnapshot()
     overallDamage = nil,
     overallHealing = nil,
     sampledAt = now,
+    topLevelKeys = {},
+    combatKeys = {},
+    overallKeys = {},
     warnings = {}
   }
 
@@ -83,11 +108,13 @@ local function BuildSnapshot()
 
   snapshot.loaded = true
   snapshot.available = true
+  snapshot.topLevelKeys = SafeSortedKeys(riftMeter, 16)
 
   latestCombat, combatCount = SafeLatestCombat(riftMeter)
   snapshot.combatCount = combatCount or 0
   if type(latestCombat) == "table" then
     snapshot.inCombat = latestCombat.ended ~= true
+    snapshot.combatKeys = SafeSortedKeys(latestCombat, 16)
 
     durationSeconds = SafeNumber(latestCombat.duration)
     if durationSeconds ~= nil then
@@ -99,6 +126,7 @@ local function BuildSnapshot()
 
   overall = riftMeter.overall
   if type(overall) == "table" then
+    snapshot.overallKeys = SafeSortedKeys(overall, 16)
     snapshot.overallDamage = SafeNumber(overall.damage)
     snapshot.overallHealing = SafeNumber(overall.healing)
   else

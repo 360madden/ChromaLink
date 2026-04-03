@@ -313,6 +313,14 @@ local function BuildRiftMeterStatus()
   return snapshot
 end
 
+local function JoinSummaryList(values)
+  if type(values) ~= "table" or #values == 0 then
+    return "none"
+  end
+
+  return table.concat(values, ", ")
+end
+
 local function BuildSyntheticFrame(frameKind, sequence)
   local snapshot
   local _, symbols
@@ -584,6 +592,46 @@ function ChromaLink.Bootstrap.LogStatus(includeNativeFrames)
   for _, entry in ipairs(nativeFrames) do
     LogFrameStatus(entry.label, entry.frame, "status")
   end
+end
+
+function ChromaLink.Bootstrap.LogRiftMeterStatus(verbose)
+  local state = ChromaLink.Bootstrap.state
+  local status
+  local warningsSummary
+
+  if state == nil then
+    ChromaLink.Diagnostics.Log("RiftMeter status requested before initialization.")
+    return
+  end
+
+  state.riftMeterStatus = BuildRiftMeterStatus()
+  status = state.riftMeterStatus
+  warningsSummary = "none"
+  if type(status.warnings) == "table" and #status.warnings > 0 then
+    warningsSummary = table.concat(status.warnings, "; ")
+  end
+
+  ChromaLink.Diagnostics.Log(string.format(
+    "RiftMeter status: configured=%s probe=%s loaded=%s available=%s active=%s combats=%s durationMs=%s damage=%s healing=%s sampledAt=%s warnings=%s.",
+    status.configured and "on" or "off",
+    status.probeStatus and "on" or "off",
+    status.loaded and "yes" or "no",
+    status.available and "yes" or "no",
+    status.inCombat and "yes" or "no",
+    tostring(status.combatCount or 0),
+    tostring(status.activeCombatDurationMs or "n/a"),
+    tostring(status.overallDamage or "n/a"),
+    tostring(status.overallHealing or "n/a"),
+    tostring(status.sampledAt or "n/a"),
+    warningsSummary))
+
+  if not verbose then
+    return
+  end
+
+  ChromaLink.Diagnostics.Log("RiftMeter top-level keys: " .. JoinSummaryList(status.topLevelKeys) .. ".")
+  ChromaLink.Diagnostics.Log("RiftMeter latest combat keys: " .. JoinSummaryList(status.combatKeys) .. ".")
+  ChromaLink.Diagnostics.Log("RiftMeter overall keys: " .. JoinSummaryList(status.overallKeys) .. ".")
 end
 
 function ChromaLink.Bootstrap.LogBuildStatus()

@@ -40,8 +40,17 @@ local function PrintRotationStatus()
   ChromaLink.Diagnostics.Log("Rotation status is unavailable until bootstrap initialization completes.")
 end
 
+local function PrintRiftMeterStatus(verbose)
+  if ChromaLink.Bootstrap ~= nil and ChromaLink.Bootstrap.LogRiftMeterStatus ~= nil then
+    ChromaLink.Bootstrap.LogRiftMeterStatus(verbose)
+    return
+  end
+
+  ChromaLink.Diagnostics.Log("RiftMeter status is unavailable until bootstrap initialization completes.")
+end
+
 local function PrintHelp()
-  ChromaLink.Diagnostics.Log("Commands: /cl status | /cl build | /cl rotation | /cl diag | /cl refresh | /cl cache status | /cl abilities status|export | /cl observer on|off|status | /cl compensate on|off|status | /cl traces on|off")
+  ChromaLink.Diagnostics.Log("Commands: /cl status | /cl build | /cl rotation | /cl diag | /cl refresh | /cl riftmeter status|dump | /cl cache status | /cl abilities status|export | /cl observer on|off|status | /cl compensate on|off|status | /cl traces on|off")
 end
 
 function ChromaLink.Commands.OnSlashCommand(_, commandText)
@@ -67,6 +76,18 @@ function ChromaLink.Commands.OnSlashCommand(_, commandText)
   if command == "diag" then
     ChromaLink.Bootstrap.LogStatus(true)
     return
+  end
+
+  if command == "riftmeter" or command == "rmeter" then
+    if option == "dump" or option == "diag" or option == "debug" then
+      PrintRiftMeterStatus(true)
+      return
+    end
+
+    if option == "status" or option == "" then
+      PrintRiftMeterStatus(false)
+      return
+    end
   end
 
   if command == "refresh" then
