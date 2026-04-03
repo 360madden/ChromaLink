@@ -65,9 +65,9 @@ ChromaLink.Config = {
     trackedAbilities = {}
   },
   riftMeter = {
-    enabled = false,
+    enabled = true,
     probeStatus = true,
-    publishTelemetry = false
+    publishTelemetry = true
   },
   preferHighestAvailableStrata = true,
   protocolVersion = 1,
@@ -95,7 +95,8 @@ ChromaLink.Config = {
     auxUnitCast = 11,
     auraPage = 12,
     textPage = 13,
-    abilityWatch = 14
+    abilityWatch = 14,
+    riftMeterCombat = 15
   },
   frameRotation = {
     "coreStatus",
@@ -103,7 +104,9 @@ ChromaLink.Config = {
     "coreStatus",
     "playerResources",
     "coreStatus",
-    "playerCombat"
+    "playerCombat",
+    "coreStatus",
+    "riftMeterCombat"
   },
   syntheticMode = {
     enabled = false

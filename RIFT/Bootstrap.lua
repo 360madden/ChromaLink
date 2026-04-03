@@ -345,6 +345,9 @@ local function BuildSyntheticFrame(frameKind, sequence)
   elseif frameKind == "playerCombat" then
     snapshot = ChromaLink.Gather.BuildSyntheticPlayerCombatSnapshot()
     _, symbols = ChromaLink.Protocol.BuildPlayerCombatFrame(snapshot, sequence)
+  elseif frameKind == "riftMeterCombat" then
+    snapshot = ChromaLink.Gather.BuildSyntheticRiftMeterCombatSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildRiftMeterCombatFrame(snapshot, sequence)
   elseif frameKind == "targetVitals" then
     snapshot = ChromaLink.Gather.BuildSyntheticTargetVitalsSnapshot()
     _, symbols = ChromaLink.Protocol.BuildTargetVitalsFrame(snapshot, sequence)
@@ -407,6 +410,9 @@ local function BuildLiveFrame(frameKind, sequence)
   elseif frameKind == "playerCombat" then
     snapshot = ChromaLink.Gather.BuildPlayerCombatSnapshot()
     _, symbols = ChromaLink.Protocol.BuildPlayerCombatFrame(snapshot, sequence)
+  elseif frameKind == "riftMeterCombat" then
+    snapshot = ChromaLink.Gather.BuildRiftMeterCombatSnapshot()
+    _, symbols = ChromaLink.Protocol.BuildRiftMeterCombatFrame(snapshot, sequence)
   elseif frameKind == "targetVitals" then
     snapshot = ChromaLink.Gather.BuildTargetVitalsSnapshot()
     _, symbols = ChromaLink.Protocol.BuildTargetVitalsFrame(snapshot, sequence)
@@ -650,7 +656,7 @@ function ChromaLink.Bootstrap.LogBuildStatus()
 
   ChromaLink.Diagnostics.Log(string.format("%s build: version=%s protocol=%s profile=%s.", identifier, tostring(version), tostring(protocolVersion), tostring(profile.id or "unknown")))
   ChromaLink.Diagnostics.Log(string.format(
-    "Frame types: coreStatus=%s playerVitals=%s playerPosition=%s playerCast=%s playerResources=%s playerCombat=%s targetPosition=%s followUnitStatus=%s targetVitals=%s targetResources=%s auxUnitCast=%s auraPage=%s textPage=%s abilityWatch=%s.",
+    "Frame types: coreStatus=%s playerVitals=%s playerPosition=%s playerCast=%s playerResources=%s playerCombat=%s targetPosition=%s followUnitStatus=%s targetVitals=%s targetResources=%s auxUnitCast=%s auraPage=%s textPage=%s abilityWatch=%s riftMeterCombat=%s.",
     tostring(frameTypes.coreStatus or "n/a"),
     tostring(frameTypes.playerVitals or "n/a"),
     tostring(frameTypes.playerPosition or "n/a"),
@@ -664,7 +670,8 @@ function ChromaLink.Bootstrap.LogBuildStatus()
     tostring(frameTypes.auxUnitCast or "n/a"),
     tostring(frameTypes.auraPage or "n/a"),
     tostring(frameTypes.textPage or "n/a"),
-    tostring(frameTypes.abilityWatch or "n/a")))
+    tostring(frameTypes.abilityWatch or "n/a"),
+    tostring(frameTypes.riftMeterCombat or "n/a")))
   ChromaLink.Diagnostics.Log(string.format(
     "Header flags: 0x%02X (%s).",
     tonumber(headerFlags.multiFrameRotation or 0)

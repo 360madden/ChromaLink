@@ -19,6 +19,7 @@ public sealed record TelemetryAggregateSnapshot(
     FrameObservation<AuraPageFrame>? AuraPage,
     FrameObservation<TextPageFrame>? TextPage,
     FrameObservation<AbilityWatchFrame>? AbilityWatch,
+    FrameObservation<RiftMeterCombatFrame>? RiftMeterCombat,
     DateTimeOffset? LastUpdatedUtc,
     int AcceptedFrames)
 {
@@ -37,7 +38,8 @@ public sealed record TelemetryAggregateSnapshot(
         AuxUnitCast is not null ||
         AuraPage is not null ||
         TextPage is not null ||
-        AbilityWatch is not null;
+        AbilityWatch is not null ||
+        RiftMeterCombat is not null;
 
     public bool HasCompleteState =>
         CoreStatus is not null &&
@@ -63,6 +65,7 @@ public sealed class TelemetryAggregate
     private FrameObservation<AuraPageFrame>? _auraPage;
     private FrameObservation<TextPageFrame>? _textPage;
     private FrameObservation<AbilityWatchFrame>? _abilityWatch;
+    private FrameObservation<RiftMeterCombatFrame>? _riftMeterCombat;
 
     public int AcceptedFrames { get; private set; }
 
@@ -132,6 +135,10 @@ public sealed class TelemetryAggregate
                 _abilityWatch = new FrameObservation<AbilityWatchFrame>(abilityWatch, observed);
                 break;
 
+            case RiftMeterCombatFrame riftMeterCombat:
+                _riftMeterCombat = new FrameObservation<RiftMeterCombatFrame>(riftMeterCombat, observed);
+                break;
+
             default:
                 throw new InvalidOperationException($"Unsupported telemetry frame type: {frame.GetType().Name}.");
         }
@@ -158,6 +165,7 @@ public sealed class TelemetryAggregate
             _auraPage,
             _textPage,
             _abilityWatch,
+            _riftMeterCombat,
             LastUpdatedUtc,
             AcceptedFrames);
     }

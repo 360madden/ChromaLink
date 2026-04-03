@@ -328,6 +328,27 @@ function ChromaLink.Protocol.BuildPlayerCombatFrame(snapshot, sequence)
   return BuildFrame(payload, frameTypes.playerCombat, 1, sequence)
 end
 
+function ChromaLink.Protocol.BuildRiftMeterCombatFrame(snapshot, sequence)
+  local payload = {
+    ClampByte(snapshot.riftMeterFlags),
+    ClampByte(snapshot.combatCount),
+    0,
+    0,
+    ClampByte(snapshot.activeCombatPlayerCount),
+    ClampByte(snapshot.activeCombatHostileCount),
+    0,
+    0,
+    ClampByte(snapshot.overallPlayerCount),
+    ClampByte(snapshot.overallHostileCount),
+    ClampByte(snapshot.overallDamageK),
+    ClampByte(snapshot.overallHealingK)
+  }
+
+  AppendBigEndian16(payload, 3, snapshot.activeCombatDurationDeci)
+  AppendBigEndian16(payload, 7, snapshot.overallDurationDeci)
+  return BuildFrame(payload, frameTypes.riftMeterCombat, 1, sequence)
+end
+
 function ChromaLink.Protocol.BuildTargetPositionFrame(snapshot, sequence)
   local payload = {}
   AppendBigEndian32(payload, 1, FloatToFixedInt32(snapshot.x))

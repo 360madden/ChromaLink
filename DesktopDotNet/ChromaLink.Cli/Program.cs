@@ -495,6 +495,22 @@ internal sealed class CliApp
                 Console.WriteLine($"ReadyCount: {abilityWatch.Payload.ReadyCount}");
                 Console.WriteLine($"CoolingCount: {abilityWatch.Payload.CoolingCount}");
                 break;
+
+            case RiftMeterCombatFrame riftMeterCombat:
+                Console.WriteLine($"RiftMeterFlags: {riftMeterCombat.Payload.RiftMeterFlags}");
+                Console.WriteLine($"RiftMeterLoaded: {((riftMeterCombat.Payload.RiftMeterFlags & 0x01) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"RiftMeterAvailable: {((riftMeterCombat.Payload.RiftMeterFlags & 0x02) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"RiftMeterActive: {((riftMeterCombat.Payload.RiftMeterFlags & 0x04) != 0).ToString().ToLowerInvariant()}");
+                Console.WriteLine($"RiftMeterCombatCount: {riftMeterCombat.Payload.CombatCount}");
+                Console.WriteLine($"RiftMeterActiveDurationSeconds: {riftMeterCombat.Payload.ActiveCombatDurationDeci / 10.0:F1}");
+                Console.WriteLine($"RiftMeterActivePlayers: {riftMeterCombat.Payload.ActiveCombatPlayerCount}");
+                Console.WriteLine($"RiftMeterActiveHostiles: {riftMeterCombat.Payload.ActiveCombatHostileCount}");
+                Console.WriteLine($"RiftMeterOverallDurationSeconds: {riftMeterCombat.Payload.OverallDurationDeci / 10.0:F1}");
+                Console.WriteLine($"RiftMeterOverallPlayers: {riftMeterCombat.Payload.OverallPlayerCount}");
+                Console.WriteLine($"RiftMeterOverallHostiles: {riftMeterCombat.Payload.OverallHostileCount}");
+                Console.WriteLine($"RiftMeterOverallDamageK: {riftMeterCombat.Payload.OverallDamageK}");
+                Console.WriteLine($"RiftMeterOverallHealingK: {riftMeterCombat.Payload.OverallHealingK}");
+                break;
         }
     }
 
@@ -599,6 +615,12 @@ internal sealed class CliApp
             nowUtc,
             observation =>
                 $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} page={observation.Frame.Payload.PageIndex} ready={observation.Frame.Payload.ReadyCount} cooling={observation.Frame.Payload.CoolingCount} entry1={FormatAbilityEntry(observation.Frame.Payload.Entry1)} entry2={FormatAbilityEntry(observation.Frame.Payload.Entry2)} shortestQ4={observation.Frame.Payload.ShortestCooldownQ4}");
+        WriteAggregateObservation(
+            "AggregateRiftMeterCombat",
+            snapshot.RiftMeterCombat,
+            nowUtc,
+            observation =>
+                $"seq={observation.Frame.Header.Sequence} ageMs={FormatAgeMs(observation.ObservedAtUtc, nowUtc)} flags=0x{observation.Frame.Payload.RiftMeterFlags:X2} combats={observation.Frame.Payload.CombatCount} activeSec={observation.Frame.Payload.ActiveCombatDurationDeci / 10.0:F1} activePlayers={observation.Frame.Payload.ActiveCombatPlayerCount} activeHostiles={observation.Frame.Payload.ActiveCombatHostileCount} overallSec={observation.Frame.Payload.OverallDurationDeci / 10.0:F1} overallPlayers={observation.Frame.Payload.OverallPlayerCount} overallHostiles={observation.Frame.Payload.OverallHostileCount} dmgK={observation.Frame.Payload.OverallDamageK} healK={observation.Frame.Payload.OverallHealingK}");
     }
 
     private static void WriteAggregateObservation<TFrame>(

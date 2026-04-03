@@ -354,6 +354,15 @@ local function AttachSourceContext(snapshot)
   return enriched
 end
 
+local function ClampDamageK(value)
+  local number = tonumber(value) or 0
+  if number < 0 then
+    return 0
+  end
+
+  return ClampByte(number / 1000)
+end
+
 local function BuildAbilityNameIndex()
   local abilities = SafeAbilityList()
   local details
@@ -950,6 +959,43 @@ function ChromaLink.Gather.BuildPlayerCombatSnapshot()
   })
 end
 
+function ChromaLink.Gather.BuildRiftMeterCombatSnapshot()
+  local status = BuildRiftMeterSnapshot() or {}
+  local flags = 0
+
+  if status.loaded then
+    flags = flags + 1
+  end
+  if status.available then
+    flags = flags + 2
+  end
+  if status.inCombat then
+    flags = flags + 4
+  end
+  if (tonumber(status.overallDamage) or 0) > 0 or (tonumber(status.overallHealing) or 0) > 0 then
+    flags = flags + 8
+  end
+  if tonumber(status.activeCombatDurationMs) ~= nil and tonumber(status.activeCombatDurationMs) > 0 then
+    flags = flags + 16
+  end
+  if tonumber(status.overallDurationMs) ~= nil and tonumber(status.overallDurationMs) > 0 then
+    flags = flags + 32
+  end
+
+  return AttachSourceContext({
+    riftMeterFlags = ClampByte(flags),
+    combatCount = ClampByte(status.combatCount),
+    activeCombatDurationDeci = ClampUInt16((tonumber(status.activeCombatDurationMs) or 0) / 100),
+    activeCombatPlayerCount = ClampByte(status.activeCombatPlayerCount),
+    activeCombatHostileCount = ClampByte(status.activeCombatHostileCount),
+    overallDurationDeci = ClampUInt16((tonumber(status.overallDurationMs) or 0) / 100),
+    overallPlayerCount = ClampByte(status.overallPlayerCount),
+    overallHostileCount = ClampByte(status.overallHostileCount),
+    overallDamageK = ClampDamageK(status.overallDamage),
+    overallHealingK = ClampDamageK(status.overallHealing)
+  })
+end
+
 function ChromaLink.Gather.BuildFollowUnitStatusSnapshot(slotOverride)
   local followConfig = config.followUnit or {}
   local slot = tonumber(slotOverride) or tonumber(followConfig.slot) or 1
@@ -1111,6 +1157,21 @@ function ChromaLink.Gather.BuildSyntheticCoreStatusSnapshot()
     targetLevel = 72,
     playerCallingRolePacked = 49,
     targetCallingRelationPacked = 66
+  }
+end
+
+function ChromaLink.Gather.BuildSyntheticRiftMeterCombatSnapshot()
+  return {
+    riftMeterFlags = 0x3F,
+    combatCount = 2,
+    activeCombatDurationDeci = 123,
+    activeCombatPlayerCount = 1,
+    activeCombatHostileCount = 3,
+    overallDurationDeci = 456,
+    overallPlayerCount = 5,
+    overallHostileCount = 8,
+    overallDamageK = 42,
+    overallHealingK = 9
   }
 end
 

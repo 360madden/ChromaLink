@@ -313,6 +313,33 @@ internal static class TelemetrySnapshotWriter
                     readyCount = aggregate.AbilityWatch.Frame.Payload.ReadyCount,
                     coolingCount = aggregate.AbilityWatch.Frame.Payload.CoolingCount
                 },
+                riftMeterCombat = aggregate.RiftMeterCombat is null ? null : new
+                {
+                    observedAtUtc = aggregate.RiftMeterCombat.ObservedAtUtc,
+                    ageMs = AgeMs(nowUtc, aggregate.RiftMeterCombat.ObservedAtUtc),
+                    fresh = IsFresh(AgeMs(nowUtc, aggregate.RiftMeterCombat.ObservedAtUtc)),
+                    stale = !IsFresh(AgeMs(nowUtc, aggregate.RiftMeterCombat.ObservedAtUtc)),
+                    frameType = aggregate.RiftMeterCombat.Frame.Header.FrameType.ToString(),
+                    schemaId = aggregate.RiftMeterCombat.Frame.Header.SchemaId,
+                    sequence = aggregate.RiftMeterCombat.Frame.Header.Sequence,
+                    reservedFlags = aggregate.RiftMeterCombat.Frame.Header.ReservedFlags,
+                    flags = aggregate.RiftMeterCombat.Frame.Payload.RiftMeterFlags,
+                    loaded = IsFlagSet(aggregate.RiftMeterCombat.Frame.Payload.RiftMeterFlags, 0x01),
+                    available = IsFlagSet(aggregate.RiftMeterCombat.Frame.Payload.RiftMeterFlags, 0x02),
+                    active = IsFlagSet(aggregate.RiftMeterCombat.Frame.Payload.RiftMeterFlags, 0x04),
+                    hasOverallTotals = IsFlagSet(aggregate.RiftMeterCombat.Frame.Payload.RiftMeterFlags, 0x08),
+                    hasActiveDuration = IsFlagSet(aggregate.RiftMeterCombat.Frame.Payload.RiftMeterFlags, 0x10),
+                    hasOverallDuration = IsFlagSet(aggregate.RiftMeterCombat.Frame.Payload.RiftMeterFlags, 0x20),
+                    combatCount = aggregate.RiftMeterCombat.Frame.Payload.CombatCount,
+                    activeCombatDurationSeconds = DeciToSeconds(aggregate.RiftMeterCombat.Frame.Payload.ActiveCombatDurationDeci),
+                    activeCombatPlayerCount = aggregate.RiftMeterCombat.Frame.Payload.ActiveCombatPlayerCount,
+                    activeCombatHostileCount = aggregate.RiftMeterCombat.Frame.Payload.ActiveCombatHostileCount,
+                    overallDurationSeconds = DeciToSeconds(aggregate.RiftMeterCombat.Frame.Payload.OverallDurationDeci),
+                    overallPlayerCount = aggregate.RiftMeterCombat.Frame.Payload.OverallPlayerCount,
+                    overallHostileCount = aggregate.RiftMeterCombat.Frame.Payload.OverallHostileCount,
+                    overallDamageK = aggregate.RiftMeterCombat.Frame.Payload.OverallDamageK,
+                    overallHealingK = aggregate.RiftMeterCombat.Frame.Payload.OverallHealingK
+                },
                 followUnitStatus = aggregate.FollowUnitStatus is null ? null : new
                 {
                     observedAtUtc = aggregate.FollowUnitStatus.ObservedAtUtc,
@@ -488,6 +515,11 @@ internal static class TelemetrySnapshotWriter
     private static double CentiToSeconds(ushort value)
     {
         return Math.Round(value / 100.0, 2);
+    }
+
+    private static double DeciToSeconds(ushort value)
+    {
+        return Math.Round(value / 10.0, 1);
     }
 
     private sealed record AggregateFreshness(

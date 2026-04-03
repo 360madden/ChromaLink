@@ -15,7 +15,8 @@ public enum FrameType : byte
     AuxUnitCast = 11,
     AuraPage = 12,
     TextPage = 13,
-    AbilityWatch = 14
+    AbilityWatch = 14,
+    RiftMeterCombat = 15
 }
 
 public enum ResourceKind : byte
@@ -248,6 +249,21 @@ public readonly record struct AbilityWatchSnapshot(
     }
 }
 
+public readonly record struct RiftMeterCombatSnapshot(
+    byte RiftMeterFlags,
+    byte CombatCount,
+    ushort ActiveCombatDurationDeci,
+    byte ActiveCombatPlayerCount,
+    byte ActiveCombatHostileCount,
+    ushort OverallDurationDeci,
+    byte OverallPlayerCount,
+    byte OverallHostileCount,
+    byte OverallDamageK,
+    byte OverallHealingK)
+{
+    public static RiftMeterCombatSnapshot CreateSynthetic() => new(0x3F, 2, 123, 1, 3, 456, 5, 8, 42, 9);
+}
+
 public sealed record CoreStatusFrame(
     TelemetryFrameHeader Header,
     CoreStatusSnapshot Payload,
@@ -346,6 +362,13 @@ public sealed record AbilityWatchFrame(
     byte[] TransportBytes)
     : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
 
+public sealed record RiftMeterCombatFrame(
+    TelemetryFrameHeader Header,
+    RiftMeterCombatSnapshot Payload,
+    uint PayloadCrc32C,
+    byte[] TransportBytes)
+    : TelemetryFrame(Header, PayloadCrc32C, TransportBytes);
+
 public sealed record TransportParseResult(
     bool IsAccepted,
     string Reason,
@@ -390,6 +413,8 @@ public static class TransportConstants
     public const byte TextPageSchemaId = 1;
     public const byte AbilityWatchFrameType = 14;
     public const byte AbilityWatchSchemaId = 1;
+    public const byte RiftMeterCombatFrameType = 15;
+    public const byte RiftMeterCombatSchemaId = 1;
     public const int TransportBytes = 24;
     public const int HeaderBytes = 8;
     public const int PayloadBytes = 12;
@@ -863,6 +888,21 @@ public static class FrameProtocol
                     payload[11]),
                 actualPayloadCrc,
                 bytes.ToArray()),
+            FrameType.RiftMeterCombat => new RiftMeterCombatFrame(
+                header,
+                new RiftMeterCombatSnapshot(
+                    payload[0],
+                    payload[1],
+                    ReadUInt16BigEndian(payload, 2),
+                    payload[4],
+                    payload[5],
+                    ReadUInt16BigEndian(payload, 6),
+                    payload[8],
+                    payload[9],
+                    payload[10],
+                    payload[11]),
+                actualPayloadCrc,
+                bytes.ToArray()),
             _ => null
         };
 
@@ -951,6 +991,7 @@ public static class FrameProtocol
             FrameType.AuraPage => schemaId == TransportConstants.AuraPageSchemaId,
             FrameType.TextPage => schemaId == TransportConstants.TextPageSchemaId,
             FrameType.AbilityWatch => schemaId == TransportConstants.AbilityWatchSchemaId,
+            FrameType.RiftMeterCombat => schemaId == TransportConstants.RiftMeterCombatSchemaId,
             _ => false
         };
     }
