@@ -612,7 +612,7 @@ function ChromaLink.Bootstrap.LogRiftMeterStatus(verbose)
   end
 
   ChromaLink.Diagnostics.Log(string.format(
-    "RiftMeter status: configured=%s probe=%s loaded=%s available=%s active=%s combats=%s durationMs=%s damage=%s healing=%s sampledAt=%s warnings=%s.",
+    "RiftMeter status: configured=%s probe=%s loaded=%s available=%s active=%s combats=%s durationMs=%s players=%s hostiles=%s overallDurationMs=%s overallPlayers=%s overallHostiles=%s damage=%s healing=%s sampledAt=%s warnings=%s.",
     status.configured and "on" or "off",
     status.probeStatus and "on" or "off",
     status.loaded and "yes" or "no",
@@ -620,6 +620,11 @@ function ChromaLink.Bootstrap.LogRiftMeterStatus(verbose)
     status.inCombat and "yes" or "no",
     tostring(status.combatCount or 0),
     tostring(status.activeCombatDurationMs or "n/a"),
+    tostring(status.activeCombatPlayerCount or 0),
+    tostring(status.activeCombatHostileCount or 0),
+    tostring(status.overallDurationMs or "n/a"),
+    tostring(status.overallPlayerCount or 0),
+    tostring(status.overallHostileCount or 0),
     tostring(status.overallDamage or "n/a"),
     tostring(status.overallHealing or "n/a"),
     tostring(status.sampledAt or "n/a"),

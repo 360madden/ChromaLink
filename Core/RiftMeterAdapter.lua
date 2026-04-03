@@ -12,6 +12,17 @@ local function SafeNow()
   return 0
 end
 
+local function SafeFrameNow()
+  if Inspect ~= nil and Inspect.Time ~= nil and Inspect.Time.Frame ~= nil then
+    local ok, result = pcall(Inspect.Time.Frame)
+    if ok then
+      return tonumber(result) or 0
+    end
+  end
+
+  return 0
+end
+
 local function SafeCountEntries(value)
   local count = 0
   local _
@@ -79,12 +90,30 @@ local function SafeNumber(value)
   return number
 end
 
+local function SafeDurationMs(durationSeconds, startTimeFrame, inCombat)
+  local durationNumber = SafeNumber(durationSeconds)
+  local startTimeNumber = SafeNumber(startTimeFrame)
+  local frameNow
+
+  if durationNumber ~= nil and durationNumber > 0 then
+    return math.max(0, math.floor((durationNumber * 1000) + 0.5))
+  end
+
+  if inCombat and startTimeNumber ~= nil then
+    frameNow = SafeFrameNow()
+    if frameNow > 0 and frameNow >= startTimeNumber then
+      return math.max(0, math.floor(((frameNow - startTimeNumber) * 1000) + 0.5))
+    end
+  end
+
+  return nil
+end
+
 local function BuildSnapshot()
   local now = SafeNow()
   local riftMeter = _G.RiftMeter
   local latestCombat
   local combatCount
-  local durationSeconds
   local overall
   local snapshot = {
     loaded = false,
@@ -92,8 +121,13 @@ local function BuildSnapshot()
     inCombat = false,
     combatCount = 0,
     activeCombatDurationMs = nil,
+    activeCombatPlayerCount = 0,
+    activeCombatHostileCount = 0,
     overallDamage = nil,
     overallHealing = nil,
+    overallDurationMs = nil,
+    overallPlayerCount = 0,
+    overallHostileCount = 0,
     sampledAt = now,
     topLevelKeys = {},
     combatKeys = {},
@@ -115,11 +149,9 @@ local function BuildSnapshot()
   if type(latestCombat) == "table" then
     snapshot.inCombat = latestCombat.ended ~= true
     snapshot.combatKeys = SafeSortedKeys(latestCombat, 16)
-
-    durationSeconds = SafeNumber(latestCombat.duration)
-    if durationSeconds ~= nil then
-      snapshot.activeCombatDurationMs = math.max(0, math.floor((durationSeconds * 1000) + 0.5))
-    end
+    snapshot.activeCombatPlayerCount = SafeCountEntries(latestCombat.players)
+    snapshot.activeCombatHostileCount = SafeCountEntries(latestCombat.hostiles)
+    snapshot.activeCombatDurationMs = SafeDurationMs(latestCombat.duration, latestCombat.startTime, snapshot.inCombat)
   else
     table.insert(snapshot.warnings, "No combat snapshot available")
   end
@@ -129,6 +161,9 @@ local function BuildSnapshot()
     snapshot.overallKeys = SafeSortedKeys(overall, 16)
     snapshot.overallDamage = SafeNumber(overall.damage)
     snapshot.overallHealing = SafeNumber(overall.healing)
+    snapshot.overallPlayerCount = SafeCountEntries(overall.players)
+    snapshot.overallHostileCount = SafeCountEntries(overall.hostiles)
+    snapshot.overallDurationMs = SafeDurationMs(overall.duration, overall.startTime, false)
   else
     table.insert(snapshot.warnings, "Overall summary unavailable")
   end
