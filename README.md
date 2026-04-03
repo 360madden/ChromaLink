@@ -5,146 +5,214 @@
 [![RIFT MMO](https://img.shields.io/badge/RIFT-MMO-FF7A2F)](https://www.riftgame.com/)
 [![License MIT](https://img.shields.io/badge/License-MIT-97CA00)](#)
 
-ChromaLink is a reliability-first optical telemetry project for RIFT. A Lua addon renders a structured color strip inside the game client, and a `.NET 9` desktop reader captures that strip from the window, decodes it, and turns it into usable telemetry plus diagnostics.
+ChromaLink is a reliability-first optical telemetry bridge for RIFT.
 
-The important constraint is also the point of the project: the game-to-desktop bridge is the on-screen strip itself. If live capture or replay fails, that failure is visible and debuggable in pixels rather than hidden behind an opaque integration.
+A Lua addon renders a structured color strip inside the game client. A `.NET 9` desktop stack captures that strip from the RIFT window, decodes it, validates it, and publishes a normalized live telemetry snapshot for other tools and apps.
 
-Design rule: the strip only needs to be machine-readable. Human readability is optional, and decoder margin matters more than visual elegance.
+The core design constraint is intentional:
 
-## Current Scope
+> the game-to-desktop bridge is the on-screen strip itself.
 
-ChromaLink is intentionally narrow right now. The active baseline is:
+If capture, decode, freshness, or synchronization fail, those failures are visible and debuggable in pixels rather than hidden behind an opaque API.
 
-- profile `P360C`
-- client `640x360`
-- strip `640x24`
-- `80` vertical segments at `8x24`
-- fixed `8-color` alphabet
-- fixed control markers on both edges
-- telemetry-first default rotation:
-  - `coreStatus`
-  - `playerVitals`
-  - `playerResources`
-  - `playerCombat`
-- additional frame types remain in the codebase for compatibility and future controlled expansion:
-  - `playerPosition`
-  - `playerCast`
-  - `targetVitals`
-  - `targetResources`
-  - `targetPosition`
-  - `followUnitStatus`
-  - `auxUnitCast`
-  - `auraPage`
-  - `textPage`
-  - `abilityWatch`
-- Rift Meter integration is being prepared as an optional enrichment path, but it is not part of the active transport contract yet
+## Current Project Position
 
-Current live proof:
+ChromaLink is now in a **telemetry-first, low-drift** phase.
 
-- offline smoke, replay, bench, build, and tests are passing
-- default live capture now prefers `PrintWindow` for the most reliable `640x360` path
-- `DesktopDuplication` and `ScreenBitBlt` are still available for comparison
-- live decode is currently proven at:
-  - `origin 0,0`
-  - `pitch 2.8`
-  - `scale 0.35`
-- live captures now decode `CoreStatus`, `PlayerVitals`, `PlayerPosition`, `PlayerCast`, `PlayerResources`, `PlayerCombat`, `TargetPosition`, and `FollowUnitStatus` on the running client
-- the current expanded build has also been live-proven with reserved flags `0xFF`, confirming:
-  - additional telemetry pages are loaded
-  - text and aura pages are loaded
-  - live captures now also decode `TargetVitals`, `AuxUnitCast`, `AuraPage`, `TextPage`, and `AbilityWatch`
-- capture sessions emit raw BMP, annotated BMP, and JSON sidecars under `%LOCALAPPDATA%\ChromaLink\DesktopDotNet\out`
+What that means today:
+- the strip/decoder pipeline remains the product center
+- player basics stay the hot path
+- Rift Meter is now **actually integrated** for compact combat telemetry
+- desktop consumers now get a normalized combat view that merges native combat state with Rift Meter combat state
+- monitor and CLI are proof/diagnostic tools, not the main product abstraction
 
-Current offline refocus note:
-
-- while RIFT is unavailable, active work is limited to low-risk refocus steps
-- the addon now carries a disabled-by-default Rift Meter adapter boundary for future integration
-- no Rift Meter data is currently published into transport payloads
-
-## How It Works
+## Current Implemented Architecture
 
 ```text
-[RIFT Client]
+[RIFT Client @ 640x360 client area]
    ↓
-[Lua Addon]
-   ├─ gathers in-game state
-   ├─ encodes transport bytes
-   └─ renders 640x24 color strip at the top of the client
-         ↓ (visible pixels only)
-[ChromaLink.Reader]
-   ├─ captures the game window
-   ├─ finds strip geometry
-   ├─ samples symbols
-   ├─ validates control markers + CRC
-   └─ produces telemetry + diagnostics
+[ChromaLink Lua Addon]
+   ├─ gathers native player telemetry
+   ├─ optionally samples Rift Meter combat state
+   ├─ builds 24-byte transport payloads
+   └─ renders a 640x24 strip using the P360C profile
+         ↓ (pixels only)
+[Desktop Reader]
+   ├─ captures the client window
+   ├─ locates strip geometry
+   ├─ decodes symbols and validates CRCs
+   ├─ aggregates live frame observations
+   └─ publishes a rolling JSON contract
          ↓
-[CLI / Inspector / Future tools]
+[CLI / Monitor / HTTP Bridge / other local apps]
 ```
 
-The older barcode or matrix work is archived for reference only. The active transport is the current reader-first segmented color strip.
+## Proven Baseline
 
-## Requirements
+### Window/profile
+- profile: `P360C`
+- RIFT client area: `640x360`
+- strip: `640x24`
+- segments: `80`
+- segment size: `8x24`
+- payload symbol range: segments `9-72`
+- control markers: segments `1-8` and `73-80`
+- alphabet: fixed `8-color`, `3 bits` per segment
 
-- RIFT game client
-- Windows 10 or 11
-- `.NET 9 SDK`
-- a windowed RIFT client that can be prepared to the current baseline
+### Desktop stack
+- capture backends supported:
+  - `PrintWindow`
+  - `DesktopDuplication`
+  - `ScreenBitBlt`
+- current live workflow prefers `PrintWindow`
+- build, smoke, replay, validate, and desktop solution build are working
 
-## Quick Start
+## Active Transport Contract
 
-### Build
+Each strip frame carries:
+- `24` transport bytes
+- `12` payload bytes
+- CRC-protected header and payload validation
 
-```powershell
-dotnet build .\DesktopDotNet\ChromaLink.sln
-```
+### Active hot-path frames
+The current baseline emphasizes:
+- `coreStatus`
+- `playerVitals`
+- `playerResources`
+- `playerCombat`
+- `riftMeterCombat`
 
-### Prepare The RIFT Window
+### Additional supported frames
+These remain supported in the codebase and reader:
+- `playerPosition`
+- `playerCast`
+- `targetPosition`
+- `targetVitals`
+- `targetResources`
+- `followUnitStatus`
+- `auxUnitCast`
+- `auraPage`
+- `textPage`
+- `abilityWatch`
 
-```powershell
-dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- prepare-window 32 32
-```
+They are no longer the center of the project, but they remain useful for compatibility, diagnostics, and controlled expansion.
 
-### Generate A Synthetic Fixture
+## Rift Meter Integration: Current State
 
-```powershell
-dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- smoke
-```
+Rift Meter is no longer just planned; it is partially integrated end-to-end.
 
-### Validate The Local Baseline
+### Implemented now
+- addon-side Rift Meter adapter exists
+- adapter safely inspects public/global Rift Meter data
+- addon builds a dedicated `riftMeterCombat` frame
+- `riftMeterCombat` is transported on the strip
+- desktop reader decodes it
+- CLI and monitor show it
+- rolling JSON includes both:
+  - raw `aggregate.riftMeterCombat`
+  - normalized merged `aggregate.combat`
 
-```powershell
-dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- validate
-```
+### Current `riftMeterCombat` purpose
+It is a compact combat/health-of-source frame intended to prove:
+- Rift Meter is present
+- Rift Meter is readable
+- active combat is visible with low latency
+- desktop consumers can merge native combat state with Rift Meter combat state
 
-### Replay A Saved Capture
+### Current `riftMeterCombat` payload content
+The compact payload currently carries:
+- loaded / available / active flags
+- overall totals present flag
+- active duration present flag
+- overall duration present flag
+- degraded snapshot bit
+- stable snapshot bit
+- combat count
+- active combat duration
+- active combat player count
+- active combat hostile count
+- overall duration
+- overall player count
+- overall hostile count
+- compact overall damage in K
+- compact overall healing in K
 
-```powershell
-dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- replay "$env:LOCALAPPDATA\ChromaLink\DesktopDotNet\fixtures\chromalink-color-core.bmp"
-```
+### Important limitation
+This is still a **compact proof-oriented combat bridge**, not a full-fidelity combat export.
 
-### Capture And Decode Live
+Current limitations:
+- damage/healing are lossy (`K` units)
+- there is no rich encounter metadata yet
+- there is no player-by-player or ability-by-ability combat contract yet
+- source-health is better than before, but still compact
 
-```powershell
-dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- capture-dump
-dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- live 5 100
-```
+## Current Downstream Contract
 
-### Open The Inspector
+The rolling machine-readable snapshot lives at:
+- `%LOCALAPPDATA%\ChromaLink\DesktopDotNet\out\chromalink-live-telemetry.json`
 
-```powershell
-dotnet run --project .\DesktopDotNet\ChromaLink.Inspector\ChromaLink.Inspector.csproj
-```
+Current contract header:
+- `contract.name = chromalink-live-telemetry`
+- `contract.schemaVersion = 2`
 
-### Open The Live Monitor
+### Important aggregate sections
+- `aggregate.coreStatus`
+- `aggregate.playerVitals`
+- `aggregate.playerResources`
+- `aggregate.playerCombat`
+- `aggregate.riftMeterCombat`
+- `aggregate.combat` ← preferred merged combat view
+- aggregate freshness/health fields
 
-```powershell
-dotnet run --project .\DesktopDotNet\ChromaLink.Monitor\ChromaLink.Monitor.csproj
-```
+### `aggregate.combat`
+This normalized desktop-side combat view merges native `playerCombat` with `riftMeterCombat` and currently exposes:
+- Rift Meter present / loaded / available / active
+- Rift Meter degraded / stable snapshot bits
+- native and Rift Meter sequences
+- sequence delta
+- observation skew ms
+- combo / charge / planar / absorb
+- combat count
+- active combat duration
+- overall duration
+- compact overall damage/healing
+- active/overall player and hostile counts
 
-## CLI Commands
+This is now the preferred downstream combat surface.
 
+## Rotation And Priority
+
+### Default baseline
+The active baseline is telemetry-first and intentionally narrow.
+
+### Combat-aware override
+When Rift Meter combat is active and publishing is enabled, runtime rotation increases priority for:
+- `playerCombat`
+- `riftMeterCombat`
+- player vitals/resources/core state
+
+So the strip spends more bandwidth on combat-state freshness only when that matters.
+
+## In-Game Commands
+
+Current ChromaLink slash commands include the normal addon diagnostics plus Rift Meter diagnostics.
+
+Important ones:
+- `/cl status`
+- `/cl build`
+- `/cl diag`
+- `/cl rotation`
+- `/cl refresh`
+- `/cl riftmeter`
+- `/cl riftmeter status`
+- `/cl riftmeter dump`
+
+Rift Meter commands are intended for live verification of adapter shape and combat-time behavior.
+
+## Desktop Tools
+
+### CLI
 `ChromaLink.Cli` currently supports:
-
 - `smoke`
 - `replay <bmpPath>`
 - `live [sampleCount] [sleepMs]`
@@ -154,653 +222,100 @@ dotnet run --project .\DesktopDotNet\ChromaLink.Monitor\ChromaLink.Monitor.cspro
 - `capture-dump`
 - `prepare-window [left] [top]`
 
-Use `validate` to run `smoke`, replay of the generated fixture, and `bench` in one command.
+Useful commands:
 
-`live` and `watch` now report per-frame-type counts for accepted samples, which makes rotating telemetry easier to verify.
+```powershell
+dotnet build .\DesktopDotNet\ChromaLink.sln
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- validate
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- prepare-window 32 32
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- live 5 100
+```
 
-They also emit a compact aggregate summary showing the newest accepted observations plus rough age in milliseconds. The proven readiness baseline still centers on `CoreStatus`, `PlayerVitals`, and `PlayerPosition`, while newer optional slices flow through the same aggregate when present.
+### Monitor
+The monitor is now a proof/diagnostic surface showing:
+- contract/freshness/readiness
+- player vitals/resources
+- player combat basics
+- Rift Meter combat summary
+- merged combat cues where available
 
-While `live` or `watch` runs, the CLI also writes a rolling machine-readable snapshot to `%LOCALAPPDATA%\ChromaLink\DesktopDotNet\out\chromalink-live-telemetry.json`.
-
-The bridge snapshot now includes a small contract header:
-
-- `contract.name = chromalink-live-telemetry`
-- `contract.schemaVersion = 1`
-- stable `profile` metadata for the proven `P360C` baseline
-- stable `transport` metadata including reserved build-flag meanings
-- aggregate freshness fields such as `healthy`, `stale`, and per-frame age/freshness metadata
-
-Capture backend flag:
-
-- `--backend desktopdup|screen|printwindow`
-- default backend order for live work:
-  - `PrintWindow`
-  - `DesktopDuplication`
-  - `ScreenBitBlt`
-
-## In-Game Commands
-
-ChromaLink exposes a small slash-command surface inside RIFT:
-
-- `/cl status`
-- `/cl build`
-- `/cl version`
-- `/cl caps`
-- `/cl rotation`
-- `/cl rotate`
-- `/cl diag`
-- `/cl refresh`
-- `/cl abilities status`
-- `/cl abilities export`
-- `/cl observer on`
-- `/cl observer off`
-- `/cl observer status`
-- `/cl compensate on`
-- `/cl compensate off`
-- `/cl compensate status`
-- `/cl traces on`
-- `/cl traces off`
-
-ChromaLink now also keeps a character-scoped ability export snapshot in SavedVariables. It gathers the live player ability book through `Inspect.Ability.New.List()` / `Inspect.Ability.New.Detail()`, stores both the full sorted list and an offensive-candidate subset, and refreshes automatically on addon load, ability-add events, role changes, and the next save cycle.
-
-The in-memory snapshot refreshes immediately inside the addon; the on-disk SavedVariables file updates on the next normal RIFT save cycle such as `/reloadui`, logout, or exit.
-
-Saved export variable:
-
-- `ChromaLink_AbilityExport` in the character SavedVariables file for the ChromaLink addon
-
-The export is machine-oriented and includes:
-
-- player metadata (`name`, `level`, `calling`, `role`)
-- counts for `total`, `active`, and `offensive`
-- `abilities`
-- `offensiveAbilities`
-- `rawText`
-- `offensiveRawText`
-
-`/cl abilities status` prints the current snapshot summary in-game. `/cl abilities export` forces an immediate refresh attempt, but the feature does not rely on chat input to keep the export current.
-
-What they are for:
-
-- `status` prints the current strip/layout summary
-- `build`, `version`, and `caps` print addon version, protocol/profile, frame types, and header capability flags
-- `rotation` and `rotate` print the active frame rotation sequence and heartbeat priority
-- `diag` adds nearby native RIFT frame summaries for overlap and layout checks
-- `refresh` forces an immediate strip redraw
-- `observer` toggles the optional observer lane below the strip
-- `compensate` toggles experimental display-compensation sizing that tries to preserve final on-screen strip size when the UI anchor reports shrinkage
-- `traces` arms or disables verbose layout tracing for the next `/reloadui`
-
-Display compensation is still experimental. It is meant to test the idea of oversizing the strip internally so the final displayed strip stays closer to the target machine-readable size.
-
-## Observer Lane
-
-ChromaLink now includes an optional observer lane for low-risk capture research. It is off by default and does not change the main strip payload contract.
-
-What it helps with:
-
-- clipping checks
-- scale drift checks
-- color drift checks
-- future capture experiments
-
-Observer diagnostics are now visible in all major tooling layers:
-
-- capture sidecars include an `observerLane` section
-- annotated BMP artifacts draw observer marker boxes and sample centers
-- the inspector preview draws the same observer geometry directly on the zoomed capture
-- observer reports now include visibility hints such as `visible`, `right-clipped`, or `offscreen`
-- the inspector details pane can now compute observer health directly from the loaded BMP even when no sidecar exists
-
-## Protocol Snapshot
-
-The current transport is a segmented strip with fixed edge controls:
-
-- `80` total segments
-- left edge control markers in segments `1-8`
-- payload symbols in segments `9-72`
-- right edge control markers in segments `73-80`
-- `8-color` alphabet for `3` bits per segment
-
-The current strip carries `24` transport bytes per frame and now supports more than one frame type without changing strip geometry:
-
-- `CoreStatus`
-  - player and target summary state
-- `PlayerVitals`
-  - health current/max
-  - resource current/max
-- `PlayerPosition`
-  - x/y/z world coordinates encoded as fixed-point integers
-- `PlayerCast`
-  - cast-state flags
-  - progress (`Q8`)
-  - duration / remaining time (`uint16`, centiseconds)
-  - cast target code
-  - short transport-safe spell label (`5` bytes)
-- `PlayerResources`
-  - mana current/max
-  - energy current/max
-  - power current/max
-- `PlayerCombat`
-  - combo points
-  - charge current/max
-  - planar charges current/max
-  - absorb
-  - compact combat-resource availability flags
-  - `pvp`, `mentoring`, `ready`, and `afk` capability flags
-- `TargetPosition`
-  - target x/y/z world coordinates encoded as fixed-point integers
-- `FollowUnitStatus`
-  - follow-slot flags for present/alive/combat/afk/offline/aggro/blocked/ready
-  - follow-unit x/y/z coordinates at half-unit precision
-  - follow-unit health/resource percentages, level, and calling/role
-- `TargetVitals`
-  - target health current/max
-  - target absorb
-  - target state flags and level
-- `TargetResources`
-  - target mana current/max
-  - target energy current/max
-  - target power current/max
-- `AuxUnitCast`
-  - compact cast telemetry for target or rotated group slots
-  - unit selector code
-  - cast flags, progress, duration, remaining, cast target code, short label
-- `AuraPage`
-  - compact player/target buff or debuff summary pages
-  - total aura count plus two compact entries
-- `TextPage`
-  - player name
-  - target name
-  - zone name
-  - shard name
-- `AbilityWatch`
-  - tracked ability ids
-  - compact cooldown/readiness state
-  - per-page ready/cooling counts
-
-The current addon rotation keeps `coreStatus` as the dominant heartbeat and periodically inserts the secondary slices to increase throughput over time instead of widening the strip. A recent live sample after `/reloadui` for the expanded live build produced:
-
-- `73` accepted `CoreStatus` frames
-- `12` accepted `PlayerVitals` frames
-- `10` accepted `PlayerPosition` frames
-- `10` accepted `PlayerCast` frames
-- `9` accepted `PlayerResources` frames
-- `11` accepted `PlayerCombat` frames
-- `12` accepted `TargetPosition` frames
-- `8` accepted `FollowUnitStatus` frames
-- `ReservedFlags: 0x3F`, confirming the live addon loaded the expanded multi-frame build
-
-The next remaining-capabilities pass widened the live capability marker to `0xFF` and produced accepted samples for:
-
-- `AbilityWatch`
-- `AuraPage`
-- `AuxUnitCast`
-- `CoreStatus`
-- `FollowUnitStatus`
-- `PlayerCast`
-- `PlayerPosition`
-- `PlayerResources`
-- `PlayerVitals`
-- `TargetPosition`
-- `TargetVitals`
-- `TextPage`
-
-The header `ReservedFlags` byte is now used as a live build-capability marker. The current live-proven value is `0x3F`, which means:
-
-- `0x01` = multi-frame rotation capable
-- `0x02` = player-position capable
-- `0x04` = player-cast capable
-- `0x08` = expanded stats capable
-- `0x10` = target-position capable
-- `0x20` = follow-unit capable
-
-The current expanded build also uses:
-
-- `0x40` = additional telemetry capable
-- `0x80` = text and aura pages capable
-
-The expanded telemetry build also defines:
-
-- `0x08` = expanded player stats capable
-- `0x10` = target-position capable
-- `0x20` = follow-unit-status capable
-
-That gives live captures a direct way to prove whether the running addon actually loaded a newer telemetry build.
-
-## Live Monitor
-
-Use the live monitor when you want a product-style view of the rolling bridge snapshot.
-
-- `ChromaLink.Monitor` is the live-first UI for `chromalink-live-telemetry.json`
-- the inspector is still the artifact and BMP analyzer
-- `Start-ChromaLinkStack.cmd` starts the local CLI watch loop plus HTTP bridge in the background without opening extra UI
-- `Bridge-ChromaLink.cmd` keeps the snapshot fresh in the background
-- `Open-ChromaLink-Monitor.cmd` launches the live monitor directly
-- `Open-ChromaLinkDashboardPinned.cmd` launches the live monitor in opt-in always-on-top mode
-- `Open-ChromaLink-LiveStack.cmd` reuses `Start-ChromaLinkStack.cmd` and then opens the monitor
-- `Open-ChromaLinkHttpBridge.cmd` opens the local HTTP bridge
-- `Open-ChromaLinkDashboard.cmd` opens the browser dashboard
-- `Open-ChromaLink-DashboardStack.cmd` reuses `Start-ChromaLinkStack.cmd` and then opens the browser dashboard
-- `Get-ChromaLinkStackStatus.cmd` checks the stack health endpoints and process counts
-- `Status-ChromaLinkStack.cmd` checks the stack bridge and readiness status
-- `Status-ChromaLinkHttpBridge.cmd` checks the HTTP bridge endpoints and process counts
-- `Stop-ChromaLinkStack.cmd` stops the local ChromaLink stack processes
-- `Stop-ChromaLinkHttpBridge.cmd` stops only the HTTP bridge process
-- `Probe-ChromaLinkHttpBridge.cmd` checks the local HTTP bridge endpoints
-- `Watch-ChromaLinkTelemetry.cmd` opens the console snapshot view if you want something lighter than the GUI
-- `Test-ChromaLinkTelemetryReady.cmd` is the automation-friendly gate for readiness and freshness
-
-## Local HTTP Bridge
-
-ChromaLink now includes a tiny local HTTP bridge on top of the same rolling snapshot contract.
-The bridge project lives in `DesktopDotNet/ChromaLink.HttpBridge`.
-
-It fits alongside the current tools like this:
-
-- the rolling JSON snapshot remains the source of truth
-- the live monitor stays the human-facing live viewer
-- the browser dashboard stays the browser-friendly live view
-- the inspector stays the BMP and overlay analyzer
-- the readiness script stays the automation gate
-- the HTTP bridge makes the same live state easier for other local tools to consume
-- `Open-ChromaLinkHttpBridge.cmd`, `Launch-ChromaLinkHttpBridge.cmd`, and `Probe-ChromaLinkHttpBridge.cmd` are the bridge helpers
-- `Open-ChromaLinkDashboard.cmd` and `Open-ChromaLink-DashboardStack.cmd` are the browser dashboard helpers
-- `Open-ChromaLinkDashboardPinned.cmd` is the pinned live-dashboard helper for gameplay
-- `Get-ChromaLinkStackStatus.cmd`, `Status-ChromaLinkStack.cmd`, `Status-ChromaLinkHttpBridge.cmd`, `Stop-ChromaLinkStack.cmd`, and `Stop-ChromaLinkHttpBridge.cmd` are the lifecycle helpers
+### HTTP Bridge
+The HTTP bridge exposes the rolling snapshot over localhost and is the intended app-facing direction.
 
 Endpoints:
-
-- `/latest-snapshot`
-- `/snapshot`
-- `/health`
-- `/ready`
-- `/dashboard`
-
-The bridge is local-only and lightweight, and it reads the snapshot rather than bypassing the existing bridge contract.
-
-Recommended workflow:
-
-1. Start `Start-ChromaLinkStack.cmd` for the safest background capture setup, or `Bridge-ChromaLink.cmd` if you only want the rolling snapshot loop
-2. Use `Open-ChromaLink-LiveStack.cmd` when you want the monitor on top of the running stack
-3. Use `Open-ChromaLink-DashboardStack.cmd` or `Open-ChromaLinkDashboard.cmd` when you want a browser view
-4. Use `Open-ChromaLinkDashboardPinned.cmd` when you want a live ChromaLink surface to stay above the game and other windows
-5. Use `Probe-ChromaLinkHttpBridge.cmd`, `Get-ChromaLinkStackStatus.cmd`, or `Status-ChromaLinkHttpBridge.cmd` when you want to verify the local API surface
-6. Open the inspector only when you need BMP artifacts or overlay diagnostics
-7. Use `Test-ChromaLinkTelemetryReady.cmd` in scripts or checks
-8. Stop the stack with `Stop-ChromaLinkStack.cmd` when you are done, or `Stop-ChromaLinkHttpBridge.cmd` if you only want to stop the HTTP bridge
-
-## Wrapper Scripts
-
-Useful helper scripts:
-
-- [scripts/Start-ChromaLinkStack.cmd](scripts/Start-ChromaLinkStack.cmd)
-- [scripts/Bridge-ChromaLink.cmd](scripts/Bridge-ChromaLink.cmd)
-- [scripts/Launch-ChromaLinkHttpBridge.cmd](scripts/Launch-ChromaLinkHttpBridge.cmd)
-- [scripts/Open-ChromaLinkHttpBridge.cmd](scripts/Open-ChromaLinkHttpBridge.cmd)
-- [scripts/Open-ChromaLink-LiveStack.cmd](scripts/Open-ChromaLink-LiveStack.cmd)
-- [scripts/Open-ChromaLinkDashboard.cmd](scripts/Open-ChromaLinkDashboard.cmd)
-- [scripts/Open-ChromaLinkDashboardPinned.cmd](scripts/Open-ChromaLinkDashboardPinned.cmd)
-- [scripts/Open-ChromaLink-DashboardStack.cmd](scripts/Open-ChromaLink-DashboardStack.cmd)
-- [scripts/Get-ChromaLinkStackStatus.cmd](scripts/Get-ChromaLinkStackStatus.cmd)
-- [scripts/Status-ChromaLinkStack.cmd](scripts/Status-ChromaLinkStack.cmd)
-- [scripts/Status-ChromaLinkHttpBridge.cmd](scripts/Status-ChromaLinkHttpBridge.cmd)
-- [scripts/Probe-ChromaLinkHttpBridge.cmd](scripts/Probe-ChromaLinkHttpBridge.cmd)
-- [scripts/Stop-ChromaLinkStack.cmd](scripts/Stop-ChromaLinkStack.cmd)
-- [scripts/Stop-ChromaLinkHttpBridge.cmd](scripts/Stop-ChromaLinkHttpBridge.cmd)
-- [scripts/Prepare-ChromaLink-640x360.cmd](scripts/Prepare-ChromaLink-640x360.cmd)
-- [scripts/Smoke-ChromaLink.cmd](scripts/Smoke-ChromaLink.cmd)
-- [scripts/Bench-ChromaLink.cmd](scripts/Bench-ChromaLink.cmd)
-- [scripts/Validate-ChromaLink.cmd](scripts/Validate-ChromaLink.cmd)
-- [scripts/Live-ChromaLink.cmd](scripts/Live-ChromaLink.cmd)
-- [scripts/Show-ChromaLinkTelemetry.cmd](scripts/Show-ChromaLinkTelemetry.cmd)
-- [scripts/Watch-ChromaLinkTelemetry.cmd](scripts/Watch-ChromaLinkTelemetry.cmd)
-- [scripts/Open-ChromaLink-Monitor.cmd](scripts/Open-ChromaLink-Monitor.cmd)
-- [scripts/Open-ChromaLinkTelemetryJson.cmd](scripts/Open-ChromaLinkTelemetryJson.cmd)
-- [scripts/Open-ChromaLinkTelemetryFolder.cmd](scripts/Open-ChromaLinkTelemetryFolder.cmd)
-- [scripts/Test-ChromaLinkTelemetryReady.cmd](scripts/Test-ChromaLinkTelemetryReady.cmd)
-- [scripts/Open-ChromaLink-Inspector.cmd](scripts/Open-ChromaLink-Inspector.cmd)
-- [scripts/Get-RiftInputReadiness.cmd](scripts/Get-RiftInputReadiness.cmd)
-- [scripts/Get-RiftAbilityExport.cmd](scripts/Get-RiftAbilityExport.cmd)
-- [scripts/Reload-RiftUi.cmd](scripts/Reload-RiftUi.cmd)
-- [scripts/Send-RiftSlash.cmd](scripts/Send-RiftSlash.cmd)
-- [scripts/Trigger-RiftActionBar.cmd](scripts/Trigger-RiftActionBar.cmd)
-- [scripts/Trigger-RiftMainBar.cmd](scripts/Trigger-RiftMainBar.cmd)
-- [scripts/Resize-RiftClient-640x360.cmd](scripts/Resize-RiftClient-640x360.cmd)
-- [scripts/Sweep-RiftResolutions.ps1](scripts/Sweep-RiftResolutions.ps1)
-
-Examples:
-
-```powershell
-.\scripts\Sweep-RiftResolutions.ps1 -Resolutions @('640x360') -ReloadUi
-```
-
-```powershell
-.\scripts\Sweep-RiftResolutions.ps1 -Resolutions @('640x360') -ReloadUi -ObserverLane on
-```
-
-```powershell
-.\scripts\Send-RiftSlash.cmd /reloadui
-.\scripts\Get-RiftInputReadiness.cmd
-.\scripts\Get-RiftInputReadiness.cmd -RequireExpectedClientSize
-.\scripts\Get-RiftAbilityExport.cmd
-.\scripts\Get-RiftAbilityExport.cmd -Json
-.\scripts\Send-RiftSlash.cmd /cl status -DryRun
-.\scripts\Reload-RiftUi.cmd -DryRun
-.\scripts\Trigger-RiftActionBar.cmd 5
-.\scripts\Trigger-RiftMainBar.cmd 1
-.\scripts\Trigger-RiftMainBar.cmd 5 -DryRun
-.\scripts\Trigger-RiftMainBar.cmd 5 -Focus
-```
-
-`Send-RiftSlash.cmd` is the existing chat-command helper. `Trigger-RiftMainBar.cmd` is the matching external input helper for the first RIFT main action bar and currently supports slots `1-12`, mapped to the default key row `1 2 3 4 5 6 7 8 9 0 - =`.
-
-`Trigger-RiftActionBar.cmd` is a clearer alias for the same helper when you want to think in terms of the currently active default main action bar instead of the older internal script name.
-
-`Get-RiftInputReadiness.cmd` is the consolidated preflight report. It compares the live RIFT process/window/client state against the last-saved `%APPDATA%\RIFT\rift.cfg` baseline and reports whether background main-bar input, focus-based chat input, and ChromaLink capture are currently ready. Add `-RequireExpectedClientSize` when you want it to fail unless the live client matches the expected `640x360` ChromaLink profile.
-
-`Get-RiftAbilityExport.cmd` reads the latest persisted `ChromaLink_AbilityExport` snapshot from the RIFT `SavedVariables` tree and prints the current character plus the exported offensive ability table. Add `-Json` for machine-readable output or `-All` to include the full exported ability book instead of just the offensive subset.
-
-`Trigger-RiftMainBar.cmd` now defaults to background `PostMessage` mode so it can fire a main-bar slot without stealing focus. Use `-Focus` only as the fallback path when you explicitly want the older foreground activation behavior. `-Background` is still accepted for clarity or backward compatibility. `-DryRun` prints the exact PID, process, window title, live window/client geometry, last-saved `rift.cfg` baseline, slot, key, and delivery mode without sending anything. Treat background posting as game-specific: many games ignore unfocused `WM_KEYDOWN` / `WM_KEYUP` messages, so ChromaLink or manual confirmation is still needed.
-
-## Bridge Output
-
-For a simple always-on desktop bridge, run:
-
-```powershell
-.\scripts\Bridge-ChromaLink.cmd
-```
-
-That runs the CLI in continuous watch mode and keeps `%LOCALAPPDATA%\ChromaLink\DesktopDotNet\out\chromalink-live-telemetry.json` refreshed with:
-
-- latest merged aggregate state
-- aggregate freshness and readiness metadata
-- frame counts
-- most recent detection geometry
-- last decoded frame metadata
-- reserved build flags
-- bridge contract metadata for downstream consumers
-- the `ChromaLink.Monitor` UI is the primary live viewer for that snapshot
-
-## HTTP Bridge
-
-For local API access on top of the rolling snapshot, run:
-
-```powershell
-.\scripts\Launch-ChromaLinkHttpBridge.cmd
-```
-
-The HTTP bridge is local-only and reads `chromalink-live-telemetry.json` directly. It exposes:
-
 - `/latest-snapshot`
 - `/snapshot`
 - `/health`
 - `/ready`
 
-## Browser Dashboard
+Default base URL:
+- `http://127.0.0.1:7337/`
 
-The browser dashboard is the browser-friendly companion to the local HTTP bridge.
-Use it when you want a zero-install view in a web browser instead of the WinForms monitor.
+## Design Rules
 
-- lighter than the live monitor
-- tied to the HTTP bridge as the source of truth
-- separate from the inspector, which remains the BMP and overlay tool
-- consistent with the readiness script, which still gates automation
-- now exposes the richer live telemetry surface instead of only the core baseline
-- browser windows still do not control z-order; pinned access stays in the desktop monitor path
+1. **Keep the strip as the product center.**
+   Avoid replacing the visible transport with hidden direct app integration.
 
-Recommended role split:
+2. **Prefer low drift over reinvention.**
+   Preserve strip geometry, protocol framing, reader assumptions, and proven tooling unless there is a concrete need to change them.
 
-- HTTP bridge for local API access
-- browser dashboard for quick at-a-glance viewing
-- live monitor for the richer desktop view
-- pinned live monitor for opt-in always-on-top gameplay access
-- inspector for artifact analysis
-- readiness script for automation checks
+3. **Player basics stay authoritative in native gather.**
+   HP, resources, and basic state should remain available even if Rift Meter is absent or degraded.
 
-Use `Probe-ChromaLinkHttpBridge.cmd` to sanity-check those endpoints from scripts, or `Open-ChromaLinkHttpBridge.cmd` to jump to the base URL in a browser.
-Use `Open-ChromaLinkDashboardPinned.cmd` when you want the live monitor to stay above the game while you play.
+4. **Rift Meter is enrichment, not ownership of the bridge.**
+   It improves combat context, but should not become a hidden hard dependency for the whole pipeline.
 
-## Lifecycle
+5. **Normalize downstream contracts on desktop.**
+   The desktop side is where multi-frame correlation and app-facing contracts should stabilize.
 
-The current ChromaLink flow is:
+## Proposed Roadmap
 
-1. Start with `Start-ChromaLinkStack.cmd` for the background CLI watch plus HTTP bridge path, or `Bridge-ChromaLink.cmd` if you only want the rolling snapshot loop.
-2. Inspect with `Open-ChromaLink-Monitor.cmd`, `Open-ChromaLinkDashboardPinned.cmd`, `Open-ChromaLinkDashboard.cmd`, or `Open-ChromaLinkHttpBridge.cmd` depending on whether you want the WinForms monitor, pinned live monitor, browser dashboard, or raw bridge.
-3. Verify with `Probe-ChromaLinkHttpBridge.cmd`, `Get-ChromaLinkStackStatus.cmd`, `Status-ChromaLinkStack.cmd`, or `Status-ChromaLinkHttpBridge.cmd`.
-4. Stop with `Stop-ChromaLinkStack.cmd`, or `Stop-ChromaLinkHttpBridge.cmd` if you only want to stop the bridge process.
+### Near-term roadmap
+1. **Live-verify the new source-health bits**
+   - confirm degraded/stable semantics during idle, combat, and post-combat conditions
 
-This keeps the rolling JSON snapshot as the source of truth while giving you four views on top of it:
+2. **Strengthen the normalized combat contract**
+   - define it as the preferred HTTP/app-facing combat surface
+   - document fields and expected semantics
 
-- monitor for artifact-heavy inspection
-- pinned live monitor for opt-in always-on-top access
-- browser dashboard for a zero-install browser view
-- HTTP bridge and readiness checks for automation
+3. **Tune combat-time rotation using freshness evidence**
+   - shift from simple combat override to freshness/error-aware prioritization
 
-To read the latest merged telemetry snapshot from the console without opening the inspector:
+### Mid-term roadmap
+4. **Add a richer secondary combat frame**
+   - keep `riftMeterCombat` compact for the hot path
+   - add a lower-frequency richer frame for less-lossy totals and encounter metadata
 
-```powershell
-.\scripts\Show-ChromaLinkTelemetry.cmd
-```
+5. **Promote HTTP bridge as the official downstream interface**
+   - treat monitor/CLI as diagnostics
+   - treat HTTP/JSON as the stable consumer surface
 
-For a simple console watcher:
+6. **Tighten the minimal live proof product**
+   - focus the UI on HP, resources, combat, freshness, and source health
 
-```powershell
-.\scripts\Show-ChromaLinkTelemetry.cmd -Watch
-```
+### Longer-term roadmap
+7. **Expand carefully beyond combat basics**
+   - richer target telemetry
+   - encounter metadata
+   - more precise combat summaries
+   - optional specialized frames only when they do not harm reliability
 
-If you want a one-click version:
+## What Is Not The Focus Right Now
 
-- `Watch-ChromaLinkTelemetry.cmd` keeps the console snapshot view live
-- `Open-ChromaLinkTelemetryJson.cmd` opens the raw snapshot file
-- `Open-ChromaLinkTelemetryFolder.cmd` opens the telemetry output folder
-- `Open-ChromaLink-LiveStack.cmd` starts the background stack and then opens the monitor
+Not current priorities:
+- large dashboard/product UX work
+- broad feature expansion just because the codebase supports it
+- replacing the strip with a hidden integration path
+- deleting all old frame types immediately
 
-For an automation-friendly readiness check that exits nonzero when the bridge is stale or missing:
+The current strategy is to **preserve working context, narrow priorities, and expand only where reliability is already proven**.
 
-```powershell
-.\scripts\Test-ChromaLinkTelemetryReady.cmd
-```
+## Key Docs
 
-`Reload-RiftUi.cmd` sends the normal RIFT `/reloadui` command to the active game window. `-DryRun` previews the target PID/title, live window/client geometry, and last-saved `rift.cfg` baseline, then confirms that it would use the focus-based chat path.
+- `C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\notes\refocus-plan-2026-04-03-riftmeter.md`
+- `C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\notes\current-stage-roadmap-2026-04-03.md`
+- `C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\DesktopDotNet\ChromaLink.HttpBridge\README.txt`
 
-`Send-RiftSlash.cmd` can send other ChromaLink slash commands when we explicitly want scripted in-game control. `-DryRun` previews the target PID/title, live window/client geometry, last-saved `rift.cfg` baseline, and the exact command text without sending it.
+## License
 
-The slash-sender helpers now abort if RIFT does not actually become the foreground window, which is safer than typing into another app by mistake.
-
-The inspector also watches the live bridge snapshot now, so it can act as a live-first bridge monitor:
-
-- a dedicated `Live Bridge` panel surfaces readiness and freshness clearly
-- the details pane shows aggregate state, frame freshness, metrics, and last backend
-- when no BMP is loaded, the inspector can still show useful live bridge state from the rolling snapshot
-
-To reduce the chance of covering the RIFT client during live capture, the helper launchers that open auxiliary windows now default to minimized startup where practical. That includes the repo-native bridge, monitor, stack, and browser-open helpers, plus the packaged stack launchers.
-
-## Packaged Output
-
-ChromaLink is still source-first in this repository. The packaged output is the assembled publish folder we want for handoff or run-from-folder use, not a replacement for the repo.
-
-Create it with:
-
-```powershell
-.\scripts\Package-ChromaLinkDesktop.ps1
-```
-
-Or build the self-contained release flavor with:
-
-```powershell
-.\scripts\Package-ChromaLinkDesktop-SelfContained.cmd
-```
-
-Release metadata now comes from:
-
-- [VERSION](C:/Users/mrkoo/OneDrive/Documents/RIFT/Interface/AddOns/ChromaLink/VERSION)
-- [CHANGELOG.md](C:/Users/mrkoo/OneDrive/Documents/RIFT/Interface/AddOns/ChromaLink/CHANGELOG.md)
-- [RELEASE_CHECKLIST.md](C:/Users/mrkoo/OneDrive/Documents/RIFT/Interface/AddOns/ChromaLink/RELEASE_CHECKLIST.md)
-
-The default package layout is:
-
-```text
-artifacts\package\
-├── Open-ChromaLink-Product.cmd
-├── Bridge-ChromaLink.cmd
-├── README.md
-├── package-manifest.json
-├── Open-ChromaLink-Monitor.cmd
-├── Open-ChromaLinkDashboardPinned.cmd
-├── Status-ChromaLinkStack.cmd
-├── Stop-ChromaLinkStack.cmd
-├── Start-ChromaLinkStack.cmd
-├── Open-ChromaLinkDashboard.cmd
-└── desktop\
-    ├── ChromaLink.Cli\
-    ├── ChromaLink.HttpBridge\
-    ├── ChromaLink.Inspector\
-    └── ChromaLink.Monitor\
-```
-
-Self-contained release output is written separately to:
-
-```text
-artifacts\package-selfcontained\
-```
-
-Use the packaged output when you want:
-
-- a predictable folder you can hand to another machine or workspace
-- the desktop tools assembled together without opening the source tree
-- the bridge, monitor, inspector, and dashboard to run from one stable layout
-
-Use the repo-native workflow when you want:
-
-- to edit Lua, reader, CLI, docs, or scripts directly
-- to run `dotnet build`, `dotnet test`, `smoke`, `capture-dump`, `live`, or `watch` from source
-- to keep the RIFT addon and desktop tools under active development
-
-Practical difference:
-
-- packaged output is the runnable product view
-- repo-native is the working view
-- both should keep the same bridge contract, live behavior, and validation results
-
-Package-emitted launchers are intentionally narrow:
-
-- `Open-ChromaLink-Product.cmd`
-- `Bridge-ChromaLink.cmd`
-- `Start-ChromaLinkStack.cmd`
-- `Open-ChromaLink-Monitor.cmd`
-- `Open-ChromaLinkDashboardPinned.cmd`
-- `Status-ChromaLinkStack.cmd`
-- `Stop-ChromaLinkStack.cmd`
-- `Open-ChromaLinkDashboard.cmd`
-
-Packaged launcher roles:
-
-- `Open-ChromaLink-Product.cmd` is the fastest first-run path: start the stack, wait for readiness, then open the monitor
-- `Bridge-ChromaLink.cmd` starts the packaged CLI in `watch` mode so the rolling snapshot stays fresh
-- `Start-ChromaLinkStack.cmd` starts the packaged CLI watch loop plus HTTP bridge without opening UI
-- `Open-ChromaLink-Monitor.cmd` opens the packaged monitor explicitly
-- `Open-ChromaLinkDashboardPinned.cmd` opens the packaged monitor in opt-in always-on-top mode
-- `Status-ChromaLinkStack.cmd` reports local endpoint health, snapshot freshness, and package-local process counts
-- `Stop-ChromaLinkStack.cmd` stops only the packaged CLI, HTTP bridge, and monitor processes from that package folder
-- `Open-ChromaLinkDashboard.cmd` opens the local dashboard URL
-
-Live-play guidance:
-
-- if you are actively playing, prefer `Start-ChromaLinkStack.cmd` first so the bridge stays in the background
-- use `Open-ChromaLinkDashboardPinned.cmd` when you want a ChromaLink window to stay above the game
-- open `Open-ChromaLink-Monitor.cmd` or `Open-ChromaLinkDashboard.cmd` only when you actually want regular UI on top
-- use `Open-ChromaLink-Product.cmd` when you want the guided first-run path and are comfortable with the monitor opening after readiness
-
-The broader helper surface in `scripts/` stays repo-native. That includes launchers such as `Open-ChromaLink-LiveStack.cmd`, `Open-ChromaLink-Monitor.cmd`, status helpers, stop helpers, and the probe/readiness scripts.
-
-Packaged workflow:
-
-1. Build the package with `.\scripts\Package-ChromaLinkDesktop.ps1`
-2. Open `artifacts\package\README.md`
-3. Run `Open-ChromaLink-Product.cmd` for the normal first-run path
-4. If you want to inspect health directly, run `Status-ChromaLinkStack.cmd`
-5. Stop with `Stop-ChromaLinkStack.cmd`
-
-Package flavor guidance:
-
-- use `artifacts\package` when the target machine already has the matching .NET runtime
-- use `artifacts\package-selfcontained` when you want the safer handoff option for another Windows machine
-- bump `VERSION` and review `CHANGELOG.md` before cutting a release build
-
-## Project Structure
-
-```text
-ChromaLink/
-├── Core/                         # Lua config and shared addon-side definitions
-├── RIFT/                         # Addon bootstrap, rendering, commands, diagnostics
-├── DesktopDotNet/                # .NET 9 solution
-│   ├── ChromaLink.Reader/        # capture, geometry lock, decode, shared diagnostics
-│   ├── ChromaLink.Cli/           # smoke, replay, live, watch, bench, dump, prep
-│   ├── ChromaLink.Monitor/       # live bridge UI for the rolling snapshot
-│   ├── ChromaLink.Inspector/     # visual frame inspection and overlays
-│   ├── ChromaLink.Tests/         # protocol, replay, synthetic, observer tests
-│   └── ChromaLink.sln
-├── scripts/                      # helper scripts for window prep and capture flows
-├── notes/                        # lab log and investigation notes
-├── PROJECT_PROMPT.md             # active product and research direction
-└── README.md
-```
-
-## Outputs
-
-Reader artifacts are written under:
-
-- `%LOCALAPPDATA%\ChromaLink\DesktopDotNet`
-
-Useful locations:
-
-- `fixtures\chromalink-color-core.bmp`
-- `out\chromalink-color-capture-dump.bmp`
-- `out\chromalink-color-capture-dump-annotated.bmp`
-- `out\chromalink-color-capture-dump.json`
-- `out\chromalink-color-first-reject.bmp`
-
-## Validation
-
-After addon-side Lua changes:
-
-```text
-/reloadui
-```
-
-Useful validation commands:
-
-```powershell
-dotnet test .\DesktopDotNet\ChromaLink.sln
-```
-
-```powershell
-dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- smoke
-```
-
-```powershell
-dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- capture-dump
-```
-
-Live capture is still the gold standard. If `capture-dump`, `live`, or replay rejects a frame with a clear reason, the observability path is doing its job.
-
-## Notes And Source Of Truth
-
-- product direction: [PROJECT_PROMPT.md](PROJECT_PROMPT.md)
-- active desktop solution: [DesktopDotNet/ChromaLink.sln](DesktopDotNet/ChromaLink.sln)
-- running lab log: [notes/telemetry-lab-log-2026-04-01.md](notes/telemetry-lab-log-2026-04-01.md)
-- focused investigation notes: [notes/ui-resolution-investigation-2026-04-01.md](notes/ui-resolution-investigation-2026-04-01.md)
-
-## Next Major Work
-
-The most important remaining work is still practical, not cosmetic:
-
-1. broaden payload coverage beyond `coreStatus`
-2. improve live robustness under scaling drift and imperfect capture
-3. tighten reject diagnostics by phase and failure type
-4. keep the `640x360` baseline solid while wider-resolution support becomes its own mode
-
----
-
-**ChromaLink** is still early, but the current project already has a real live baseline, reproducible tooling, and a much clearer path for growing telemetry without losing observability.
+MIT

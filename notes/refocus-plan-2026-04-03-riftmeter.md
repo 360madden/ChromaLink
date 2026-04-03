@@ -1,296 +1,163 @@
-# ChromaLink refocus plan (telemetry-first, low-drift)
+# ChromaLink refocus plan (updated 2026-04-03)
 
-## Goal
-Refocus ChromaLink around the existing strip transport and decoder pipeline while minimizing drift from the current codebase.
+## Status summary
+This plan started as a refocus note. It is now also a status note.
 
-Primary objective:
-- maximize reliable low-latency telemetry from RIFT into the ChromaLink decoder
-- make decoded telemetry available to other apps
-- keep only a minimal live proof surface for player basics
+The original refocus direction has largely been implemented:
+- ChromaLink remained centered on the existing strip/render/protocol/decode pipeline
+- default transport priority was narrowed around player basics
+- Rift Meter was integrated as an optional enrichment source rather than replacing native gather
+- a dedicated compact `riftMeterCombat` transport frame was added
+- desktop consumers now receive a normalized merged combat view
 
-Secondary objective:
-- integrate Rift Meter as an optional upstream enrichment source without making ChromaLink depend on it for core player vitals
-- defer live Rift Meter integration work until the RIFT client is available again
+So this document now tracks:
+- what is done
+- what remains in progress
+- what should happen next
+
+## What is implemented
+
+### Addon side
+Implemented in the current codebase:
+- narrowed default telemetry-first rotation
+- combat-aware runtime priority boost for `riftMeterCombat`
+- `Core/RiftMeterAdapter.lua`
+- safe public/global Rift Meter inspection
+- `BuildRiftMeterCombatSnapshot()` in `Core/Gather.lua`
+- dedicated `riftMeterCombat` frame encoding in `Core/Protocol.lua`
+- in-game diagnostics:
+  - `/cl riftmeter`
+  - `/cl riftmeter status`
+  - `/cl riftmeter dump`
+
+### Desktop side
+Implemented in the current codebase:
+- reader support for frame type `15` / `RiftMeterCombat`
+- aggregate storage of Rift Meter combat frames
+- normalized combat model that merges native `playerCombat` with `riftMeterCombat`
+- rolling JSON contract with:
+  - raw `aggregate.riftMeterCombat`
+  - preferred normalized `aggregate.combat`
+- monitor support for Rift Meter combat
+- CLI summary support for Rift Meter combat
 
 ## Architectural stance
-ChromaLink remains the owner of:
+
+### ChromaLink owns
 - strip layout and rendering
-- transport protocol and framing
+- protocol framing
 - decoder compatibility
-- normalized desktop telemetry publishing
+- desktop normalization
+- app-facing contract evolution
 
-Rift Meter becomes an optional source for:
-- combat/encounter context
-- aggregate combat state
-- prioritization hints
-- compact combat summaries where stable public fields exist
-
-Native ChromaLink gathering remains authoritative for:
-- current HP / max HP / HP%
-- current resource / max resource / resource%
+### Native gather remains authoritative for
+- player HP / max HP
+- player resources
 - basic player state flags
 - basic cast state
-- transport sequence / timing
+- always-hot low-latency proof data
 
-## Preserve first
-Do not redesign these first:
-- `Core/Protocol.lua` symbol/byte framing
-- `RIFT/Render.lua` strip rendering model
-- `DesktopDotNet/ChromaLink.Reader` capture/decode foundations
-- `P360C` transport profile
-- current control markers / palette / geometry
+### Rift Meter currently provides
+- compact combat presence/state
+- combat counts and durations
+- compact overall totals
+- source-health cues through compact flags
 
-## Refocus by file
+This remains the right split.
 
-### 1) `C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\Core\Config.lua`
-Purpose in refocus:
-- keep the current protocol/profile ids stable
-- narrow active telemetry rotation without deleting old concepts
+## Current design
 
-Changes:
-- shorten `frameRotation` so the default schedule prioritizes:
-  - `coreStatus`
-  - `playerVitals`
-  - `playerResources`
-  - `playerCombat` (or compact combat summary if repurposed)
-- de-prioritize by default, but do not remove:
-  - `targetVitals`
-  - `targetResources`
-  - `targetPosition`
-  - `followUnitStatus`
-  - `auxUnitCast`
-  - `auraPage`
-  - `textPage`
-  - `abilityWatch`
-- add feature flags for optional Rift Meter enrichment
+### Transport baseline
+Keep stable unless there is strong evidence to change it:
+- `P360C`
+- `640x360` client baseline
+- `640x24` strip
+- existing strip geometry / control markers / palette
+- CRC/header model
 
-Recommended near-term default rotation:
-1. `coreStatus`
-2. `playerVitals`
-3. `coreStatus`
-4. `playerResources`
-5. `coreStatus`
-6. `playerCombat`
+### Active transport priorities
+Current priority emphasis:
+- `coreStatus`
+- `playerVitals`
+- `playerResources`
+- `playerCombat`
+- `riftMeterCombat`
 
-Optional later:
-- inject one low-frequency optional frame every N cycles
+### Downstream contract direction
+Preferred downstream surface is now:
+- desktop normalized JSON
+- especially `aggregate.combat`
 
-### 2) `C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\Core\Gather.lua`
-Purpose in refocus:
-- remain the central assembly point for addon-side telemetry
-- merge native data with optional Rift Meter enrichment
+Raw frame sections still matter for debugging, but downstream apps should increasingly consume normalized sections instead of piecing raw frames together themselves.
 
-Changes:
-- keep existing safe native wrappers intact
-- add a merge step for a Rift Meter adapter snapshot
-- make native player basics the authoritative source for always-hot values
-- add a compact merged snapshot shape that clearly separates:
-  - native basics
-  - optional Rift Meter enrichment
-  - source availability flags
+## Current Rift Meter frame semantics
 
-Fields to prioritize in gathered snapshot:
-- playerHealthCurrent
-- playerHealthMax
-- playerHealthPct
-- playerResourceKind
-- playerResourceCurrent
-- playerResourceMax
-- playerResourcePct
-- playerAlive
-- playerCombat
-- playerCasting
-- sequence / timestamp hints
-- riftMeterLoaded
-- riftMeterCombatActive
-- riftMeterCombatDurationMs
-- riftMeterOverallDamage (optional)
-- riftMeterOverallHealing (optional)
+`riftMeterCombat` is intentionally compact.
 
-### 3) `C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\Core\RiftMeterAdapter.lua` (new)
-Purpose in refocus:
-- isolate all Rift Meter integration logic in one place
-- prevent tight coupling between ChromaLink gather logic and Rift Meter internals
+Current meaning of major flags:
+- loaded
+- available
+- active
+- has overall totals
+- has active duration
+- has overall duration
+- degraded snapshot
+- stable snapshot
 
-Responsibilities:
-- detect whether `RiftMeter` global exists
-- safely inspect public tables like `RM.combats` and `RM.overall`
-- expose a small normalized adapter result
-- fail safely when Rift Meter is absent or incompatible
+Current payload family:
+- combat count
+- active combat duration
+- overall duration
+- active/overall player counts
+- active/overall hostile counts
+- compact overall damage in K
+- compact overall healing in K
 
-Initial adapter output:
-- `loaded`
-- `available`
-- `inCombat`
-- `combatCount`
-- `activeCombatDurationMs` if safely derivable
-- `overallDamage` if safely derivable
-- `overallHealing` if safely derivable
-- `warnings` / `shapeVersion` as diagnostics
+This is good enough for low-latency proof and source-health signaling, but not yet good enough for rich combat analytics.
 
-Rule:
-- do not read or depend on Rift Meter UI frames
-- prefer public globals and stable table summaries only
+## Remaining gaps
 
-### 4) `C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\Core\Protocol.lua`
-Purpose in refocus:
-- preserve transport encoding and decoder compatibility as much as possible
+### 1) Live semantic verification
+Still needed:
+- verify `degraded` vs `stableSnapshot` behavior through real combat and post-combat cycles
+- confirm that the compact flags stay meaningful across different combat states
 
-Changes:
-- keep current framing and CRC logic intact
-- keep existing frame ids if practical
-- keep current `coreStatus`, `playerVitals`, `playerResources`, `playerCombat` paths as the main active transport
-- if needed, repurpose spare bytes in `playerCombat` for compact Rift Meter enrichment before adding a new frame type
+### 2) Better downstream documentation
+Still needed:
+- formally document `aggregate.combat`
+- define which fields downstream apps should treat as authoritative
+- make the HTTP bridge docs point to the normalized combat section directly
 
-Priority:
-- avoid introducing new frame types until the narrowed transport is proven insufficient
+### 3) Richer combat evolution path
+Still needed:
+- preserve `riftMeterCombat` as the hot-path frame
+- add a lower-frequency richer combat frame only if the compact frame proves insufficient
 
-### 5) `C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\RIFT\Bootstrap.lua`
-Purpose in refocus:
-- control the runtime rotation and priority policy with minimal structural drift
+## Recommended next roadmap
 
-Changes:
-- simplify live rotation to the new narrow default
-- gate optional pages behind low-frequency or disabled-by-default scheduling
-- prepare a small hook point where combat-active state can raise the priority of `playerCombat`
-- keep existing scheduling helpers unless they directly interfere with the narrow baseline
+### Phase A: validate and stabilize
+1. live-verify the current compact frame flags
+2. freeze `aggregate.combat` semantics once verified
+3. document preferred downstream usage
 
-Later enhancement:
-- event-driven burst policy after significant changes:
-  - large HP/resource changes
-  - combat enter/exit
-  - cast start/stop
+### Phase B: improve app-facing contract
+1. make HTTP bridge docs and outputs emphasize normalized combat
+2. keep CLI and monitor aligned with the same contract
+3. avoid forcing downstream apps to decode raw frame semantics
 
-### 6) `C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\RIFT\Commands.lua`
-Purpose in refocus:
-- add visibility into the new source model without bloating scope
-
-Changes:
-- keep existing commands unless they become misleading
-- add or update diagnostics so `/cl status` or `/cl diag` can show:
-  - native telemetry status
-  - Rift Meter detected: yes/no
-  - Rift Meter readable: yes/no
-  - active narrow rotation
-
-### 7) `C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\DesktopDotNet\ChromaLink.Reader`
-Purpose in refocus:
-- keep decoder behavior stable while narrowing what is treated as first-class output
-
-Changes:
-- retain support for current decoded frame set initially
-- define a normalized telemetry model centered on:
-  - transport freshness
-  - player vitals
-  - player resources
-  - combat state
-  - optional Rift Meter enrichment
-- maintain diagnostics for rejected/accepted frames and freshness
-
-### 8) `C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\DesktopDotNet\ChromaLink.HttpBridge`
-Purpose in refocus:
-- become the primary app-facing surface
-
-Changes:
-- publish a stable current snapshot contract
-- expose health/freshness metadata
-- avoid making monitor/inspector the main product abstraction
-
-Suggested outward contract sections:
-- `contract`
-- `transport`
-- `player`
-- `riftMeter`
-- `health`
-
-### 9) `C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\DesktopDotNet\ChromaLink.Monitor`
-Purpose in refocus:
-- become a minimal proof surface only
-
-Changes:
-- show only:
-  - HP current/max/%
-  - resource current/max/%
-  - combat/casting
-  - freshness/latency
-  - Rift Meter loaded/combat active
-- de-emphasize broader dashboard behavior
-
-### 10) `C:\Users\mrkoo\OneDrive\Documents\RIFT\Interface\AddOns\ChromaLink\README.md`
-Purpose in refocus:
-- align documentation with the telemetry-first mission while preserving current context
-
-Changes:
-- describe ChromaLink as:
-  - strip transport
-  - decoder
-  - app-facing telemetry bridge
-- describe Rift Meter as optional enrichment
-- reduce emphasis on broad product/dashboard framing
-- clearly distinguish:
-  - proven transport baseline
-  - minimal proof UI
-  - optional internal tools
-
-## Order of implementation
-
-### Milestone 1: scope narrowing without protocol churn
-1. update docs/notes
-2. narrow default frame rotation in `Core/Config.lua`
-3. adjust runtime rotation logic in `RIFT/Bootstrap.lua`
-4. keep decoder compatibility intact
-
-Success check:
-- current decoder still works
-- player basics are fresher and more frequent
-
-### Milestone 2: Rift Meter adapter
-1. add `Core/RiftMeterAdapter.lua`
-2. merge adapter snapshot into `Core/Gather.lua`
-3. expose adapter status via addon diagnostics
-
-Success check:
-- ChromaLink runs with and without Rift Meter installed
-- no addon load failures
-- adapter state is visible in diagnostics
-
-Offline note:
-- while RIFT is offline, do not rely on runtime verification of Rift Meter structures
-- limit current work to adapter boundaries, config changes, and documentation unless a non-live test path is available
-
-### Milestone 3: compact combat enrichment
-1. map stable Rift Meter fields into existing combat-oriented payload
-2. prefer existing frame ids before adding new ones
-3. update desktop normalization to surface optional Rift Meter data
-
-Success check:
-- downstream snapshot includes optional `riftMeter` section
-- no regression in player basics decode
-
-### Milestone 4: app-facing bridge cleanup
-1. make HTTP bridge the official outward-facing surface
-2. shrink monitor to proof-of-life stats
-3. leave richer tools as secondary/internal
-
-Success check:
-- another local app can consume one stable snapshot
-- proof UI shows low-latency basics plus bridge health
-
-## Risks
-- Rift Meter public structures may not be a stable API
-- active combat details may require runtime shape verification
-- over-packing combat enrichment too early could create protocol churn
-- removing old telemetry pages too soon would increase drift and reduce test coverage
+### Phase C: richer combat only if justified
+1. add a secondary lower-frequency frame for richer totals or encounter metadata
+2. do not bloat the hot path
+3. do not break current reader compatibility without a strong reason
 
 ## Guardrails
-- preserve current transport geometry and decoder assumptions first
-- add Rift Meter through one adapter module only
-- prefer de-prioritizing old telemetry over deleting it immediately
-- keep native player basics as the low-latency guaranteed baseline
-- make each step live-verifiable before pruning more
+- preserve current strip geometry first
+- preserve low-latency player basics first
+- keep Rift Meter optional at the source level
+- prefer desktop normalization over addon-side overpacking
+- do not broaden scope back into dashboard-first development
 
-## Immediate next coding step
-Implement Milestone 1 first:
-- tighten `frameRotation` in `Core/Config.lua`
-- adjust `RIFT/Bootstrap.lua` only as needed to honor the narrowed rotation cleanly
-- leave protocol ids and decoder logic untouched
+## Immediate recommended next work
+1. live verification pass of the current Rift Meter flags
+2. HTTP bridge documentation and sample-contract update
+3. only then consider a richer secondary combat frame
