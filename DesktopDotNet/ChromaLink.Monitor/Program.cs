@@ -40,7 +40,9 @@ internal sealed class MonitorForm : Form
     private readonly Label _pathLabel = new() { AutoSize = true, ForeColor = Color.Gainsboro };
     private readonly Label _coreLine = new() { AutoSize = true, ForeColor = Color.WhiteSmoke };
     private readonly Label _vitalsLine = new() { AutoSize = true, ForeColor = Color.WhiteSmoke };
-    private readonly Label _positionLine = new() { AutoSize = true, ForeColor = Color.WhiteSmoke };
+    private readonly Label _resourcesLine = new() { AutoSize = true, ForeColor = Color.WhiteSmoke };
+    private readonly Label _combatLine = new() { AutoSize = true, ForeColor = Color.WhiteSmoke };
+    private readonly Label _riftMeterLine = new() { AutoSize = true, ForeColor = Color.WhiteSmoke };
     private readonly Label _metricsLine = new() { AutoSize = true, ForeColor = Color.WhiteSmoke };
     private readonly Label _statusLine = new() { AutoSize = true, ForeColor = Color.Gainsboro };
     private readonly CheckBox _topMostToggle = new()
@@ -127,7 +129,9 @@ internal sealed class MonitorForm : Form
         };
         headline.Controls.Add(_statusLine);
         headline.Controls.Add(_metricsLine);
-        headline.Controls.Add(_positionLine);
+        headline.Controls.Add(_riftMeterLine);
+        headline.Controls.Add(_combatLine);
+        headline.Controls.Add(_resourcesLine);
         headline.Controls.Add(_vitalsLine);
         headline.Controls.Add(_coreLine);
         headline.Controls.Add(_readiness);
@@ -141,10 +145,12 @@ internal sealed class MonitorForm : Form
         _readiness.Location = new Point(0, 80);
         _coreLine.Location = new Point(0, 108);
         _vitalsLine.Location = new Point(0, 130);
-        _positionLine.Location = new Point(0, 152);
-        _metricsLine.Location = new Point(0, 174);
-        _statusLine.Location = new Point(0, 196);
-        headline.Height = 224;
+        _resourcesLine.Location = new Point(0, 152);
+        _combatLine.Location = new Point(0, 174);
+        _riftMeterLine.Location = new Point(0, 196);
+        _metricsLine.Location = new Point(0, 218);
+        _statusLine.Location = new Point(0, 240);
+        headline.Height = 270;
 
         var detailsHost = new Panel
         {
@@ -252,7 +258,9 @@ internal sealed class MonitorForm : Form
             _readiness.Text = BuildReadinessLine(root);
             _coreLine.Text = BuildFrameLine(root, "coreStatus", "CoreStatus");
             _vitalsLine.Text = BuildFrameLine(root, "playerVitals", "PlayerVitals");
-            _positionLine.Text = BuildFrameLine(root, "playerPosition", "PlayerPosition");
+            _resourcesLine.Text = BuildPlayerResourcesLine(root);
+            _combatLine.Text = BuildPlayerCombatLine(root);
+            _riftMeterLine.Text = BuildRiftMeterCombatLine(root);
             _metricsLine.Text = BuildMetricsLine(root);
             _details.Text = BuildDetails(root);
         }
@@ -345,6 +353,40 @@ internal sealed class MonitorForm : Form
         return $"Metrics: accepted={accepted} rejected={rejected} backend={backend}";
     }
 
+    private static string BuildPlayerResourcesLine(JsonElement root)
+    {
+        if (!root.TryGetProperty("aggregate", out var aggregate) || !aggregate.TryGetProperty("playerResources", out var frame) || frame.ValueKind != JsonValueKind.Object)
+        {
+            return "PlayerResources: missing";
+        }
+
+        var mana = $"mana={TryGetInt(frame, "manaCurrent")}/{TryGetInt(frame, "manaMax")}";
+        var energy = $"energy={TryGetInt(frame, "energyCurrent")}/{TryGetInt(frame, "energyMax")}";
+        var power = $"power={TryGetInt(frame, "powerCurrent")}/{TryGetInt(frame, "powerMax")}";
+        var age = TryGetDouble(frame, "ageMs");
+        return $"PlayerResources: {mana} {energy} {power} age={age:F0}ms";
+    }
+
+    private static string BuildPlayerCombatLine(JsonElement root)
+    {
+        if (!root.TryGetProperty("aggregate", out var aggregate) || !aggregate.TryGetProperty("playerCombat", out var frame) || frame.ValueKind != JsonValueKind.Object)
+        {
+            return "PlayerCombat: missing";
+        }
+
+        return $"PlayerCombat: combo={TryGetInt(frame, "combo")} charge={TryGetInt(frame, "chargeCurrent")}/{TryGetInt(frame, "chargeMax")} planar={TryGetInt(frame, "planarCurrent")}/{TryGetInt(frame, "planarMax")} absorb={TryGetInt(frame, "absorb")} age={TryGetDouble(frame, "ageMs"):F0}ms";
+    }
+
+    private static string BuildRiftMeterCombatLine(JsonElement root)
+    {
+        if (!root.TryGetProperty("aggregate", out var aggregate) || !aggregate.TryGetProperty("riftMeterCombat", out var frame) || frame.ValueKind != JsonValueKind.Object)
+        {
+            return "RiftMeterCombat: missing";
+        }
+
+        return $"RiftMeterCombat: active={TryGetBool(frame, "active")} combats={TryGetInt(frame, "combatCount")} activeSec={TryGetDouble(frame, "activeCombatDurationSeconds"):F1} dmgK={TryGetInt(frame, "overallDamageK")} healK={TryGetInt(frame, "overallHealingK")} age={TryGetDouble(frame, "ageMs"):F0}ms";
+    }
+
     private static string BuildDetails(JsonElement root)
     {
         var builder = new StringBuilder();
@@ -354,7 +396,9 @@ internal sealed class MonitorForm : Form
         builder.AppendLine(BuildReadinessLine(root));
         builder.AppendLine(BuildFrameLine(root, "coreStatus", "CoreStatus"));
         builder.AppendLine(BuildFrameLine(root, "playerVitals", "PlayerVitals"));
-        builder.AppendLine(BuildFrameLine(root, "playerPosition", "PlayerPosition"));
+        builder.AppendLine(BuildPlayerResourcesLine(root));
+        builder.AppendLine(BuildPlayerCombatLine(root));
+        builder.AppendLine(BuildRiftMeterCombatLine(root));
         builder.AppendLine(BuildMetricsLine(root));
 
         if (root.TryGetProperty("aggregate", out var aggregate) && aggregate.TryGetProperty("freshness", out var freshness))
@@ -388,5 +432,26 @@ internal sealed class MonitorForm : Form
         }
 
         builder.AppendLine($"  {propertyName}: {property}");
+    }
+
+    private static int TryGetInt(JsonElement element, string propertyName)
+    {
+        return element.TryGetProperty(propertyName, out var property) && property.ValueKind != JsonValueKind.Null
+            ? property.GetInt32()
+            : 0;
+    }
+
+    private static double TryGetDouble(JsonElement element, string propertyName)
+    {
+        return element.TryGetProperty(propertyName, out var property) && property.ValueKind != JsonValueKind.Null
+            ? property.GetDouble()
+            : 0;
+    }
+
+    private static bool TryGetBool(JsonElement element, string propertyName)
+    {
+        return element.TryGetProperty(propertyName, out var property) &&
+               property.ValueKind is JsonValueKind.True or JsonValueKind.False &&
+               property.GetBoolean();
     }
 }

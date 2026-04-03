@@ -451,9 +451,30 @@ local function BuildLiveFrame(frameKind, sequence)
   return frameKind, snapshot, symbols
 end
 
-local function ResolveRotationFrameKind(sequence)
+local function ResolveRotationFrameKind(sequence, state)
   local rotation = ChromaLink.Config.frameRotation or { "coreStatus" }
+  local riftMeterConfig = ChromaLink.Config.riftMeter or {}
+  local combatActive = false
   local rotationIndex = math.fmod(sequence, #rotation) + 1
+
+  if state ~= nil and state.riftMeterStatus ~= nil and state.riftMeterStatus.inCombat then
+    combatActive = true
+  end
+
+  if combatActive and riftMeterConfig.publishTelemetry then
+    rotation = {
+      "coreStatus",
+      "playerVitals",
+      "coreStatus",
+      "playerCombat",
+      "coreStatus",
+      "riftMeterCombat",
+      "coreStatus",
+      "playerResources"
+    }
+    rotationIndex = math.fmod(sequence, #rotation) + 1
+  end
+
   return rotation[rotationIndex] or "coreStatus"
 end
 
@@ -475,10 +496,12 @@ function ChromaLink.Bootstrap.Refresh(forceRefresh, reason)
     return
   end
 
+  state.riftMeterStatus = BuildRiftMeterStatus()
+
   stripCount = ResolveStripCount()
   for stripIndex = 1, stripCount do
     local sequence = math.fmod(state.sequence + (stripIndex - 1), 256)
-    local frameKind = ResolveRotationFrameKind(sequence)
+    local frameKind = ResolveRotationFrameKind(sequence, state)
     local snapshot
     local symbols
 
