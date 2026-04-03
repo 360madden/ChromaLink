@@ -142,6 +142,7 @@ This is still a **compact proof-oriented combat bridge**, not a full-fidelity co
 
 Current limitations:
 - damage/healing are lossy (`K` units)
+- live rate stats like DPS/HPS/DTPS are not yet carried on the strip
 - there is no rich encounter metadata yet
 - there is no player-by-player or ability-by-ability combat contract yet
 - source-health is better than before, but still compact
@@ -179,6 +180,14 @@ This normalized desktop-side combat view merges native `playerCombat` with `rift
 - active/overall player and hostile counts
 
 This is now the preferred downstream combat surface.
+
+### Planned send-now live combat metrics
+The immediate next telemetry priority for Rift Meter is to carry live decision stats as first-class telemetry:
+- DPS
+- HPS
+- DTPS
+
+These are considered **send now** metrics because players use them in real time to judge burn pressure, healing throughput, and incoming damage pressure during live encounters.
 
 ## Rotation And Priority
 
@@ -277,24 +286,30 @@ Default base URL:
 2. **Strengthen the normalized combat contract**
    - define it as the preferred HTTP/app-facing combat surface
    - document fields and expected semantics
+   - explicitly promote DPS/HPS/DTPS as first-class live combat metrics
 
-3. **Tune combat-time rotation using freshness evidence**
+3. **Add live combat rates to the send-now plan**
+   - carry DPS / HPS / DTPS as first-class telemetry
+   - prefer a minimal clean transport evolution over downstream-only inference
+
+4. **Tune combat-time rotation using freshness evidence**
    - shift from simple combat override to freshness/error-aware prioritization
 
 ### Mid-term roadmap
-4. **Add a richer secondary combat frame**
+5. **Add a richer secondary combat frame**
    - keep `riftMeterCombat` compact for the hot path
+   - keep DPS/HPS/DTPS in the send-now live set
    - add a lower-frequency richer frame for less-lossy totals and encounter metadata
 
-5. **Promote HTTP bridge as the official downstream interface**
+6. **Promote HTTP bridge as the official downstream interface**
    - treat monitor/CLI as diagnostics
    - treat HTTP/JSON as the stable consumer surface
 
-6. **Tighten the minimal live proof product**
-   - focus the UI on HP, resources, combat, freshness, and source health
+7. **Tighten the minimal live proof product**
+   - focus the UI on HP, resources, combat, freshness, source health, and live rates
 
 ### Longer-term roadmap
-7. **Expand carefully beyond combat basics**
+8. **Expand carefully beyond combat basics**
    - richer target telemetry
    - encounter metadata
    - more precise combat summaries

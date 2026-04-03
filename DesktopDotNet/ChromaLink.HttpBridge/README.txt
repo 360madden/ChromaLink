@@ -35,6 +35,7 @@ Why:
 - it merges native player combat with Rift Meter combat
 - it exposes source-health cues like degraded/stable snapshot
 - it includes cross-frame correlation details like sequence delta and observation skew
+- it is the right future place to expose first-class live rates like DPS/HPS/DTPS
 
 Use raw `aggregate.riftMeterCombat` when you need transport-level diagnostics.
 Use normalized `aggregate.combat` when you need app-facing combat state.

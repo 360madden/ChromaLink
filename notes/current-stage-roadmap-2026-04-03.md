@@ -51,6 +51,7 @@ That is the preferred design direction because it minimizes addon drift while ke
 - source-health semantics are still compact and need more live validation
 - HTTP bridge docs still lag behind the normalized contract direction
 - richer encounter metadata is not transported yet
+- live rate stats like DPS/HPS/DTPS are not yet first-class strip telemetry
 
 ## Proposed future roadmap
 
@@ -61,6 +62,7 @@ Goal:
 Deliverables:
 - verified meaning for degraded/stable snapshot behavior
 - documented preferred downstream combat fields
+- documented send-now live metrics, especially DPS/HPS/DTPS
 - no protocol change required unless evidence demands it
 
 ### Breakthrough 2: app-facing contract cleanup
@@ -71,8 +73,21 @@ Deliverables:
 - HTTP bridge docs updated around `aggregate.combat`
 - downstream examples for local apps
 - monitor/CLI/HTTP language aligned
+- DPS/HPS/DTPS described as live-decision telemetry rather than post-fight analytics
 
-### Breakthrough 3: richer secondary combat payload
+### Breakthrough 3: live-rate transport evolution
+Goal:
+- promote DPS/HPS/DTPS into the immediate live telemetry set
+
+Possible additions:
+- add DPS/HPS/DTPS directly to the combat transport plan
+- keep the evolution minimal and low-risk
+- prefer explicit transport or normalized output over downstream guesswork
+
+Constraint:
+- treat DPS/HPS/DTPS as send-now metrics, not deferred analytics
+
+### Breakthrough 4: richer secondary combat payload
 Goal:
 - improve richness without bloating the hot path
 
@@ -84,8 +99,9 @@ Possible additions:
 
 Constraint:
 - keep `riftMeterCombat` compact and fast
+- do not displace DPS/HPS/DTPS from the live first-class set
 
-### Breakthrough 4: freshness-aware scheduling
+### Breakthrough 5: freshness-aware scheduling
 Goal:
 - use actual freshness/error evidence to drive runtime priority rather than simple combat-state bias
 
@@ -102,4 +118,4 @@ Possible additions:
 
 ## Recommended next action
 If continuing immediately, the highest-value next step is:
-- live-verify the current combat contract and document the resulting semantics as stable consumer guidance
+- live-verify the current combat contract and then add DPS/HPS/DTPS to the concrete transport plan as first-class live telemetry

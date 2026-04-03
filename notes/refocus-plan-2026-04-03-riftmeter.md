@@ -62,6 +62,7 @@ Implemented in the current codebase:
 - combat counts and durations
 - compact overall totals
 - source-health cues through compact flags
+- the strongest candidate set for next live-rate telemetry: DPS / HPS / DTPS
 
 This remains the right split.
 
@@ -127,10 +128,12 @@ Still needed:
 - formally document `aggregate.combat`
 - define which fields downstream apps should treat as authoritative
 - make the HTTP bridge docs point to the normalized combat section directly
+- document DPS/HPS/DTPS as send-now live combat metrics
 
 ### 3) Richer combat evolution path
 Still needed:
 - preserve `riftMeterCombat` as the hot-path frame
+- promote DPS/HPS/DTPS into the immediate live telemetry set
 - add a lower-frequency richer combat frame only if the compact frame proves insufficient
 
 ## Recommended next roadmap
@@ -139,15 +142,17 @@ Still needed:
 1. live-verify the current compact frame flags
 2. freeze `aggregate.combat` semantics once verified
 3. document preferred downstream usage
+4. lock DPS/HPS/DTPS into the send-now live contract plan
 
 ### Phase B: improve app-facing contract
 1. make HTTP bridge docs and outputs emphasize normalized combat
 2. keep CLI and monitor aligned with the same contract
 3. avoid forcing downstream apps to decode raw frame semantics
+4. treat DPS/HPS/DTPS as first-class live combat outputs
 
 ### Phase C: richer combat only if justified
 1. add a secondary lower-frequency frame for richer totals or encounter metadata
-2. do not bloat the hot path
+2. keep the hot path focused on compact combat state plus DPS/HPS/DTPS
 3. do not break current reader compatibility without a strong reason
 
 ## Guardrails
@@ -159,5 +164,6 @@ Still needed:
 
 ## Immediate recommended next work
 1. live verification pass of the current Rift Meter flags
-2. HTTP bridge documentation and sample-contract update
-3. only then consider a richer secondary combat frame
+2. add DPS/HPS/DTPS to the concrete transport evolution plan
+3. update HTTP bridge documentation/examples around normalized combat plus live rates
+4. only then consider a richer secondary combat frame
