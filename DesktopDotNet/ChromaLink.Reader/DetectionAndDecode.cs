@@ -196,12 +196,16 @@ public static class ColorStripAnalyzer
 
     private static int ResolveSearchMaxOffsetY(Bgr24Frame image, StripProfile profile, int bandHeight)
     {
+        var maxOffset = Math.Max(0, image.Height - bandHeight);
         if (image.Height > profile.BandHeight)
         {
-            return Math.Max(0, image.Height - bandHeight);
+            var stackedEnvelope = Math.Max(
+                DefaultSearchMaxOffsetY,
+                (bandHeight * Math.Max(0, profile.StripCount - 1)) + DefaultSearchMaxOffsetY);
+            return Math.Min(maxOffset, stackedEnvelope);
         }
 
-        return Math.Min(Math.Max(0, image.Height - bandHeight), DefaultSearchMaxOffsetY);
+        return Math.Min(maxOffset, DefaultSearchMaxOffsetY);
     }
 
     private static IEnumerable<Candidate> EnumerateCandidates(Bgr24Frame image, StripProfile profile)

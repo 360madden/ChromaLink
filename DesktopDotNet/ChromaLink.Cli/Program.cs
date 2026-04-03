@@ -215,7 +215,8 @@ internal sealed class CliApp
 
         for (var iteration = 0; iteration < iterationLimit && started.ElapsedMilliseconds < durationMs; iteration++)
         {
-            var bestAttempt = ChooseBestAttempt(CaptureAndAnalyze(hwnd, invocation.Backends));
+            var attempts = CaptureAndAnalyzePreferred(hwnd, invocation.Backends, lastBackend);
+            var bestAttempt = ChooseBestAttempt(attempts);
             if (bestAttempt is not null)
             {
                 var primaryValidation = bestAttempt.Validation!;
@@ -720,6 +721,23 @@ internal sealed class CliApp
         }
 
         return attempts;
+    }
+
+    private List<CaptureAttempt> CaptureAndAnalyzePreferred(nint hwnd, IReadOnlyList<CaptureBackend> backends, CaptureBackend? preferredBackend)
+    {
+        if (preferredBackend is null)
+        {
+            return CaptureAndAnalyze(hwnd, backends);
+        }
+
+        var preferredAttempts = CaptureAndAnalyze(hwnd, new[] { preferredBackend.Value });
+        var preferredBest = ChooseBestAttempt(preferredAttempts);
+        if (preferredBest?.Validation?.IsAccepted == true)
+        {
+            return preferredAttempts;
+        }
+
+        return CaptureAndAnalyze(hwnd, backends);
     }
 
     private static CaptureAttempt? ChooseBestAttempt(IEnumerable<CaptureAttempt> attempts)
