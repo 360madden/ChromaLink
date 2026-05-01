@@ -10,6 +10,7 @@
 - Tightened replay/bench search bounds so non-live validation stays fast while preserving wide live-capture search.
 - Added a read-only `/api/v1/riftreader/world-state` HTTP bridge endpoint and C# consumer example for external tools.
 - Added `ChromaLink.Client`, a typed .NET client for consuming the HTTP bridge from RiftReader-style external programs.
+- Added `/api/v1/riftreader/world-state/schema` so non-.NET consumers can discover and validate the world-state contract.
 
 ## 0.1.0-dev
 

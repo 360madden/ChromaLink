@@ -10,6 +10,7 @@ Current direction:
 Endpoints:
 - /api/v1
 - /api/v1/riftreader/world-state
+- /api/v1/riftreader/world-state/schema
 - /latest-snapshot
 - /snapshot
 - /health
@@ -44,6 +45,7 @@ Use normalized `aggregate.combat` when you need app-facing combat state.
 
 RiftReader-style world-state endpoint:
 - GET http://127.0.0.1:7337/api/v1/riftreader/world-state
+- JSON schema: http://127.0.0.1:7337/api/v1/riftreader/world-state/schema
 - contract.name = chromalink-riftreader-world-state
 - contract.schemaVersion = 1
 - purpose: small read-only JSON shape for outside programs that need current player/target/follow-unit positions without parsing the full diagnostic snapshot

@@ -300,6 +300,27 @@ public class SnapshotContractTests
             Assert.Contains(
                 manifestDocument.RootElement.GetProperty("endpoints").EnumerateArray(),
                 endpoint => endpoint.GetProperty("path").GetString() == "/api/v1/riftreader/world-state");
+            Assert.Contains(
+                manifestDocument.RootElement.GetProperty("endpoints").EnumerateArray(),
+                endpoint => endpoint.GetProperty("path").GetString() == "/api/v1/riftreader/world-state/schema");
+        }
+
+        using (var schemaResponse = await client.GetAsync("/api/v1/riftreader/world-state/schema"))
+        using (var schemaDocument = JsonDocument.Parse(await schemaResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(HttpStatusCode.OK, schemaResponse.StatusCode);
+            Assert.Equal("application/schema+json", schemaResponse.Content.Headers.ContentType?.MediaType);
+            Assert.Equal("https://json-schema.org/draft/2020-12/schema", schemaDocument.RootElement.GetProperty("$schema").GetString());
+            Assert.Equal("ChromaLink RiftReader World State", schemaDocument.RootElement.GetProperty("title").GetString());
+            var contractProperties = schemaDocument.RootElement
+                .GetProperty("$defs")
+                .GetProperty("success")
+                .GetProperty("properties")
+                .GetProperty("contract")
+                .GetProperty("allOf")[1]
+                .GetProperty("properties");
+            Assert.Equal(HttpBridgeSnapshotService.RiftReaderWorldStateContractName, contractProperties.GetProperty("name").GetProperty("const").GetString());
+            Assert.Equal(HttpBridgeSnapshotService.RiftReaderWorldStateContractSchemaVersion, contractProperties.GetProperty("schemaVersion").GetProperty("const").GetInt32());
         }
 
         using (var response = await client.GetAsync("/api/v1/riftreader/world-state"))

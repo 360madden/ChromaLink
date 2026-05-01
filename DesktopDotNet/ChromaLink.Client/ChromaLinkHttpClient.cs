@@ -11,6 +11,7 @@ public sealed class ChromaLinkHttpClient : IDisposable
 
     public const string ApiManifestPath = "api/v1";
     public const string RiftReaderWorldStatePath = "api/v1/riftreader/world-state";
+    public const string RiftReaderWorldStateSchemaPath = "api/v1/riftreader/world-state/schema";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -39,6 +40,11 @@ public sealed class ChromaLinkHttpClient : IDisposable
     public Task<ChromaLinkApiManifest?> GetApiManifestAsync(CancellationToken cancellationToken = default)
     {
         return _httpClient.GetFromJsonAsync<ChromaLinkApiManifest>(ApiManifestPath, JsonOptions, cancellationToken);
+    }
+
+    public Task<string> GetRiftReaderWorldStateSchemaJsonAsync(CancellationToken cancellationToken = default)
+    {
+        return _httpClient.GetStringAsync(RiftReaderWorldStateSchemaPath, cancellationToken);
     }
 
     public async Task<ChromaLinkWorldStateResponse> GetRiftReaderWorldStateAsync(CancellationToken cancellationToken = default)

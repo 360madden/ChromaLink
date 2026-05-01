@@ -24,6 +24,12 @@ public class ChromaLinkClientTests
         Assert.NotNull(manifest);
         Assert.True(manifest!.LocalOnly);
         Assert.Contains(manifest.Endpoints, endpoint => endpoint.Path == "/api/v1/riftreader/world-state");
+        Assert.Contains(manifest.Endpoints, endpoint => endpoint.Path == "/api/v1/riftreader/world-state/schema");
+
+        using (var schema = JsonDocument.Parse(await client.GetRiftReaderWorldStateSchemaJsonAsync()))
+        {
+            Assert.Equal("ChromaLink RiftReader World State", schema.RootElement.GetProperty("title").GetString());
+        }
 
         var response = await client.GetRiftReaderWorldStateAsync();
 

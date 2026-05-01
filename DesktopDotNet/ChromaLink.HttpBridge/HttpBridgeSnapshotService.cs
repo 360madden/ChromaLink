@@ -156,11 +156,193 @@ public static class HttpBridgeSnapshotService
     public const double FreshnessWindowSeconds = 5.0;
     public const string RiftReaderWorldStateContractName = "chromalink-riftreader-world-state";
     public const int RiftReaderWorldStateContractSchemaVersion = 1;
+    public const string RiftReaderWorldStatePath = "/api/v1/riftreader/world-state";
+    public const string RiftReaderWorldStateSchemaPath = "/api/v1/riftreader/world-state/schema";
 
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true
     };
+
+    public static readonly string RiftReaderWorldStateSchemaJson = """
+        {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://chromalink.local/schemas/chromalink-riftreader-world-state-v1.schema.json",
+          "title": "ChromaLink RiftReader World State",
+          "description": "Read-only local world-state projection for RiftReader-style consumers. It exposes position/status only; heading, route planning, and movement control are intentionally not part of this contract.",
+          "oneOf": [
+            { "$ref": "#/$defs/success" },
+            { "$ref": "#/$defs/error" }
+          ],
+          "$defs": {
+            "contract": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [ "name", "schemaVersion" ],
+              "properties": {
+                "name": { "type": "string" },
+                "schemaVersion": { "type": "integer" }
+              }
+            },
+            "position": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "x", "y", "z" ],
+              "properties": {
+                "x": { "type": "number" },
+                "y": { "type": "number" },
+                "z": { "type": "number" },
+                "observedAtUtc": { "type": [ "string", "null" ], "format": "date-time" },
+                "ageMs": { "type": [ "number", "null" ] },
+                "fresh": { "type": [ "boolean", "null" ] },
+                "stale": { "type": [ "boolean", "null" ] }
+              }
+            },
+            "navigation": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "playerPositionAvailable",
+                "targetPositionAvailable",
+                "followUnitPositionsAvailable",
+                "headingAvailable",
+                "facingAvailable",
+                "routeAvailable",
+                "controlAvailable",
+                "limitations"
+              ],
+              "properties": {
+                "playerPositionAvailable": { "type": "boolean" },
+                "targetPositionAvailable": { "type": "boolean" },
+                "followUnitPositionsAvailable": { "type": "boolean" },
+                "headingAvailable": { "const": false },
+                "facingAvailable": { "const": false },
+                "routeAvailable": { "const": false },
+                "controlAvailable": { "const": false },
+                "limitations": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            },
+            "player": {
+              "type": [ "object", "null" ],
+              "additionalProperties": false,
+              "properties": {
+                "position": { "anyOf": [ { "$ref": "#/$defs/position" }, { "type": "null" } ] },
+                "healthCurrent": { "type": [ "integer", "null" ] },
+                "healthMax": { "type": [ "integer", "null" ] },
+                "resourceCurrent": { "type": [ "integer", "null" ] },
+                "resourceMax": { "type": [ "integer", "null" ] },
+                "level": { "type": [ "integer", "null" ] },
+                "calling": { "type": [ "integer", "null" ] },
+                "role": { "type": [ "integer", "null" ] }
+              }
+            },
+            "target": {
+              "type": [ "object", "null" ],
+              "additionalProperties": false,
+              "properties": {
+                "position": { "anyOf": [ { "$ref": "#/$defs/position" }, { "type": "null" } ] },
+                "present": { "type": [ "boolean", "null" ] },
+                "alive": { "type": [ "boolean", "null" ] },
+                "combat": { "type": [ "boolean", "null" ] },
+                "healthCurrent": { "type": [ "integer", "null" ] },
+                "healthMax": { "type": [ "integer", "null" ] },
+                "level": { "type": [ "integer", "null" ] }
+              }
+            },
+            "followUnit": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "slot": { "type": [ "integer", "null" ] },
+                "position": { "anyOf": [ { "$ref": "#/$defs/position" }, { "type": "null" } ] },
+                "present": { "type": [ "boolean", "null" ] },
+                "alive": { "type": [ "boolean", "null" ] },
+                "combat": { "type": [ "boolean", "null" ] },
+                "afk": { "type": [ "boolean", "null" ] },
+                "offline": { "type": [ "boolean", "null" ] },
+                "blocked": { "type": [ "boolean", "null" ] },
+                "ready": { "type": [ "boolean", "null" ] },
+                "healthPctQ8": { "type": [ "integer", "null" ] },
+                "resourcePctQ8": { "type": [ "integer", "null" ] },
+                "level": { "type": [ "integer", "null" ] },
+                "calling": { "type": [ "integer", "null" ] },
+                "role": { "type": [ "integer", "null" ] }
+              }
+            },
+            "success": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [
+                "ok",
+                "artifactKind",
+                "contract",
+                "ready",
+                "healthy",
+                "fresh",
+                "stale",
+                "snapshotPath",
+                "navigation",
+                "followUnits"
+              ],
+              "properties": {
+                "ok": { "type": "boolean" },
+                "artifactKind": { "const": "riftreader-world-state" },
+                "contract": {
+                  "allOf": [
+                    { "$ref": "#/$defs/contract" },
+                    {
+                      "properties": {
+                        "name": { "const": "chromalink-riftreader-world-state" },
+                        "schemaVersion": { "const": 1 }
+                      }
+                    }
+                  ]
+                },
+                "sourceContract": { "anyOf": [ { "$ref": "#/$defs/contract" }, { "type": "null" } ] },
+                "ready": { "type": "boolean" },
+                "healthy": { "type": "boolean" },
+                "fresh": { "type": "boolean" },
+                "stale": { "type": "boolean" },
+                "snapshotAgeSeconds": { "type": [ "number", "null" ] },
+                "snapshotPath": { "type": "string" },
+                "navigation": { "$ref": "#/$defs/navigation" },
+                "player": { "$ref": "#/$defs/player" },
+                "target": { "$ref": "#/$defs/target" },
+                "followUnits": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/followUnit" }
+                }
+              }
+            },
+            "error": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [ "ok", "artifactKind", "contract", "error", "snapshotPath" ],
+              "properties": {
+                "ok": { "const": false },
+                "artifactKind": { "const": "riftreader-world-state" },
+                "contract": {
+                  "allOf": [
+                    { "$ref": "#/$defs/contract" },
+                    {
+                      "properties": {
+                        "name": { "const": "chromalink-riftreader-world-state" },
+                        "schemaVersion": { "const": 1 }
+                      }
+                    }
+                  ]
+                },
+                "error": { "type": "string" },
+                "detail": { "type": "string" },
+                "snapshotPath": { "type": "string" }
+              }
+            }
+          }
+        }
+        """;
 
     public static HttpBridgeRawSnapshot TryReadRawSnapshot(string snapshotPath)
     {
@@ -195,7 +377,8 @@ public static class HttpBridgeSnapshotService
             {
                 new HttpBridgeApiEndpoint("/latest-snapshot", "Full rolling telemetry snapshot for diagnostics and advanced consumers."),
                 new HttpBridgeApiEndpoint("/snapshot", "Alias for /latest-snapshot."),
-                new HttpBridgeApiEndpoint("/api/v1/riftreader/world-state", "Reduced read-only world-state view for RiftReader-style consumers."),
+                new HttpBridgeApiEndpoint(RiftReaderWorldStatePath, "Reduced read-only world-state view for RiftReader-style consumers."),
+                new HttpBridgeApiEndpoint(RiftReaderWorldStateSchemaPath, "JSON schema for the RiftReader world-state endpoint."),
                 new HttpBridgeApiEndpoint("/health", "Bridge health, freshness, and source snapshot status."),
                 new HttpBridgeApiEndpoint("/ready", "Readiness probe with the same payload shape as /health.")
             });

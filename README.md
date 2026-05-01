@@ -254,6 +254,7 @@ The HTTP bridge exposes the rolling snapshot over localhost and is the intended 
 Endpoints:
 - `/api/v1`
 - `/api/v1/riftreader/world-state`
+- `/api/v1/riftreader/world-state/schema`
 - `/latest-snapshot`
 - `/snapshot`
 - `/health`
@@ -273,6 +274,12 @@ GET http://127.0.0.1:7337/api/v1/riftreader/world-state
 That endpoint exposes current player, target, and follow-unit positions/status
 without requiring consumers to parse the full rolling snapshot. It deliberately
 does not expose heading/facing/yaw, route planning, or movement control.
+
+Non-.NET consumers can fetch the contract schema from:
+
+```text
+GET http://127.0.0.1:7337/api/v1/riftreader/world-state/schema
+```
 
 For .NET consumers, `ChromaLink.Client` provides a typed wrapper around this
 HTTP surface so projects like RiftReader do not have to hand-parse the bridge
