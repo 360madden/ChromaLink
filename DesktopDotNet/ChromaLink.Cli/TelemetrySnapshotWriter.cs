@@ -5,7 +5,7 @@ internal static class TelemetrySnapshotWriter
 {
     public const int ContractSchemaVersion = 2;
     public const string ContractName = "chromalink-live-telemetry";
-    private const double FreshnessWindowMilliseconds = 2000.0;
+    private const double FreshnessWindowMilliseconds = 5000.0;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

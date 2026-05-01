@@ -7,7 +7,9 @@ param(
   [string]$Argument1 = "",
 
   [Parameter(Position = 2)]
-  [string]$Argument2 = ""
+  [string]$Argument2 = "",
+
+  [string]$Backend = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -52,6 +54,14 @@ switch ($Mode) {
       $cliArgs += $Argument2
     }
   }
+}
+
+if (-not [string]::IsNullOrWhiteSpace($Backend)) {
+  if ($Mode -notin @("capture-dump", "live", "watch")) {
+    throw "-Backend is only supported for capture-dump, live, and watch modes."
+  }
+
+  $cliArgs += @("--backend", $Backend)
 }
 
 Write-Host "Running ChromaLink CLI: dotnet $($cliArgs -join ' ')" -ForegroundColor Cyan

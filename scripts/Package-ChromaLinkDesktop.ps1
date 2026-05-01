@@ -181,8 +181,8 @@ Notes:
 - launcher windows start minimized by default to reduce the chance of covering the RIFT client during live capture
 - if you are actively playing, prefer `Start-ChromaLinkStack.cmd` first so the bridge stays in the background
 - `Open-ChromaLink-Product.cmd` is the fastest guided first-run path. It starts the background stack, waits for readiness, and then opens the monitor.
-- `Bridge-ChromaLink.cmd` starts the packaged CLI in `watch` mode so it can keep the rolling snapshot fresh.
-- `Start-ChromaLinkStack.cmd` starts the packaged CLI watch loop plus HTTP bridge without opening UI.
+- `Bridge-ChromaLink.cmd` starts the packaged CLI in `watch --backend screen` mode so it can keep the rolling snapshot fresh.
+- `Start-ChromaLinkStack.cmd` starts the packaged CLI `watch --backend screen` loop plus HTTP bridge without opening UI.
 - `Open-ChromaLink-Monitor.cmd` opens the packaged monitor explicitly.
 - `Open-ChromaLinkDashboardPinned.cmd` opens the packaged monitor in opt-in always-on-top mode.
 - `Open-ChromaLinkDashboard.cmd` opens the local browser dashboard explicitly.
@@ -287,7 +287,9 @@ $bridgeScript = Join-Path $OutputRoot "Bridge-ChromaLink.cmd"
 @echo off
 setlocal
 
-start "" /min "%~dp0desktop\ChromaLink.Cli\ChromaLink.Cli.exe" watch
+REM Use ScreenBitBlt explicitly; the default backend order can leave the
+REM app-facing telemetry stale on current RiftReader live-capture runs.
+start "" /min "%~dp0desktop\ChromaLink.Cli\ChromaLink.Cli.exe" watch --backend screen
 
 exit /b 0
 '@ | Set-Content -LiteralPath $bridgeScript -Encoding ascii
@@ -297,7 +299,9 @@ $startScript = Join-Path $OutputRoot "Start-ChromaLinkStack.cmd"
 @echo off
 setlocal
 
-start "" /min "%~dp0desktop\ChromaLink.Cli\ChromaLink.Cli.exe" watch
+REM Use ScreenBitBlt explicitly; the default backend order can leave the
+REM app-facing telemetry stale on current RiftReader live-capture runs.
+start "" /min "%~dp0desktop\ChromaLink.Cli\ChromaLink.Cli.exe" watch --backend screen
 start "" /min "%~dp0desktop\ChromaLink.HttpBridge\ChromaLink.HttpBridge.exe"
 
 exit /b 0

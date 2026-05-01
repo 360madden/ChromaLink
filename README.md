@@ -64,7 +64,10 @@ What that means today:
   - `PrintWindow`
   - `DesktopDuplication`
   - `ScreenBitBlt`
-- current live workflow prefers `PrintWindow`
+- standard live stack launchers use `ScreenBitBlt` via `--backend screen` so
+  the rolling telemetry snapshot stays fresh for external consumers
+- aggregate live-telemetry health uses a `5000ms` freshness window to match the
+  RiftReader live-capture gate and tolerate multi-frame rotation cadence
 - build, smoke, replay, validate, and desktop solution build are working
 
 ## Active Transport Contract
@@ -238,6 +241,7 @@ dotnet build .\DesktopDotNet\ChromaLink.sln
 dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- validate
 dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- prepare-window 32 32
 dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- live 5 100
+dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- watch --backend screen
 ```
 
 ### Monitor

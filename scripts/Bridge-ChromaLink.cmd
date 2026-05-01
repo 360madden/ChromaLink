@@ -1,4 +1,4 @@
 @echo off
 setlocal
-call "%~dp0Run-ChromaLink.cmd" -Mode watch -Argument2 100
+call "%~dp0Run-ChromaLink.cmd" -Mode watch -Backend screen
 exit /b %ERRORLEVEL%

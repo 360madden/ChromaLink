@@ -51,7 +51,7 @@ public class SnapshotContractTests
         Assert.Equal(15, aggregateJson.GetProperty("acceptedFrames").GetInt32());
 
         var freshness = aggregateJson.GetProperty("freshness");
-        Assert.Equal(2000.0, freshness.GetProperty("windowMs").GetDouble(), 2);
+        Assert.Equal(5000.0, freshness.GetProperty("windowMs").GetDouble(), 2);
         Assert.Equal(3, freshness.GetProperty("freshFrameCount").GetInt32());
         Assert.Equal(0, freshness.GetProperty("staleFrameCount").GetInt32());
 
@@ -463,7 +463,7 @@ public class SnapshotContractTests
                 stale = false,
                 freshness = new
                 {
-                    windowMs = 2000.0,
+                    windowMs = 5000.0,
                     lastUpdatedAgeMs = 20.0,
                     oldestFrameAgeMs = 50.0,
                     newestFrameAgeMs = 10.0,
