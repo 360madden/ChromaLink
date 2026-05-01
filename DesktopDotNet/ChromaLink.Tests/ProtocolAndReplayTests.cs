@@ -106,6 +106,25 @@ public class ProtocolAndReplayTests
     }
 
     [Fact]
+    public void RiftMeterCombatFrame_RoundTripsThroughRendererAndAnalyzer()
+    {
+        var bytes = FrameProtocol.BuildRiftMeterCombatFrameBytes(_profile.NumericId, 21, RiftMeterCombatSnapshot.CreateSynthetic());
+        var image = ColorStripRenderer.Render(_profile, bytes);
+        var validation = ColorStripAnalyzer.Analyze(image, _profile);
+
+        Assert.True(validation.IsAccepted, validation.Reason);
+        var frame = Assert.IsType<RiftMeterCombatFrame>(validation.Frame);
+        Assert.Equal(FrameType.RiftMeterCombat, frame.Header.FrameType);
+        Assert.Equal(TransportConstants.HeaderCapabilities, (HeaderCapabilityFlags)frame.Header.ReservedFlags);
+        Assert.Equal((byte)0xBF, frame.Payload.RiftMeterFlags);
+        Assert.Equal((byte)2, frame.Payload.CombatCount);
+        Assert.Equal((ushort)123, frame.Payload.ActiveCombatDurationDeci);
+        Assert.Equal((ushort)456, frame.Payload.OverallDurationDeci);
+        Assert.Equal((byte)42, frame.Payload.OverallDamageK);
+        Assert.Equal((byte)9, frame.Payload.OverallHealingK);
+    }
+
+    [Fact]
     public void TargetVitalsFrame_RoundTripsThroughRendererAndAnalyzer()
     {
         var bytes = FrameProtocol.BuildTargetVitalsFrameBytes(_profile.NumericId, 25, TargetVitalsSnapshot.CreateSynthetic());
@@ -584,5 +603,47 @@ public class ProtocolAndReplayTests
         Assert.True(snapshot.FollowUnitStatusesBySlot.ContainsKey(2));
         Assert.Equal((byte)1, snapshot.FollowUnitStatusesBySlot[1].Frame.Payload.Slot);
         Assert.Equal((byte)2, snapshot.FollowUnitStatusesBySlot[2].Frame.Payload.Slot);
+    }
+
+    [Fact]
+    public void TelemetryAggregate_Combat_MergesPlayerCombatAndRiftMeterCombat()
+    {
+        var aggregate = new TelemetryAggregate();
+        var baseTime = new DateTimeOffset(2026, 4, 2, 12, 0, 0, TimeSpan.Zero);
+
+        var playerCombat = Assert.IsType<PlayerCombatFrame>(
+            FrameProtocol.AnalyzeFrameBytes(
+                FrameProtocol.BuildPlayerCombatFrameBytes(_profile.NumericId, 40, PlayerCombatSnapshot.CreateSynthetic())).Frame);
+        var riftMeterCombat = Assert.IsType<RiftMeterCombatFrame>(
+            FrameProtocol.AnalyzeFrameBytes(
+                FrameProtocol.BuildRiftMeterCombatFrameBytes(_profile.NumericId, 44, RiftMeterCombatSnapshot.CreateSynthetic())).Frame);
+
+        aggregate.Update(playerCombat, baseTime);
+        aggregate.Update(riftMeterCombat, baseTime.AddMilliseconds(125));
+
+        var snapshot = aggregate.Snapshot();
+        Assert.NotNull(snapshot.RiftMeterCombat);
+        Assert.Equal((byte)44, snapshot.RiftMeterCombat!.Frame.Header.Sequence);
+
+        var combat = snapshot.Combat;
+        Assert.NotNull(combat);
+        Assert.True(combat!.Available);
+        Assert.True(combat.RiftMeterPresent);
+        Assert.True(combat.RiftMeterLoaded);
+        Assert.True(combat.RiftMeterAvailable);
+        Assert.True(combat.RiftMeterActive);
+        Assert.False(combat.RiftMeterDegraded);
+        Assert.True(combat.RiftMeterStableSnapshot);
+        Assert.Equal((byte)40, combat.PlayerCombatSequence);
+        Assert.Equal((byte)44, combat.RiftMeterSequence);
+        Assert.Equal(4, combat.SequenceDelta);
+        Assert.Equal(125.0, combat.ObservationSkewMs!.Value, 2);
+        Assert.Equal((byte)4, combat.Combo);
+        Assert.Equal((ushort)250, combat.Absorb);
+        Assert.Equal((byte)2, combat.CombatCount);
+        Assert.Equal(12.3, combat.ActiveCombatDurationSeconds!.Value, 1);
+        Assert.Equal(45.6, combat.OverallDurationSeconds!.Value, 1);
+        Assert.Equal((byte)42, combat.OverallDamageK);
+        Assert.Equal((byte)9, combat.OverallHealingK);
     }
 }

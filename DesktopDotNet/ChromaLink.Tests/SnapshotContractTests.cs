@@ -9,6 +9,9 @@ namespace ChromaLink.Tests;
 
 public class SnapshotContractTests
 {
+    private const string ContractName = "chromalink-live-telemetry";
+    private const int ContractSchemaVersion = 2;
+
     [Fact]
     public void RollingSnapshot_EmitsStableContractFieldsAndAggregateShape()
     {
@@ -19,8 +22,8 @@ public class SnapshotContractTests
         var root = document.RootElement;
 
         Assert.Equal("live-telemetry", root.GetProperty("artifactKind").GetString());
-        Assert.Equal("chromalink-live-telemetry", root.GetProperty("contract").GetProperty("name").GetString());
-        Assert.Equal(1, root.GetProperty("contract").GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(ContractName, root.GetProperty("contract").GetProperty("name").GetString());
+        Assert.Equal(ContractSchemaVersion, root.GetProperty("contract").GetProperty("schemaVersion").GetInt32());
 
         var profile = root.GetProperty("profile");
         Assert.Equal("P360C", profile.GetProperty("id").GetString());
@@ -45,7 +48,7 @@ public class SnapshotContractTests
         Assert.True(aggregateJson.GetProperty("ready").GetBoolean());
         Assert.True(aggregateJson.GetProperty("healthy").GetBoolean());
         Assert.False(aggregateJson.GetProperty("stale").GetBoolean());
-        Assert.Equal(14, aggregateJson.GetProperty("acceptedFrames").GetInt32());
+        Assert.Equal(15, aggregateJson.GetProperty("acceptedFrames").GetInt32());
 
         var freshness = aggregateJson.GetProperty("freshness");
         Assert.Equal(2000.0, freshness.GetProperty("windowMs").GetDouble(), 2);
@@ -58,6 +61,7 @@ public class SnapshotContractTests
         Assert.True(aggregateJson.GetProperty("playerCast").GetProperty("fresh").GetBoolean());
         Assert.True(aggregateJson.GetProperty("playerResources").GetProperty("fresh").GetBoolean());
         Assert.True(aggregateJson.GetProperty("playerCombat").GetProperty("fresh").GetBoolean());
+        Assert.True(aggregateJson.GetProperty("riftMeterCombat").GetProperty("fresh").GetBoolean());
         Assert.True(aggregateJson.GetProperty("targetPosition").GetProperty("fresh").GetBoolean());
         Assert.True(aggregateJson.GetProperty("followUnitStatus").GetProperty("fresh").GetBoolean());
         Assert.True(aggregateJson.GetProperty("targetVitals").GetProperty("fresh").GetBoolean());
@@ -72,8 +76,16 @@ public class SnapshotContractTests
         Assert.Equal(1, followStatusItems[0].GetProperty("slot").GetInt32());
         Assert.Equal(2, followStatusItems[1].GetProperty("slot").GetInt32());
 
+        var combat = aggregateJson.GetProperty("combat");
+        Assert.True(combat.GetProperty("available").GetBoolean());
+        Assert.True(combat.GetProperty("riftMeterPresent").GetBoolean());
+        Assert.True(combat.GetProperty("riftMeterLoaded").GetBoolean());
+        Assert.True(combat.GetProperty("riftMeterActive").GetBoolean());
+        Assert.Equal(42, combat.GetProperty("overallDamageK").GetInt32());
+        Assert.Equal(9, combat.GetProperty("overallHealingK").GetInt32());
+
         var metrics = root.GetProperty("metrics");
-        Assert.Equal(13, metrics.GetProperty("acceptedSamples").GetInt32());
+        Assert.Equal(14, metrics.GetProperty("acceptedSamples").GetInt32());
         Assert.Equal(1, metrics.GetProperty("rejectedSamples").GetInt32());
         Assert.Equal(3, metrics.GetProperty("frameTypeCounts").GetProperty("CoreStatus/schema-1").GetInt32());
         Assert.Equal(2, metrics.GetProperty("frameTypeCounts").GetProperty("PlayerVitals/schema-1").GetInt32());
@@ -89,6 +101,7 @@ public class SnapshotContractTests
         Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("AuraPage/schema-1").GetInt32());
         Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("TextPage/schema-1").GetInt32());
         Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("AbilityWatch/schema-1").GetInt32());
+        Assert.Equal(1, metrics.GetProperty("frameTypeCounts").GetProperty("RiftMeterCombat/schema-1").GetInt32());
 
         Assert.Equal("screen", root.GetProperty("lastBackend").GetString());
         Assert.Equal(0, root.GetProperty("lastDetection").GetProperty("originX").GetInt32());
@@ -144,8 +157,8 @@ public class SnapshotContractTests
         Assert.False(freshPayload.Stale);
         Assert.True(freshPayload.Fresh);
         Assert.True(freshDocument.Ok);
-        Assert.Equal("chromalink-live-telemetry", freshJson.RootElement.GetProperty("contract").GetProperty("name").GetString());
-        Assert.Equal(14, freshJson.RootElement.GetProperty("aggregate").GetProperty("acceptedFrames").GetInt32());
+        Assert.Equal(ContractName, freshJson.RootElement.GetProperty("contract").GetProperty("name").GetString());
+        Assert.Equal(15, freshJson.RootElement.GetProperty("aggregate").GetProperty("acceptedFrames").GetInt32());
         Assert.True(freshJson.RootElement.GetProperty("aggregate").GetProperty("ready").GetBoolean());
         Assert.True(freshJson.RootElement.GetProperty("aggregate").GetProperty("healthy").GetBoolean());
         Assert.False(freshJson.RootElement.GetProperty("aggregate").GetProperty("stale").GetBoolean());
@@ -168,7 +181,7 @@ public class SnapshotContractTests
         Assert.True(staleJson.RootElement.GetProperty("aggregate").GetProperty("ready").GetBoolean());
         Assert.True(staleJson.RootElement.GetProperty("aggregate").GetProperty("healthy").GetBoolean());
         Assert.False(staleJson.RootElement.GetProperty("aggregate").GetProperty("stale").GetBoolean());
-        Assert.Equal("chromalink-live-telemetry", staleJson.RootElement.GetProperty("contract").GetProperty("name").GetString());
+        Assert.Equal(ContractName, staleJson.RootElement.GetProperty("contract").GetProperty("name").GetString());
     }
 
     [Fact]
@@ -283,8 +296,8 @@ public class SnapshotContractTests
         {
             contract = new
             {
-                name = "chromalink-live-telemetry",
-                schemaVersion = 1
+                name = ContractName,
+                schemaVersion = ContractSchemaVersion
             },
             aggregate = new
             {
@@ -311,8 +324,8 @@ public class SnapshotContractTests
             artifactKind = "live-telemetry",
             contract = new
             {
-                name = "chromalink-live-telemetry",
-                schemaVersion = 1
+                name = ContractName,
+                schemaVersion = ContractSchemaVersion
             },
             generatedAtUtc = nowUtc,
             profile = new
@@ -347,7 +360,7 @@ public class SnapshotContractTests
             },
             aggregate = new
             {
-                acceptedFrames = 14,
+                acceptedFrames = 15,
                 ready = true,
                 lastUpdatedUtc = nowUtc.AddMilliseconds(-20),
                 healthy = true,
@@ -481,6 +494,64 @@ public class SnapshotContractTests
                     planarCurrent = 3,
                     planarMax = 6,
                     absorb = 250
+                },
+                riftMeterCombat = new
+                {
+                    observedAtUtc = nowUtc.AddMilliseconds(-8),
+                    ageMs = 8.0,
+                    fresh = true,
+                    stale = false,
+                    frameType = "RiftMeterCombat",
+                    schemaId = 1,
+                    sequence = 8,
+                    reservedFlags = 255,
+                    flags = 191,
+                    loaded = true,
+                    available = true,
+                    active = true,
+                    hasOverallTotals = true,
+                    hasActiveDuration = true,
+                    hasOverallDuration = true,
+                    degraded = false,
+                    stableSnapshot = true,
+                    combatCount = 2,
+                    activeCombatDurationSeconds = 12.3,
+                    activeCombatPlayerCount = 1,
+                    activeCombatHostileCount = 3,
+                    overallDurationSeconds = 45.6,
+                    overallPlayerCount = 5,
+                    overallHostileCount = 8,
+                    overallDamageK = 42,
+                    overallHealingK = 9
+                },
+                combat = new
+                {
+                    available = true,
+                    riftMeterPresent = true,
+                    riftMeterLoaded = true,
+                    riftMeterAvailable = true,
+                    riftMeterActive = true,
+                    riftMeterDegraded = false,
+                    riftMeterStableSnapshot = true,
+                    playerCombatSequence = 6,
+                    riftMeterSequence = 8,
+                    sequenceDelta = 2,
+                    observationSkewMs = 3.0,
+                    combo = 4,
+                    chargeCurrent = 80,
+                    chargeMax = 100,
+                    planarCurrent = 3,
+                    planarMax = 6,
+                    absorb = 250,
+                    combatCount = 2,
+                    activeCombatDurationSeconds = 12.3,
+                    activeCombatPlayerCount = 1,
+                    activeCombatHostileCount = 3,
+                    overallDurationSeconds = 45.6,
+                    overallPlayerCount = 5,
+                    overallHostileCount = 8,
+                    overallDamageK = 42,
+                    overallHealingK = 9
                 },
                 targetPosition = new
                 {
@@ -712,7 +783,7 @@ public class SnapshotContractTests
             },
             metrics = new
             {
-                acceptedSamples = 13,
+                acceptedSamples = 14,
                 rejectedSamples = 1,
                 averageCaptureMs = 12.5,
                 averageDecodeMs = 4.25,
@@ -734,7 +805,8 @@ public class SnapshotContractTests
                     ["AuxUnitCast/schema-1"] = 1,
                     ["AuraPage/schema-1"] = 1,
                     ["TextPage/schema-1"] = 1,
-                    ["AbilityWatch/schema-1"] = 1
+                    ["AbilityWatch/schema-1"] = 1,
+                    ["RiftMeterCombat/schema-1"] = 1
                 }
             },
             lastBackend = "screen",

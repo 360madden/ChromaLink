@@ -6,7 +6,7 @@ end
 
 ChromaLink.Config = {
   addonIdentifier = "ChromaLink",
-  addonVersion = "0.1.0",
+  addonVersion = "0.1.0-dev",
   requestedLayer = 100000,
   requestedStrata = "topmost",
   showOnStartup = true,

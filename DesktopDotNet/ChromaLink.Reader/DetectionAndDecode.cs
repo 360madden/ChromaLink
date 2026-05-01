@@ -64,6 +64,7 @@ public static class ColorStripAnalyzer
     private const double PayloadDistanceThreshold = 0.52;
     private const int DefaultSearchMaxOffsetX = 4;
     private const int WideSearchMaxOffsetX = 320;
+    private const int WideSearchMinExtraWidth = 32;
     private const int DefaultSearchMaxOffsetY = 2;
     private static readonly (double X, double Y)[] ProbeOffsets =
     {
@@ -184,9 +185,11 @@ public static class ColorStripAnalyzer
 
     private static int ResolveSearchMaxOffsetX(Bgr24Frame image, StripProfile profile)
     {
-        // Live captures larger than the fixed profile width may host the strip away from the
-        // crowded top-left HUD zone, so search a wider horizontal window there.
-        if (image.Width > profile.WindowWidth)
+        // Only widen the search when the capture is materially wider than the fixed profile.
+        // Slightly oversized synthetic canvases and minor padding should stay on the narrow
+        // path so replay/bench validation does not pay the full live-capture search cost.
+        var extraWidth = image.Width - profile.WindowWidth;
+        if (extraWidth >= WideSearchMinExtraWidth)
         {
             return WideSearchMaxOffsetX;
         }

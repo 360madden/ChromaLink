@@ -598,6 +598,22 @@ public static class FrameProtocol
         return BuildFrameBytes(profileId, sequence, FrameType.AbilityWatch, TransportConstants.AbilityWatchSchemaId, payload);
     }
 
+    public static byte[] BuildRiftMeterCombatFrameBytes(byte profileId, byte sequence, RiftMeterCombatSnapshot snapshot)
+    {
+        Span<byte> payload = stackalloc byte[TransportConstants.PayloadBytes];
+        payload[0] = snapshot.RiftMeterFlags;
+        payload[1] = snapshot.CombatCount;
+        WriteUInt16BigEndian(payload, 2, snapshot.ActiveCombatDurationDeci);
+        payload[4] = snapshot.ActiveCombatPlayerCount;
+        payload[5] = snapshot.ActiveCombatHostileCount;
+        WriteUInt16BigEndian(payload, 6, snapshot.OverallDurationDeci);
+        payload[8] = snapshot.OverallPlayerCount;
+        payload[9] = snapshot.OverallHostileCount;
+        payload[10] = snapshot.OverallDamageK;
+        payload[11] = snapshot.OverallHealingK;
+        return BuildFrameBytes(profileId, sequence, FrameType.RiftMeterCombat, TransportConstants.RiftMeterCombatSchemaId, payload);
+    }
+
     public static byte[] EncodeBytesToPayloadSymbols(ReadOnlySpan<byte> bytes)
     {
         if (bytes.Length != TransportConstants.TransportBytes)

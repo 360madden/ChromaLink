@@ -3,7 +3,7 @@ ChromaLink.AbilityExport = ChromaLink.AbilityExport or {}
 ChromaLink_AbilityExport = ChromaLink_AbilityExport or {}
 
 local addonIdentifier = (ChromaLink.Config and ChromaLink.Config.addonIdentifier) or "ChromaLink"
-local addonVersion = (ChromaLink.Config and ChromaLink.Config.addonVersion) or "0.1.0"
+local addonVersion = (ChromaLink.Config and ChromaLink.Config.addonVersion) or "0.1.0-dev"
 
 local costFields = {
   { key = "costMana", label = "mana" },

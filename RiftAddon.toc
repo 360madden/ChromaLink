@@ -5,7 +5,7 @@ Description = "Segmented color-strip telemetry for RIFT."
 Author = "360madden"
 Email = "360madden@gmail.com"
 Website = ""
-Version = "0.1.0"
+Version = "0.1.0-dev"
 Environment = "4.4"
 RunOnStartup = {
   "Core/Config.lua",
