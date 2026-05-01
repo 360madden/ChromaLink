@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChromaLink.Monitor", "Chrom
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChromaLink.HttpBridge", "ChromaLink.HttpBridge\ChromaLink.HttpBridge.csproj", "{C8D0F82D-EB67-4E44-9E8E-3A93F0E4A5A5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChromaLink.Client", "ChromaLink.Client\ChromaLink.Client.csproj", "{5915B82A-3B84-45F9-BFB7-D18A681E2C0A}"
+EndProject
 Global
   GlobalSection(SolutionConfigurationPlatforms) = preSolution
     Debug|Any CPU = Debug|Any CPU
@@ -45,6 +47,10 @@ Global
     {C8D0F82D-EB67-4E44-9E8E-3A93F0E4A5A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
     {C8D0F82D-EB67-4E44-9E8E-3A93F0E4A5A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
     {C8D0F82D-EB67-4E44-9E8E-3A93F0E4A5A5}.Release|Any CPU.Build.0 = Release|Any CPU
+    {5915B82A-3B84-45F9-BFB7-D18A681E2C0A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+    {5915B82A-3B84-45F9-BFB7-D18A681E2C0A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+    {5915B82A-3B84-45F9-BFB7-D18A681E2C0A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+    {5915B82A-3B84-45F9-BFB7-D18A681E2C0A}.Release|Any CPU.Build.0 = Release|Any CPU
   EndGlobalSection
   GlobalSection(SolutionProperties) = preSolution
     HideSolutionNode = FALSE

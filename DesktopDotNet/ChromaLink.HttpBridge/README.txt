@@ -50,6 +50,25 @@ RiftReader-style world-state endpoint:
 - includes: player.position, player vitals/level, target.position/vitals, followUnits[] positions/status, readiness/freshness, and source contract metadata
 - explicitly does not include: heading/facing/yaw, route planning, or movement control
 
+Typed .NET consumer:
+- reference DesktopDotNet/ChromaLink.Client/ChromaLink.Client.csproj
+- use ChromaLink.Client.ChromaLinkHttpClient
+- call GetRiftReaderWorldStateAsync()
+- check response.IsReadyAndFresh before trusting response.PlayerPosition
+
+Typed .NET example:
+
+using ChromaLink.Client;
+
+using var client = new ChromaLinkHttpClient();
+var response = await client.GetRiftReaderWorldStateAsync();
+
+if (response.IsReadyAndFresh)
+{
+    var position = response.PlayerPosition!;
+    Console.WriteLine($"Player: {position.X:F2}, {position.Y:F2}, {position.Z:F2}");
+}
+
 Minimal C# consumer example:
 
 using System.Text.Json;

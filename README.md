@@ -274,6 +274,23 @@ That endpoint exposes current player, target, and follow-unit positions/status
 without requiring consumers to parse the full rolling snapshot. It deliberately
 does not expose heading/facing/yaw, route planning, or movement control.
 
+For .NET consumers, `ChromaLink.Client` provides a typed wrapper around this
+HTTP surface so projects like RiftReader do not have to hand-parse the bridge
+JSON:
+
+```csharp
+using ChromaLink.Client;
+
+using var client = new ChromaLinkHttpClient();
+var response = await client.GetRiftReaderWorldStateAsync();
+
+if (response.IsReadyAndFresh)
+{
+    var position = response.PlayerPosition!;
+    Console.WriteLine($"Player: {position.X:F2}, {position.Y:F2}, {position.Z:F2}");
+}
+```
+
 Minimal C# consumer example:
 
 ```csharp
