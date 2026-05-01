@@ -52,6 +52,14 @@ RiftReader-style world-state endpoint:
 - includes: player.position, player vitals/level, target.position/vitals, followUnits[] positions/status, readiness/freshness, and source contract metadata
 - explicitly does not include: heading/facing/yaw, route planning, or movement control
 
+Cross-repo ownership:
+- ChromaLink owns this endpoint, its schema, and its typed client.
+- RiftReader should consume this as an optional read-only provider contract.
+- If RiftReader needs additional fields, record a ChromaLink change request first
+  and update provider code, schema, tests, and docs together in this repo.
+- Do not treat raw /latest-snapshot diagnostics as stable RiftReader contract
+  until fields are promoted into this documented endpoint/schema.
+
 Typed .NET consumer:
 - reference DesktopDotNet/ChromaLink.Client/ChromaLink.Client.csproj
 - use ChromaLink.Client.ChromaLinkHttpClient

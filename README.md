@@ -319,6 +319,22 @@ if (root.GetProperty("ok").GetBoolean() &&
 }
 ```
 
+### Cross-repo contract ownership
+
+ChromaLink is the provider for its HTTP bridge, schema, typed client, and strip
+transport contract. RiftReader should consume those published surfaces as an
+optional read-only source instead of directly changing ChromaLink from a
+RiftReader-focused task.
+
+If RiftReader needs more ChromaLink data, record the request first, then make the
+provider-side change in this repo:
+
+1. Define the needed field/endpoint and why the existing contract is
+   insufficient.
+2. Update ChromaLink code, schema, tests, and docs together.
+3. Publish a ChromaLink handoff that states the new contract and validation.
+4. Integrate from RiftReader only after the provider contract is explicit.
+
 ## Design Rules
 
 1. **Keep the strip as the product center.**

@@ -31,6 +31,9 @@ Working rules:
 - prefer explicit reject reasons over silent heuristics
 - keep docs honest about what is proven and what is pending
 - optimize the strip for machine readability first; human readability or visual elegance is optional
+- ChromaLink owns provider-side HTTP/schema/client contracts; RiftReader sessions
+  should consume published ChromaLink contracts or file change requests instead
+  of silently editing this repo from a RiftReader-focused task
 
 Current transport contract:
 - segments `1-8` and `73-80` are fixed control markers

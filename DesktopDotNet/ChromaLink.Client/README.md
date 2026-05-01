@@ -60,3 +60,13 @@ It does **not** expose:
 
 RiftReader should keep using its own proven facing/control source alongside this
 world-state feed.
+
+## Cross-repo ownership
+
+ChromaLink owns this client and the provider contract it wraps. RiftReader-style
+consumers should treat it as an optional read-only dependency surface, not as a
+reason to edit ChromaLink from a RiftReader-focused task.
+
+If a consumer needs more data, update the ChromaLink endpoint/schema/client in
+this repo first, publish a ChromaLink handoff, then integrate the explicit
+contract from the consumer repo.
