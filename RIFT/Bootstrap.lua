@@ -466,6 +466,8 @@ local function ResolveRotationFrameKind(sequence, state)
       "coreStatus",
       "playerVitals",
       "coreStatus",
+      "playerPosition",
+      "coreStatus",
       "playerCombat",
       "coreStatus",
       "riftMeterCombat",

@@ -102,6 +102,8 @@ ChromaLink.Config = {
     "coreStatus",
     "playerVitals",
     "coreStatus",
+    "playerPosition",
+    "coreStatus",
     "playerResources",
     "coreStatus",
     "playerCombat",
