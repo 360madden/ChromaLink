@@ -252,6 +252,8 @@ The monitor is now a proof/diagnostic surface showing:
 The HTTP bridge exposes the rolling snapshot over localhost and is the intended app-facing direction.
 
 Endpoints:
+- `/api/v1`
+- `/api/v1/riftreader/world-state`
 - `/latest-snapshot`
 - `/snapshot`
 - `/health`
@@ -259,6 +261,39 @@ Endpoints:
 
 Default base URL:
 - `http://127.0.0.1:7337/`
+
+The full diagnostic contract remains available through `/latest-snapshot`.
+Outside programs that only need a small read-only world-state view, such as
+RiftReader, should start with:
+
+```text
+GET http://127.0.0.1:7337/api/v1/riftreader/world-state
+```
+
+That endpoint exposes current player, target, and follow-unit positions/status
+without requiring consumers to parse the full rolling snapshot. It deliberately
+does not expose heading/facing/yaw, route planning, or movement control.
+
+Minimal C# consumer example:
+
+```csharp
+using System.Text.Json;
+
+using var http = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:7337") };
+using var document = JsonDocument.Parse(
+    await http.GetStringAsync("/api/v1/riftreader/world-state"));
+
+var root = document.RootElement;
+if (root.GetProperty("ok").GetBoolean() &&
+    root.GetProperty("navigation").GetProperty("playerPositionAvailable").GetBoolean())
+{
+    var position = root.GetProperty("player").GetProperty("position");
+    var x = position.GetProperty("x").GetDouble();
+    var y = position.GetProperty("y").GetDouble();
+    var z = position.GetProperty("z").GetDouble();
+    Console.WriteLine($"Player: {x:F2}, {y:F2}, {z:F2}");
+}
+```
 
 ## Design Rules
 

@@ -8,6 +8,7 @@
 - Polished the release-candidate package guidance toward background-first live play.
 - Aligned addon-facing version markers with the canonical `VERSION` file and added repository consistency coverage.
 - Tightened replay/bench search bounds so non-live validation stays fast while preserving wide live-capture search.
+- Added a read-only `/api/v1/riftreader/world-state` HTTP bridge endpoint and C# consumer example for external tools.
 
 ## 0.1.0-dev
 

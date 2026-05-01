@@ -10,7 +10,8 @@ public static class HttpBridgeApp
             builder.WebHost.UseTestServer();
         }
 
-        builder.WebHost.UseUrls(GetDefaultUrl());
+        var baseUrl = GetDefaultUrl();
+        builder.WebHost.UseUrls(baseUrl);
 
         var app = builder.Build();
         var snapshotPath = ResolveSnapshotPath(snapshotPathOverride);
@@ -19,6 +20,8 @@ public static class HttpBridgeApp
         app.UseStaticFiles();
 
         app.MapGet("/dashboard", () => Results.Redirect("/"));
+        app.MapGet("/api/v1", () => Results.Json(HttpBridgeSnapshotService.BuildApiManifest(baseUrl), HttpBridgeSnapshotService.JsonOptions));
+        app.MapGet("/api/v1/riftreader/world-state", () => HttpBridgeSnapshotService.TryBuildRiftReaderWorldState(snapshotPath).ToResult());
         app.MapGet("/latest-snapshot", () => HttpBridgeSnapshotService.TryReadRawSnapshot(snapshotPath).ToResult());
         app.MapGet("/snapshot", () => HttpBridgeSnapshotService.TryReadRawSnapshot(snapshotPath).ToResult());
         app.MapGet("/health", () =>

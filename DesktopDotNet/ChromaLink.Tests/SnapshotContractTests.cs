@@ -282,6 +282,81 @@ public class SnapshotContractTests
         }
     }
 
+    [Fact]
+    public async Task HttpBridge_RiftReaderWorldState_ExposesReducedReadOnlyPositionSurface()
+    {
+        using var scope = new TempSnapshotScope();
+        var path = WriteSampleRollingSnapshot(scope);
+
+        await using var app = CreateBridgeApp(path);
+        await app.StartAsync();
+        var client = app.GetTestClient();
+
+        using (var manifestResponse = await client.GetAsync("/api/v1"))
+        using (var manifestDocument = JsonDocument.Parse(await manifestResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(HttpStatusCode.OK, manifestResponse.StatusCode);
+            Assert.True(manifestDocument.RootElement.GetProperty("localOnly").GetBoolean());
+            Assert.Contains(
+                manifestDocument.RootElement.GetProperty("endpoints").EnumerateArray(),
+                endpoint => endpoint.GetProperty("path").GetString() == "/api/v1/riftreader/world-state");
+        }
+
+        using (var response = await client.GetAsync("/api/v1/riftreader/world-state"))
+        using (var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync()))
+        {
+            var root = document.RootElement;
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.True(root.GetProperty("ok").GetBoolean());
+            Assert.Equal("riftreader-world-state", root.GetProperty("artifactKind").GetString());
+            Assert.Equal(HttpBridgeSnapshotService.RiftReaderWorldStateContractName, root.GetProperty("contract").GetProperty("name").GetString());
+            Assert.Equal(HttpBridgeSnapshotService.RiftReaderWorldStateContractSchemaVersion, root.GetProperty("contract").GetProperty("schemaVersion").GetInt32());
+            Assert.Equal(ContractName, root.GetProperty("sourceContract").GetProperty("name").GetString());
+            Assert.True(root.GetProperty("ready").GetBoolean());
+
+            var navigation = root.GetProperty("navigation");
+            Assert.True(navigation.GetProperty("playerPositionAvailable").GetBoolean());
+            Assert.True(navigation.GetProperty("targetPositionAvailable").GetBoolean());
+            Assert.True(navigation.GetProperty("followUnitPositionsAvailable").GetBoolean());
+            Assert.False(navigation.GetProperty("headingAvailable").GetBoolean());
+            Assert.False(navigation.GetProperty("facingAvailable").GetBoolean());
+            Assert.False(navigation.GetProperty("routeAvailable").GetBoolean());
+            Assert.False(navigation.GetProperty("controlAvailable").GetBoolean());
+
+            var playerPosition = root.GetProperty("player").GetProperty("position");
+            Assert.Equal(12.5, playerPosition.GetProperty("x").GetDouble(), 2);
+            Assert.Equal(44.25, playerPosition.GetProperty("y").GetDouble(), 2);
+            Assert.Equal(-8.0, playerPosition.GetProperty("z").GetDouble(), 2);
+            Assert.True(playerPosition.GetProperty("fresh").GetBoolean());
+            Assert.Equal(900, root.GetProperty("player").GetProperty("healthCurrent").GetInt32());
+            Assert.Equal(70, root.GetProperty("player").GetProperty("level").GetInt32());
+
+            var target = root.GetProperty("target");
+            Assert.True(target.GetProperty("present").GetBoolean());
+            Assert.Equal(128.75, target.GetProperty("position").GetProperty("x").GetDouble(), 2);
+            Assert.Equal(31200, target.GetProperty("healthCurrent").GetInt32());
+
+            var followUnits = root.GetProperty("followUnits").EnumerateArray().ToArray();
+            Assert.Equal(2, followUnits.Length);
+            Assert.Equal(1, followUnits[0].GetProperty("slot").GetInt32());
+            Assert.Equal(7123.5, followUnits[0].GetProperty("position").GetProperty("x").GetDouble(), 2);
+            Assert.True(followUnits[0].GetProperty("ready").GetBoolean());
+        }
+
+        using var missingScope = new TempSnapshotScope();
+        await using var missingApp = CreateBridgeApp(missingScope.GetSnapshotPath("missing.json"));
+        await missingApp.StartAsync();
+        var missingClient = missingApp.GetTestClient();
+
+        using (var missingResponse = await missingClient.GetAsync("/api/v1/riftreader/world-state"))
+        using (var missingDocument = JsonDocument.Parse(await missingResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, missingResponse.StatusCode);
+            Assert.False(missingDocument.RootElement.GetProperty("ok").GetBoolean());
+            Assert.Equal("Snapshot not found.", missingDocument.RootElement.GetProperty("error").GetString());
+        }
+    }
+
     private static WebApplication CreateBridgeApp(string snapshotPath)
     {
         return HttpBridgeApp.CreateApp(Array.Empty<string>(), useTestServer: true, snapshotPathOverride: snapshotPath);
