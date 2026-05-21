@@ -47,7 +47,7 @@ ChromaLink is provider-fresh only when all required rows pass:
 | Player position freshness | `player.position.fresh=true`, `player.position.stale=false`. |
 | Snapshot age | Inside the configured freshness window. |
 | Player position age | Inside the configured freshness window. |
-| RIFT geometry | Matches `P360C` expectation or reports an explicit geometry blocker. |
+| RIFT geometry | Is at least `640x360`; `P360C` is the known-good fallback, while larger 16:9 geometries are accepted only when provider freshness and `player.position.fresh=true` both pass. |
 | Watch loop | Active and writing fresh rolling snapshots. |
 | Artifacts | Provider status JSON/Markdown written for diagnosis. |
 
@@ -59,7 +59,7 @@ ChromaLink is provider-fresh only when all required rows pass:
 | Debuggers | No Cheat Engine, x64dbg, breakpoints, watchpoints, or debugger attach are part of this fix. |
 | Provider/consumer split | Provider changes happen here in ChromaLink; RiftReader changes happen separately and consume only published surfaces. |
 | Git | Stage explicit paths only; do not use `git add .`. |
-| Runtime actions | Starting ChromaLink desktop stack and resizing the RIFT window to `640x360` are operational fixes, not movement proof. |
+| Runtime actions | Starting ChromaLink desktop stack, resizing the RIFT window to `640x360`, or resizing to a larger explicit test geometry are operational fixes/proofs, not movement proof. |
 | Claims | Endpoint reachability is not enough; player-position freshness is required before RiftReader can use ChromaLink as API-now truth. |
 
 ---
@@ -185,8 +185,8 @@ scripts/Run-ChromaLink.cmd -Mode watch -Backend screen
 
 | Step | Action | Pass criteria |
 |---:|---|---|
-| 2.2.1 | Check RIFT client area. | Exact client size known. |
-| 2.2.2 | If not `640x360`, run prepare-window. | Client becomes `640x360`. |
+| 2.2.1 | Check RIFT client area. | Exact client size, aspect ratio, and minimum/fallback classification known. |
+| 2.2.2 | If below `640x360`, unsupported aspect, or freshness-blocked, run prepare-window. | Client becomes known-good `640x360`. |
 | 2.2.3 | Wait for watch loop refresh. | Rolling snapshot updates. |
 | 2.2.4 | Reprobe `/health`. | `healthy=true`, `fresh=true`, `stale=false`. |
 
@@ -406,7 +406,7 @@ ChromaLink provider slice is accepted only when:
 | Root world-state | `ok=true`, `fresh=true`, `stale=false`. |
 | Player position | Present and fresh. |
 | Snapshot age | Inside freshness window. |
-| Geometry | `640x360` or explicit blocker. |
+| Geometry | `640x360` known-good fallback, or larger geometry accepted only by fresh `/health` and fresh `player.position`; otherwise explicit blocker. |
 | Tests | ChromaLink tests pass. |
 | Handoff | ChromaLink handoff written. |
 
@@ -477,6 +477,24 @@ Never stage unrelated generated artifacts or consumer changes into provider comm
 | Skip artifacts. | Future sessions cannot resume safely. | Every run writes JSON/Markdown summaries. |
 | Skip tests. | Helper regressions undetected. | Fixtures plus existing solution tests are required. |
 | Skip commit/push. | Plan or fix can be lost. | This plan is committed first; implementation later gets explicit commits. |
+
+# 2026-05-21 geometry acceptance amendment
+
+`640x360 / P360C` is the **minimum known-good fallback**, not the only
+acceptable runtime geometry. A larger client area should not invalidate a
+ChromaLink-dependent test by itself. The decisive gate is provider freshness:
+
+| Observed geometry | Provider freshness | Classification |
+|---|---|---|
+| `640x360` | Fresh `/health` and fresh `player.position` | `known-good-p360c` |
+| Larger 16:9, e.g. `1280x720` | Fresh `/health` and fresh `player.position` | `larger-16x9-fresh` |
+| Larger 16:9 | Stale/missing provider or stale/missing player position | `larger-16x9-unproven` / provider blocker |
+| Maximized/non-16:9, e.g. `1920x1009` | Stale/missing provider or stale/missing player position | `unsupported-aspect` / provider blocker |
+| Any geometry below `640x360` | Any | `below-minimum-profile` |
+
+Historical live-test failures where RIFT was maximized/fullscreen-windowed and
+ChromaLink was stale should be reclassified as **setup-blocked / provider
+geometry blocked**, not as movement/navigation/proof failures.
 
 # Optimized execution order
 

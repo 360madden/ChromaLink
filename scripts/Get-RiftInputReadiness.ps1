@@ -50,6 +50,10 @@ else {
 
   $hasLiveClient = ($null -ne $snapshot.ClientWidth) -and ($null -ne $snapshot.ClientHeight)
   $liveClientMatchesExpected = $hasLiveClient -and $snapshot.ClientWidth -eq $ExpectedClientWidth -and $snapshot.ClientHeight -eq $ExpectedClientHeight
+  $liveClientAtLeastExpected = $hasLiveClient -and $snapshot.ClientWidth -ge $ExpectedClientWidth -and $snapshot.ClientHeight -ge $ExpectedClientHeight
+  $expectedAspectRatio = if ($ExpectedClientHeight -gt 0) { [double]$ExpectedClientWidth / [double]$ExpectedClientHeight } else { 0.0 }
+  $liveClientAspectRatio = if ($hasLiveClient -and $snapshot.ClientHeight -gt 0) { [double]$snapshot.ClientWidth / [double]$snapshot.ClientHeight } else { $null }
+  $liveClientMatchesExpectedAspectRatio = $hasLiveClient -and $null -ne $liveClientAspectRatio -and ([Math]::Abs($liveClientAspectRatio - $expectedAspectRatio) -le 0.025)
   $savedResolutionMatchesLiveClient = $false
   if ($null -ne $savedConfig -and $hasLiveClient -and $savedConfig.ResolutionX -ne $null -and $savedConfig.ResolutionY -ne $null) {
     $savedResolutionMatchesLiveClient = ($savedConfig.ResolutionX -eq $snapshot.ClientWidth) -and ($savedConfig.ResolutionY -eq $snapshot.ClientHeight)
@@ -57,7 +61,12 @@ else {
 
   $backgroundMainBarReady = -not [bool]$snapshot.IsMinimized
   $focusChatReady = $true
-  $captureReady = $backgroundMainBarReady -and $liveClientMatchesExpected
+  $geometryCaptureReady = if ($RequireExpectedClientSize) {
+    $liveClientMatchesExpected
+  } else {
+    $liveClientAtLeastExpected -and $liveClientMatchesExpectedAspectRatio
+  }
+  $captureReady = $backgroundMainBarReady -and $geometryCaptureReady
   $actionReady = $backgroundMainBarReady
   $ok = if ($RequireExpectedClientSize) { $captureReady } else { $actionReady }
 
@@ -103,6 +112,9 @@ else {
       clientWidth = $snapshot.ClientWidth
       clientHeight = $snapshot.ClientHeight
       clientMatchesExpected = $liveClientMatchesExpected
+      clientAtLeastExpected = $liveClientAtLeastExpected
+      clientAspectRatio = $liveClientAspectRatio
+      clientMatchesExpectedAspectRatio = $liveClientMatchesExpectedAspectRatio
     }
     savedConfig = if ($null -eq $savedConfig) {
       $null
@@ -155,6 +167,8 @@ else {
     Write-Host ("WindowRect: {0},{1} {2}x{3}" -f $result.liveWindow.windowLeft, $result.liveWindow.windowTop, $result.liveWindow.windowWidth, $result.liveWindow.windowHeight)
     Write-Host ("ClientRect: {0},{1} {2}x{3}" -f $result.liveWindow.clientLeft, $result.liveWindow.clientTop, $result.liveWindow.clientWidth, $result.liveWindow.clientHeight)
     Write-Host ("ClientMatchesExpected: {0}" -f $result.liveWindow.clientMatchesExpected.ToString().ToLowerInvariant())
+    Write-Host ("ClientAtLeastExpected: {0}" -f $result.liveWindow.clientAtLeastExpected.ToString().ToLowerInvariant())
+    Write-Host ("ClientMatchesExpectedAspectRatio: {0}" -f $result.liveWindow.clientMatchesExpectedAspectRatio.ToString().ToLowerInvariant())
   }
 
   if ($null -ne $result.savedConfig) {
