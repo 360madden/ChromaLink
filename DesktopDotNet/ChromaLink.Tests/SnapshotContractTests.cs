@@ -467,6 +467,7 @@ public class SnapshotContractTests
             Assert.Equal(HttpStatusCode.ServiceUnavailable, missingResponse.StatusCode);
             Assert.False(missingDocument.RootElement.GetProperty("ok").GetBoolean());
             Assert.Equal("Snapshot not found.", missingDocument.RootElement.GetProperty("error").GetString());
+            Assert.False(missingDocument.RootElement.TryGetProperty("detail", out _));
             Assert.Equal(HttpBridgeSnapshotService.CombatAssistantStateContractName, missingDocument.RootElement.GetProperty("contract").GetProperty("name").GetString());
         }
     }

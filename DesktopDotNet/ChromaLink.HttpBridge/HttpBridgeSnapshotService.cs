@@ -142,6 +142,15 @@ public sealed record HttpBridgeCombatAssistantCapabilities(
     [property: JsonPropertyName("movementAvailable")] bool MovementAvailable,
     [property: JsonPropertyName("limitations")] IReadOnlyList<string> Limitations);
 
+public sealed record HttpBridgeCombatAssistantError(
+    [property: JsonPropertyName("ok")] bool Ok,
+    [property: JsonPropertyName("artifactKind")] string ArtifactKind,
+    [property: JsonPropertyName("contract")] HttpBridgeSnapshotContract Contract,
+    [property: JsonPropertyName("error")] string Error,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [property: JsonPropertyName("detail")] string? Detail,
+    [property: JsonPropertyName("snapshotPath")] string SnapshotPath);
+
 public sealed record HttpBridgeRawSnapshot(
     bool Exists,
     string SnapshotPath,
@@ -950,17 +959,15 @@ public static class HttpBridgeSnapshotService
     {
         return new HttpBridgeJsonPayload(
             statusCode,
-            new
-            {
-                ok = false,
-                artifactKind = "combat-assistant-state",
-                contract = new HttpBridgeSnapshotContract(
+            new HttpBridgeCombatAssistantError(
+                false,
+                "combat-assistant-state",
+                new HttpBridgeSnapshotContract(
                     CombatAssistantStateContractName,
                     CombatAssistantStateContractSchemaVersion),
                 error,
                 detail,
-                snapshotPath
-            });
+                snapshotPath));
     }
 
     private static int? GetInt32(JsonElement element, string propertyName)
