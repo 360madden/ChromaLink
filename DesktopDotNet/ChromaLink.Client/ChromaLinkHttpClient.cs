@@ -12,6 +12,8 @@ public sealed class ChromaLinkHttpClient : IDisposable
     public const string ApiManifestPath = "api/v1";
     public const string RiftReaderWorldStatePath = "api/v1/riftreader/world-state";
     public const string RiftReaderWorldStateSchemaPath = "api/v1/riftreader/world-state/schema";
+    public const string CombatAssistantStatePath = "api/v1/consumers/combat-assistant/state";
+    public const string CombatAssistantStateSchemaPath = "api/v1/consumers/combat-assistant/state/schema";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -47,6 +49,11 @@ public sealed class ChromaLinkHttpClient : IDisposable
         return _httpClient.GetStringAsync(RiftReaderWorldStateSchemaPath, cancellationToken);
     }
 
+    public Task<string> GetCombatAssistantStateSchemaJsonAsync(CancellationToken cancellationToken = default)
+    {
+        return _httpClient.GetStringAsync(CombatAssistantStateSchemaPath, cancellationToken);
+    }
+
     public async Task<ChromaLinkWorldStateResponse> GetRiftReaderWorldStateAsync(CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.GetAsync(RiftReaderWorldStatePath, cancellationToken).ConfigureAwait(false);
@@ -65,6 +72,27 @@ public sealed class ChromaLinkHttpClient : IDisposable
         catch (JsonException ex)
         {
             return new ChromaLinkWorldStateResponse(response.StatusCode, response.IsSuccessStatusCode, null, rawJson, ex.Message);
+        }
+    }
+
+    public async Task<ChromaLinkCombatAssistantStateResponse> GetCombatAssistantStateAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync(CombatAssistantStatePath, cancellationToken).ConfigureAwait(false);
+        var rawJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            return new ChromaLinkCombatAssistantStateResponse(response.StatusCode, response.IsSuccessStatusCode, null, rawJson, "Response body was empty.");
+        }
+
+        try
+        {
+            var state = JsonSerializer.Deserialize<ChromaLinkCombatAssistantState>(rawJson, JsonOptions);
+            return new ChromaLinkCombatAssistantStateResponse(response.StatusCode, response.IsSuccessStatusCode, state, rawJson, null);
+        }
+        catch (JsonException ex)
+        {
+            return new ChromaLinkCombatAssistantStateResponse(response.StatusCode, response.IsSuccessStatusCode, null, rawJson, ex.Message);
         }
     }
 
@@ -94,6 +122,23 @@ public sealed record ChromaLinkWorldStateResponse(
         WorldState.Navigation?.PlayerPositionAvailable == true;
 
     public ChromaLinkRiftReaderPosition? PlayerPosition => WorldState?.Player?.Position;
+}
+
+public sealed record ChromaLinkCombatAssistantStateResponse(
+    HttpStatusCode StatusCode,
+    bool IsSuccessStatusCode,
+    ChromaLinkCombatAssistantState? State,
+    string RawJson,
+    string? ParseError)
+{
+    public bool HasCombatAssistantFacts => State?.Player is not null;
+
+    public bool IsReadyAndFresh =>
+        IsSuccessStatusCode &&
+        State?.Ok == true &&
+        State.Ready &&
+        State.Fresh &&
+        HasCombatAssistantFacts;
 }
 
 public sealed record ChromaLinkApiManifest
@@ -178,6 +223,78 @@ public sealed record ChromaLinkRiftReaderWorldState
 
     [JsonPropertyName("error")]
     public string? Error { get; init; }
+}
+
+public sealed record ChromaLinkCombatAssistantState
+{
+    [JsonPropertyName("ok")]
+    public bool Ok { get; init; }
+
+    [JsonPropertyName("artifactKind")]
+    public string? ArtifactKind { get; init; }
+
+    [JsonPropertyName("contract")]
+    public ChromaLinkSnapshotContract? Contract { get; init; }
+
+    [JsonPropertyName("sourceContract")]
+    public ChromaLinkSnapshotContract? SourceContract { get; init; }
+
+    [JsonPropertyName("ready")]
+    public bool Ready { get; init; }
+
+    [JsonPropertyName("healthy")]
+    public bool Healthy { get; init; }
+
+    [JsonPropertyName("fresh")]
+    public bool Fresh { get; init; }
+
+    [JsonPropertyName("stale")]
+    public bool Stale { get; init; }
+
+    [JsonPropertyName("snapshotAgeSeconds")]
+    public double? SnapshotAgeSeconds { get; init; }
+
+    [JsonPropertyName("snapshotPath")]
+    public string? SnapshotPath { get; init; }
+
+    [JsonPropertyName("capabilities")]
+    public ChromaLinkCombatAssistantCapabilities? Capabilities { get; init; }
+
+    [JsonPropertyName("player")]
+    public JsonElement? Player { get; init; }
+
+    [JsonPropertyName("target")]
+    public JsonElement? Target { get; init; }
+
+    [JsonPropertyName("abilityWatch")]
+    public JsonElement? AbilityWatch { get; init; }
+
+    [JsonPropertyName("auraPage")]
+    public JsonElement? AuraPage { get; init; }
+
+    [JsonPropertyName("combat")]
+    public JsonElement? Combat { get; init; }
+
+    [JsonPropertyName("error")]
+    public string? Error { get; init; }
+}
+
+public sealed record ChromaLinkCombatAssistantCapabilities
+{
+    [JsonPropertyName("factsOnly")]
+    public bool FactsOnly { get; init; }
+
+    [JsonPropertyName("actionSuggestionsAvailable")]
+    public bool ActionSuggestionsAvailable { get; init; }
+
+    [JsonPropertyName("controlAvailable")]
+    public bool ControlAvailable { get; init; }
+
+    [JsonPropertyName("movementAvailable")]
+    public bool MovementAvailable { get; init; }
+
+    [JsonPropertyName("limitations")]
+    public IReadOnlyList<string> Limitations { get; init; } = Array.Empty<string>();
 }
 
 public sealed record ChromaLinkRiftReaderNavigation

@@ -39,6 +39,24 @@ This file defines default assistant behavior for work inside
   2. RiftReader consumes the published contract.
   3. Both sides record validation and remaining unknowns.
 
+## Geometry and freshness policy
+
+- Treat `640x360 / P360C` as the known-good fallback and minimum geometry, not
+  as the only valid geometry.
+- Larger 16:9 client areas are acceptable only when ChromaLink proves fresh
+  provider state through `/health` and
+  `/api/v1/riftreader/world-state` with `player.position.fresh=true`.
+- Do not classify a ChromaLink-dependent RiftReader live test as a
+  navigation/proof failure when ChromaLink is stale, player position is stale or
+  missing, or the RIFT window is an unsupported geometry. Classify it as
+  setup/provider blocked instead.
+- Use `scripts\Ensure-ChromaLinkFresh.cmd --status --wait-fresh --json` as the
+  default provider preflight before consumer proof. It is provider-owned and
+  must remain movement-free, debugger-free, and SavedVariables-free for live
+  truth.
+- `scripts\Ensure-ChromaLinkFresh.cmd --prepare-window --wait-fresh --json`
+  restores the known-good fallback when larger/maximized geometry blocks.
+
 ## Validation
 
 - Prefer the smallest correct patch over broad rewrites.

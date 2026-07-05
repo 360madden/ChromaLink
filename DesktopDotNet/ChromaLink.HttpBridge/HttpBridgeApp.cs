@@ -22,7 +22,9 @@ public static class HttpBridgeApp
         app.MapGet("/dashboard", () => Results.Redirect("/"));
         app.MapGet("/api/v1", () => Results.Json(HttpBridgeSnapshotService.BuildApiManifest(baseUrl), HttpBridgeSnapshotService.JsonOptions));
         app.MapGet(HttpBridgeSnapshotService.RiftReaderWorldStateSchemaPath, () => Results.Text(HttpBridgeSnapshotService.RiftReaderWorldStateSchemaJson, "application/schema+json"));
+        app.MapGet(HttpBridgeSnapshotService.CombatAssistantStateSchemaPath, () => Results.Text(HttpBridgeSnapshotService.CombatAssistantStateSchemaJson, "application/schema+json"));
         app.MapGet("/api/v1/riftreader/world-state", () => HttpBridgeSnapshotService.TryBuildRiftReaderWorldState(snapshotPath).ToResult());
+        app.MapGet(HttpBridgeSnapshotService.CombatAssistantStatePath, () => HttpBridgeSnapshotService.TryBuildCombatAssistantState(snapshotPath).ToResult());
         app.MapGet("/latest-snapshot", () => HttpBridgeSnapshotService.TryReadRawSnapshot(snapshotPath).ToResult());
         app.MapGet("/snapshot", () => HttpBridgeSnapshotService.TryReadRawSnapshot(snapshotPath).ToResult());
         app.MapGet("/health", () =>

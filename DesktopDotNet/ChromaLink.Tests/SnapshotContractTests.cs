@@ -378,6 +378,99 @@ public class SnapshotContractTests
         }
     }
 
+    [Fact]
+    public async Task HttpBridge_CombatAssistantState_ExposesFactsOnlyCombatProfile()
+    {
+        using var scope = new TempSnapshotScope();
+        var path = WriteSampleRollingSnapshot(scope);
+
+        await using var app = CreateBridgeApp(path);
+        await app.StartAsync();
+        var client = app.GetTestClient();
+
+        using (var manifestResponse = await client.GetAsync("/api/v1"))
+        using (var manifestDocument = JsonDocument.Parse(await manifestResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(HttpStatusCode.OK, manifestResponse.StatusCode);
+            Assert.Contains(
+                manifestDocument.RootElement.GetProperty("endpoints").EnumerateArray(),
+                endpoint => endpoint.GetProperty("path").GetString() == HttpBridgeSnapshotService.CombatAssistantStatePath);
+            Assert.Contains(
+                manifestDocument.RootElement.GetProperty("endpoints").EnumerateArray(),
+                endpoint => endpoint.GetProperty("path").GetString() == HttpBridgeSnapshotService.CombatAssistantStateSchemaPath);
+        }
+
+        using (var schemaResponse = await client.GetAsync(HttpBridgeSnapshotService.CombatAssistantStateSchemaPath))
+        using (var schemaDocument = JsonDocument.Parse(await schemaResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(HttpStatusCode.OK, schemaResponse.StatusCode);
+            Assert.Equal("application/schema+json", schemaResponse.Content.Headers.ContentType?.MediaType);
+            Assert.Equal("ChromaLink Combat Assistant State", schemaDocument.RootElement.GetProperty("title").GetString());
+            var contractProperties = schemaDocument.RootElement
+                .GetProperty("$defs")
+                .GetProperty("success")
+                .GetProperty("properties")
+                .GetProperty("contract")
+                .GetProperty("allOf")[1]
+                .GetProperty("properties");
+            Assert.Equal(HttpBridgeSnapshotService.CombatAssistantStateContractName, contractProperties.GetProperty("name").GetProperty("const").GetString());
+            Assert.Equal(HttpBridgeSnapshotService.CombatAssistantStateContractSchemaVersion, contractProperties.GetProperty("schemaVersion").GetProperty("const").GetInt32());
+        }
+
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
+
+        using (var response = await client.GetAsync(HttpBridgeSnapshotService.CombatAssistantStatePath))
+        using (var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync()))
+        {
+            var root = document.RootElement;
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.True(root.GetProperty("ok").GetBoolean());
+            Assert.Equal("combat-assistant-state", root.GetProperty("artifactKind").GetString());
+            Assert.Equal(HttpBridgeSnapshotService.CombatAssistantStateContractName, root.GetProperty("contract").GetProperty("name").GetString());
+            Assert.Equal(HttpBridgeSnapshotService.CombatAssistantStateContractSchemaVersion, root.GetProperty("contract").GetProperty("schemaVersion").GetInt32());
+            Assert.Equal(ContractName, root.GetProperty("sourceContract").GetProperty("name").GetString());
+            Assert.True(root.GetProperty("ready").GetBoolean());
+            Assert.True(root.GetProperty("fresh").GetBoolean());
+
+            var capabilities = root.GetProperty("capabilities");
+            Assert.True(capabilities.GetProperty("factsOnly").GetBoolean());
+            Assert.False(capabilities.GetProperty("actionSuggestionsAvailable").GetBoolean());
+            Assert.False(capabilities.GetProperty("controlAvailable").GetBoolean());
+            Assert.False(capabilities.GetProperty("movementAvailable").GetBoolean());
+
+            var player = root.GetProperty("player");
+            Assert.Equal(900, player.GetProperty("vitals").GetProperty("healthCurrent").GetInt32());
+            Assert.Equal(4200, player.GetProperty("resources").GetProperty("manaCurrent").GetInt32());
+            Assert.Equal(4, player.GetProperty("combat").GetProperty("combo").GetInt32());
+            Assert.True(player.GetProperty("cast").GetProperty("castActive").GetBoolean());
+            Assert.Equal(12.5, player.GetProperty("position").GetProperty("x").GetDouble(), 2);
+
+            var target = root.GetProperty("target");
+            Assert.True(target.GetProperty("vitals").GetProperty("present").GetBoolean());
+            Assert.Equal(31200, target.GetProperty("vitals").GetProperty("healthCurrent").GetInt32());
+            Assert.Equal(2200, target.GetProperty("resources").GetProperty("manaCurrent").GetInt32());
+            Assert.Equal(128.75, target.GetProperty("position").GetProperty("x").GetDouble(), 2);
+
+            Assert.Equal(3, root.GetProperty("abilityWatch").GetProperty("readyCount").GetInt32());
+            Assert.Equal(8, root.GetProperty("auraPage").GetProperty("totalAuraCount").GetInt32());
+            Assert.Equal(42, root.GetProperty("combat").GetProperty("overallDamageK").GetInt32());
+        }
+
+        using var missingScope = new TempSnapshotScope();
+        await using var missingApp = CreateBridgeApp(missingScope.GetSnapshotPath("missing.json"));
+        await missingApp.StartAsync();
+        var missingClient = missingApp.GetTestClient();
+
+        using (var missingResponse = await missingClient.GetAsync(HttpBridgeSnapshotService.CombatAssistantStatePath))
+        using (var missingDocument = JsonDocument.Parse(await missingResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, missingResponse.StatusCode);
+            Assert.False(missingDocument.RootElement.GetProperty("ok").GetBoolean());
+            Assert.Equal("Snapshot not found.", missingDocument.RootElement.GetProperty("error").GetString());
+            Assert.Equal(HttpBridgeSnapshotService.CombatAssistantStateContractName, missingDocument.RootElement.GetProperty("contract").GetProperty("name").GetString());
+        }
+    }
+
     private static WebApplication CreateBridgeApp(string snapshotPath)
     {
         return HttpBridgeApp.CreateApp(Array.Empty<string>(), useTestServer: true, snapshotPathOverride: snapshotPath);

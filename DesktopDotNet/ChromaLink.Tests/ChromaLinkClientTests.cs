@@ -56,6 +56,54 @@ public class ChromaLinkClientTests
     }
 
     [Fact]
+    public async Task Client_ReadsCombatAssistantState_FromHttpBridge()
+    {
+        using var scope = new TempSnapshotScope();
+        var snapshotPath = WriteClientSnapshot(scope, ready: true, healthy: true, ageSeconds: 0);
+
+        await using var app = CreateBridgeApp(snapshotPath);
+        await app.StartAsync();
+
+        using var client = new ChromaLinkHttpClient(app.GetTestClient());
+
+        var manifest = await client.GetApiManifestAsync();
+        Assert.NotNull(manifest);
+        Assert.Contains(manifest!.Endpoints, endpoint => endpoint.Path == "/api/v1/consumers/combat-assistant/state");
+        Assert.Contains(manifest.Endpoints, endpoint => endpoint.Path == "/api/v1/consumers/combat-assistant/state/schema");
+
+        using (var schema = JsonDocument.Parse(await client.GetCombatAssistantStateSchemaJsonAsync()))
+        {
+            Assert.Equal("ChromaLink Combat Assistant State", schema.RootElement.GetProperty("title").GetString());
+        }
+
+        File.SetLastWriteTimeUtc(snapshotPath, DateTime.UtcNow);
+
+        var response = await client.GetCombatAssistantStateAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.IsSuccessStatusCode);
+        Assert.Null(response.ParseError);
+        Assert.True(response.HasCombatAssistantFacts);
+        Assert.True(response.IsReadyAndFresh);
+        Assert.NotNull(response.State);
+        Assert.True(response.State!.Ok);
+        Assert.Equal("chromalink-combat-assistant-state", response.State.Contract?.Name);
+        Assert.Equal("chromalink-live-telemetry", response.State.SourceContract?.Name);
+        Assert.True(response.State.Capabilities?.FactsOnly);
+        Assert.False(response.State.Capabilities?.ActionSuggestionsAvailable);
+        Assert.False(response.State.Capabilities?.ControlAvailable);
+
+        var player = response.State.Player!.Value;
+        Assert.Equal(900, player.GetProperty("vitals").GetProperty("healthCurrent").GetInt32());
+        Assert.Equal(80, player.GetProperty("combat").GetProperty("chargeCurrent").GetInt32());
+
+        var target = response.State.Target!.Value;
+        Assert.True(target.GetProperty("vitals").GetProperty("present").GetBoolean());
+        Assert.Equal(31200, target.GetProperty("vitals").GetProperty("healthCurrent").GetInt32());
+        Assert.Equal(42, response.State.Combat!.Value.GetProperty("overallDamageK").GetInt32());
+    }
+
+    [Fact]
     public async Task Client_ReturnsUnavailableState_WhenSnapshotIsMissing()
     {
         using var scope = new TempSnapshotScope();
@@ -73,6 +121,27 @@ public class ChromaLinkClientTests
         Assert.False(response.WorldState!.Ok);
         Assert.Equal("Snapshot not found.", response.WorldState.Error);
         Assert.False(response.HasWorldState);
+        Assert.False(response.IsReadyAndFresh);
+    }
+
+    [Fact]
+    public async Task Client_ReturnsUnavailableCombatAssistantState_WhenSnapshotIsMissing()
+    {
+        using var scope = new TempSnapshotScope();
+        await using var app = CreateBridgeApp(scope.GetSnapshotPath("missing.json"));
+        await app.StartAsync();
+
+        using var client = new ChromaLinkHttpClient(app.GetTestClient());
+
+        var response = await client.GetCombatAssistantStateAsync();
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.False(response.IsSuccessStatusCode);
+        Assert.Null(response.ParseError);
+        Assert.NotNull(response.State);
+        Assert.False(response.State!.Ok);
+        Assert.Equal("Snapshot not found.", response.State.Error);
+        Assert.False(response.HasCombatAssistantFacts);
         Assert.False(response.IsReadyAndFresh);
     }
 
@@ -142,6 +211,35 @@ public class ChromaLinkClientTests
                     x = 128.75,
                     y = 201.50,
                     z = -48.25
+                },
+                playerCombat = new
+                {
+                    observedAtUtc = nowUtc.AddMilliseconds(-15),
+                    ageMs = 15.0,
+                    fresh = true,
+                    stale = false,
+                    combatFlags = 255,
+                    combo = 4,
+                    chargeCurrent = 80,
+                    chargeMax = 100,
+                    planarCurrent = 3,
+                    planarMax = 6,
+                    absorb = 250
+                },
+                combat = new
+                {
+                    available = true,
+                    riftMeterPresent = true,
+                    riftMeterLoaded = true,
+                    riftMeterAvailable = true,
+                    riftMeterActive = true,
+                    riftMeterDegraded = false,
+                    riftMeterStableSnapshot = true,
+                    combo = 4,
+                    chargeCurrent = 80,
+                    chargeMax = 100,
+                    overallDamageK = 42,
+                    overallHealingK = 9
                 },
                 followUnitStatuses = new[]
                 {

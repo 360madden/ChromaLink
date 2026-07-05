@@ -9,7 +9,9 @@ Current project direction:
 - active product name: `ChromaLink`
 - active transport: segmented color strip
 - active live profile: `P360C`
-- active client target: `640x360`
+- active fallback/minimum client target: `640x360`
+- larger 16:9 client targets are allowed only when provider freshness and
+  `player.position.fresh=true` prove the geometry live
 - active strip size: `640x24`
 - segment count: `80`
 - segment size: `8x24`
@@ -34,6 +36,12 @@ Working rules:
 - ChromaLink owns provider-side HTTP/schema/client contracts; RiftReader sessions
   should consume published ChromaLink contracts or file change requests instead
   of silently editing this repo from a RiftReader-focused task
+- ChromaLink freshness is the consumer gate: endpoint reachability or matching
+  PID/window identity is not enough; require `/health` fresh plus world-state
+  fresh player position before treating ChromaLink as API-now coordinate truth
+- consumer-specific HTTP profiles are preferred over one monolithic external
+  contract; the combat-assistant profile is facts-only and must not publish
+  action recommendations, movement, or gameplay-control directives
 
 Current transport contract:
 - segments `1-8` and `73-80` are fixed control markers
@@ -174,6 +182,7 @@ Desktop requirements:
 - `bench`
 - `capture-dump`
 - `prepare-window [left] [top]`
+- `scripts\Ensure-ChromaLinkFresh.cmd --status --wait-fresh --json`
 - one inspector app for BMP review, segment overlays, and decode visibility
 
 Validation requirements:
@@ -183,3 +192,5 @@ Validation requirements:
 - replay on known-good BMP
 - bench with offset, blur, brightness/gain drift, gamma drift, and mild scale drift
 - live capture that either decodes or fails with an explicit reason
+- geometry/freshness proof that classifies `known-good-p360c`,
+  `larger-16x9-fresh`, provider-stale, and unsupported-profile states

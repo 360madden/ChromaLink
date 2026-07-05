@@ -29,7 +29,7 @@ What that means today:
 ## Current Implemented Architecture
 
 ```text
-[RIFT Client @ 640x360 client area]
+[RIFT Client @ >=640x360 client area; 16:9 preferred]
    ↓
 [ChromaLink Lua Addon]
    ├─ gathers native player telemetry
@@ -51,7 +51,9 @@ What that means today:
 
 ### Window/profile
 - profile: `P360C`
-- RIFT client area: `640x360`
+- known-good fallback/minimum RIFT client area: `640x360`
+- larger 16:9 client areas are accepted only when `/health` and
+  `/api/v1/riftreader/world-state` both prove fresh player position
 - strip: `640x24`
 - segments: `80`
 - segment size: `8x24`
@@ -68,7 +70,34 @@ What that means today:
   the rolling telemetry snapshot stays fresh for external consumers
 - aggregate live-telemetry health uses a `5000ms` freshness window to match the
   RiftReader live-capture gate and tolerate multi-frame rotation cadence
+- `scripts\Ensure-ChromaLinkFresh.cmd` is the provider-owned status/recovery
+  entrypoint for geometry, freshness, and world-state readiness checks
 - build, smoke, replay, validate, and desktop solution build are working
+
+### Geometry and freshness policy
+
+`640x360 / P360C` is the known-good fallback and minimum supported geometry, not
+the only valid geometry. Larger client areas should be judged by provider
+freshness, not by exact size alone.
+
+| Geometry | Fresh provider state | Classification |
+|---|---:|---|
+| `640x360` | yes | `known-good-p360c` |
+| Larger 16:9, such as `1280x720` | yes | `larger-16x9-fresh` |
+| Larger 16:9 | no | setup-blocked / unproven provider geometry |
+| Maximized or non-16:9 | no | setup-blocked, usually `unsupported-aspect` |
+| Below `640x360` | any | unsupported minimum-profile blocker |
+
+Before a RiftReader-style consumer treats ChromaLink as API-now coordinate truth,
+verify:
+
+```powershell
+.\scripts\Ensure-ChromaLinkFresh.cmd --status --wait-fresh --json
+```
+
+The helper writes JSON/Markdown summaries under `artifacts\diagnostics\`. It
+does not send movement/gameplay input, use Cheat Engine, attach a debugger, or
+use SavedVariables as live truth.
 
 ## Active Transport Contract
 
@@ -242,6 +271,9 @@ dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- val
 dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- prepare-window 32 32
 dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- live 5 100
 dotnet run --project .\DesktopDotNet\ChromaLink.Cli\ChromaLink.Cli.csproj -- watch --backend screen
+.\scripts\Ensure-ChromaLinkFresh.cmd --status --wait-fresh --json
+.\scripts\Ensure-ChromaLinkFresh.cmd --resize-client 1280x720 --wait-fresh --json
+.\scripts\Ensure-ChromaLinkFresh.cmd --prepare-window --wait-fresh --json
 ```
 
 ### Monitor
@@ -259,6 +291,8 @@ Endpoints:
 - `/api/v1`
 - `/api/v1/riftreader/world-state`
 - `/api/v1/riftreader/world-state/schema`
+- `/api/v1/consumers/combat-assistant/state`
+- `/api/v1/consumers/combat-assistant/state/schema`
 - `/latest-snapshot`
 - `/snapshot`
 - `/health`
@@ -279,11 +313,31 @@ That endpoint exposes current player, target, and follow-unit positions/status
 without requiring consumers to parse the full rolling snapshot. It deliberately
 does not expose heading/facing/yaw, route planning, or movement control.
 
+Reachability is not enough for live proof. Consumers must require `fresh=true`,
+`stale=false`, `navigation.playerPositionAvailable=true`, and
+`player.position.fresh=true` before using ChromaLink position as live API-now
+truth. If those gates fail, classify the run as provider/setup blocked rather
+than as a navigation or movement failure.
+
 Non-.NET consumers can fetch the contract schema from:
 
 ```text
 GET http://127.0.0.1:7337/api/v1/riftreader/world-state/schema
 ```
+
+Combat-assistant consumers that need bot-relevant facts without parsing the full
+rolling diagnostic snapshot should use:
+
+```text
+GET http://127.0.0.1:7337/api/v1/consumers/combat-assistant/state
+GET http://127.0.0.1:7337/api/v1/consumers/combat-assistant/state/schema
+```
+
+That endpoint is facts-only and read-only. It groups existing aggregate data for
+player vitals/resources/combat/cast/position, target vitals/resources/position,
+ability-watch, aura-page, and normalized combat summaries when those sections
+are present. It deliberately does not expose action recommendations, rotations,
+movement, or gameplay control.
 
 For .NET consumers, `ChromaLink.Client` provides a typed wrapper around this
 HTTP surface so projects like RiftReader do not have to hand-parse the bridge
@@ -345,7 +399,9 @@ provider-side change in this repo:
    Avoid replacing the visible transport with hidden direct app integration.
 
 2. **Prefer low drift over reinvention.**
-   Preserve strip geometry, protocol framing, reader assumptions, and proven tooling unless there is a concrete need to change them.
+   Preserve strip geometry, protocol framing, reader assumptions, and proven
+   tooling unless there is a concrete need to change them. Treat `640x360` as
+   the fallback minimum; accept larger geometries only by freshness proof.
 
 3. **Player basics stay authoritative in native gather.**
    HP, resources, and basic state should remain available even if Rift Meter is absent or degraded.

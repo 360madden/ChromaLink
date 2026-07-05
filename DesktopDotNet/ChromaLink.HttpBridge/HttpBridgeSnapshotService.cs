@@ -117,6 +117,31 @@ public sealed record HttpBridgeRiftReaderPosition(
     [property: JsonPropertyName("fresh")] bool? Fresh,
     [property: JsonPropertyName("stale")] bool? Stale);
 
+public sealed record HttpBridgeCombatAssistantState(
+    [property: JsonPropertyName("ok")] bool Ok,
+    [property: JsonPropertyName("artifactKind")] string ArtifactKind,
+    [property: JsonPropertyName("contract")] HttpBridgeSnapshotContract Contract,
+    [property: JsonPropertyName("sourceContract")] HttpBridgeSnapshotContract? SourceContract,
+    [property: JsonPropertyName("ready")] bool Ready,
+    [property: JsonPropertyName("healthy")] bool Healthy,
+    [property: JsonPropertyName("fresh")] bool Fresh,
+    [property: JsonPropertyName("stale")] bool Stale,
+    [property: JsonPropertyName("snapshotAgeSeconds")] double? SnapshotAgeSeconds,
+    [property: JsonPropertyName("snapshotPath")] string SnapshotPath,
+    [property: JsonPropertyName("capabilities")] HttpBridgeCombatAssistantCapabilities Capabilities,
+    [property: JsonPropertyName("player")] object? Player,
+    [property: JsonPropertyName("target")] object? Target,
+    [property: JsonPropertyName("abilityWatch")] JsonElement? AbilityWatch,
+    [property: JsonPropertyName("auraPage")] JsonElement? AuraPage,
+    [property: JsonPropertyName("combat")] JsonElement? Combat);
+
+public sealed record HttpBridgeCombatAssistantCapabilities(
+    [property: JsonPropertyName("factsOnly")] bool FactsOnly,
+    [property: JsonPropertyName("actionSuggestionsAvailable")] bool ActionSuggestionsAvailable,
+    [property: JsonPropertyName("controlAvailable")] bool ControlAvailable,
+    [property: JsonPropertyName("movementAvailable")] bool MovementAvailable,
+    [property: JsonPropertyName("limitations")] IReadOnlyList<string> Limitations);
+
 public sealed record HttpBridgeRawSnapshot(
     bool Exists,
     string SnapshotPath,
@@ -158,6 +183,10 @@ public static class HttpBridgeSnapshotService
     public const int RiftReaderWorldStateContractSchemaVersion = 1;
     public const string RiftReaderWorldStatePath = "/api/v1/riftreader/world-state";
     public const string RiftReaderWorldStateSchemaPath = "/api/v1/riftreader/world-state/schema";
+    public const string CombatAssistantStateContractName = "chromalink-combat-assistant-state";
+    public const int CombatAssistantStateContractSchemaVersion = 1;
+    public const string CombatAssistantStatePath = "/api/v1/consumers/combat-assistant/state";
+    public const string CombatAssistantStateSchemaPath = "/api/v1/consumers/combat-assistant/state/schema";
 
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -344,6 +373,116 @@ public static class HttpBridgeSnapshotService
         }
         """;
 
+    public static readonly string CombatAssistantStateSchemaJson = """
+        {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://chromalink.local/schemas/chromalink-combat-assistant-state-v1.schema.json",
+          "title": "ChromaLink Combat Assistant State",
+          "description": "Read-only facts-only combat-assistant projection. It exposes observed player, target, ability, aura, and combat facts; action suggestions, movement, and control are intentionally not part of this contract.",
+          "oneOf": [
+            { "$ref": "#/$defs/success" },
+            { "$ref": "#/$defs/error" }
+          ],
+          "$defs": {
+            "contract": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [ "name", "schemaVersion" ],
+              "properties": {
+                "name": { "type": "string" },
+                "schemaVersion": { "type": "integer" }
+              }
+            },
+            "capabilities": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "factsOnly", "actionSuggestionsAvailable", "controlAvailable", "movementAvailable", "limitations" ],
+              "properties": {
+                "factsOnly": { "const": true },
+                "actionSuggestionsAvailable": { "const": false },
+                "controlAvailable": { "const": false },
+                "movementAvailable": { "const": false },
+                "limitations": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            },
+            "success": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [
+                "ok",
+                "artifactKind",
+                "contract",
+                "ready",
+                "healthy",
+                "fresh",
+                "stale",
+                "snapshotPath",
+                "capabilities",
+                "player",
+                "target",
+                "abilityWatch",
+                "auraPage",
+                "combat"
+              ],
+              "properties": {
+                "ok": { "type": "boolean" },
+                "artifactKind": { "const": "combat-assistant-state" },
+                "contract": {
+                  "allOf": [
+                    { "$ref": "#/$defs/contract" },
+                    {
+                      "properties": {
+                        "name": { "const": "chromalink-combat-assistant-state" },
+                        "schemaVersion": { "const": 1 }
+                      }
+                    }
+                  ]
+                },
+                "sourceContract": { "anyOf": [ { "$ref": "#/$defs/contract" }, { "type": "null" } ] },
+                "ready": { "type": "boolean" },
+                "healthy": { "type": "boolean" },
+                "fresh": { "type": "boolean" },
+                "stale": { "type": "boolean" },
+                "snapshotAgeSeconds": { "type": [ "number", "null" ] },
+                "snapshotPath": { "type": "string" },
+                "capabilities": { "$ref": "#/$defs/capabilities" },
+                "player": { "type": [ "object", "null" ], "additionalProperties": true },
+                "target": { "type": [ "object", "null" ], "additionalProperties": true },
+                "abilityWatch": { "type": [ "object", "null" ], "additionalProperties": true },
+                "auraPage": { "type": [ "object", "null" ], "additionalProperties": true },
+                "combat": { "type": [ "object", "null" ], "additionalProperties": true }
+              }
+            },
+            "error": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [ "ok", "artifactKind", "contract", "error", "snapshotPath" ],
+              "properties": {
+                "ok": { "const": false },
+                "artifactKind": { "const": "combat-assistant-state" },
+                "contract": {
+                  "allOf": [
+                    { "$ref": "#/$defs/contract" },
+                    {
+                      "properties": {
+                        "name": { "const": "chromalink-combat-assistant-state" },
+                        "schemaVersion": { "const": 1 }
+                      }
+                    }
+                  ]
+                },
+                "error": { "type": "string" },
+                "detail": { "type": "string" },
+                "snapshotPath": { "type": "string" }
+              }
+            }
+          }
+        }
+        """;
+
     public static HttpBridgeRawSnapshot TryReadRawSnapshot(string snapshotPath)
     {
         if (!File.Exists(snapshotPath))
@@ -379,6 +518,8 @@ public static class HttpBridgeSnapshotService
                 new HttpBridgeApiEndpoint("/snapshot", "Alias for /latest-snapshot."),
                 new HttpBridgeApiEndpoint(RiftReaderWorldStatePath, "Reduced read-only world-state view for RiftReader-style consumers."),
                 new HttpBridgeApiEndpoint(RiftReaderWorldStateSchemaPath, "JSON schema for the RiftReader world-state endpoint."),
+                new HttpBridgeApiEndpoint(CombatAssistantStatePath, "Facts-only combat-assistant state profile for automation-oriented consumers."),
+                new HttpBridgeApiEndpoint(CombatAssistantStateSchemaPath, "JSON schema for the combat-assistant state endpoint."),
                 new HttpBridgeApiEndpoint("/health", "Bridge health, freshness, and source snapshot status."),
                 new HttpBridgeApiEndpoint("/ready", "Readiness probe with the same payload shape as /health.")
             });
@@ -557,6 +698,71 @@ public static class HttpBridgeSnapshotService
         return document.Ok ? StatusCodes.Status200OK : StatusCodes.Status503ServiceUnavailable;
     }
 
+    public static HttpBridgeJsonPayload TryBuildCombatAssistantState(string snapshotPath)
+    {
+        if (!File.Exists(snapshotPath))
+        {
+            return BuildCombatAssistantError(
+                StatusCodes.Status503ServiceUnavailable,
+                "Snapshot not found.",
+                snapshotPath);
+        }
+
+        HttpBridgeHealthSnapshot health;
+        JsonDocument document;
+        try
+        {
+            health = BuildHealthDocument(snapshotPath);
+            document = JsonDocument.Parse(File.ReadAllText(snapshotPath));
+        }
+        catch (JsonException ex)
+        {
+            return BuildCombatAssistantError(
+                StatusCodes.Status503ServiceUnavailable,
+                "Snapshot JSON could not be parsed.",
+                snapshotPath,
+                ex.Message);
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+            if (!TryGetObject(root, "aggregate", out var aggregate))
+            {
+                return BuildCombatAssistantError(
+                    StatusCodes.Status503ServiceUnavailable,
+                    "Snapshot aggregate section is missing.",
+                    snapshotPath);
+            }
+
+            var player = BuildCombatAssistantPlayer(aggregate);
+            var ready = player is not null;
+            var payload = new HttpBridgeCombatAssistantState(
+                ready,
+                "combat-assistant-state",
+                new HttpBridgeSnapshotContract(
+                    CombatAssistantStateContractName,
+                    CombatAssistantStateContractSchemaVersion),
+                health.Contract,
+                ready,
+                ready && health.Fresh,
+                health.Fresh,
+                health.Stale,
+                health.SnapshotAgeSeconds,
+                health.SnapshotPath,
+                BuildCombatAssistantCapabilities(),
+                player,
+                BuildCombatAssistantTarget(aggregate),
+                CloneObjectProperty(aggregate, "abilityWatch"),
+                CloneObjectProperty(aggregate, "auraPage"),
+                CloneObjectProperty(aggregate, "combat"));
+
+            return new HttpBridgeJsonPayload(
+                ready ? StatusCodes.Status200OK : StatusCodes.Status503ServiceUnavailable,
+                payload);
+        }
+    }
+
     private static HttpBridgeRiftReaderPlayer? BuildRiftReaderPlayer(JsonElement aggregate)
     {
         var hasPlayerPosition = TryGetObject(aggregate, "playerPosition", out var playerPosition);
@@ -577,6 +783,60 @@ public static class HttpBridgeSnapshotService
             GetInt32(coreStatus, "playerLevel"),
             GetInt32(coreStatus, "playerCalling"),
             GetInt32(coreStatus, "playerRole"));
+    }
+
+    private static object? BuildCombatAssistantPlayer(JsonElement aggregate)
+    {
+        var coreStatus = CloneObjectProperty(aggregate, "coreStatus");
+        var vitals = CloneObjectProperty(aggregate, "playerVitals");
+        var resources = CloneObjectProperty(aggregate, "playerResources");
+        var combat = CloneObjectProperty(aggregate, "playerCombat");
+        var cast = CloneObjectProperty(aggregate, "playerCast");
+        var position = CloneObjectProperty(aggregate, "playerPosition");
+
+        if (!coreStatus.HasValue &&
+            !vitals.HasValue &&
+            !resources.HasValue &&
+            !combat.HasValue &&
+            !cast.HasValue &&
+            !position.HasValue)
+        {
+            return null;
+        }
+
+        return new
+        {
+            coreStatus,
+            vitals,
+            resources,
+            combat,
+            cast,
+            position
+        };
+    }
+
+    private static object? BuildCombatAssistantTarget(JsonElement aggregate)
+    {
+        var coreStatus = CloneObjectProperty(aggregate, "coreStatus");
+        var vitals = CloneObjectProperty(aggregate, "targetVitals");
+        var resources = CloneObjectProperty(aggregate, "targetResources");
+        var position = CloneObjectProperty(aggregate, "targetPosition");
+
+        if (!coreStatus.HasValue &&
+            !vitals.HasValue &&
+            !resources.HasValue &&
+            !position.HasValue)
+        {
+            return null;
+        }
+
+        return new
+        {
+            coreStatus,
+            vitals,
+            resources,
+            position
+        };
     }
 
     private static HttpBridgeRiftReaderTarget? BuildRiftReaderTarget(JsonElement aggregate)
@@ -660,6 +920,47 @@ public static class HttpBridgeSnapshotService
 
         value = default;
         return false;
+    }
+
+    private static JsonElement? CloneObjectProperty(JsonElement element, string propertyName)
+    {
+        return TryGetObject(element, propertyName, out var value) ? value.Clone() : null;
+    }
+
+    private static HttpBridgeCombatAssistantCapabilities BuildCombatAssistantCapabilities()
+    {
+        return new HttpBridgeCombatAssistantCapabilities(
+            true,
+            false,
+            false,
+            false,
+            new[]
+            {
+                "This endpoint publishes observed combat facts only.",
+                "ChromaLink does not provide suggested abilities, rotations, movement, or gameplay control.",
+                "Consumers must apply their own policy and freshness gates before automation decisions."
+            });
+    }
+
+    private static HttpBridgeJsonPayload BuildCombatAssistantError(
+        int statusCode,
+        string error,
+        string snapshotPath,
+        string? detail = null)
+    {
+        return new HttpBridgeJsonPayload(
+            statusCode,
+            new
+            {
+                ok = false,
+                artifactKind = "combat-assistant-state",
+                contract = new HttpBridgeSnapshotContract(
+                    CombatAssistantStateContractName,
+                    CombatAssistantStateContractSchemaVersion),
+                error,
+                detail,
+                snapshotPath
+            });
     }
 
     private static int? GetInt32(JsonElement element, string propertyName)
